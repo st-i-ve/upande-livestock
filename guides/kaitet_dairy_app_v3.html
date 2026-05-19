@@ -1,0 +1,1081 @@
+<h2 class="sr-only">Kaitet dairy mobile app prototype with animal diagnosis screen and streamlined forms</h2>
+<style>
+.phone{max-width:380px;margin:0 auto;background:#1c1c1e;border-radius:32px;padding:10px;border:0.5px solid var(--color-border-tertiary)}
+.screen{background:var(--color-background-primary);border-radius:24px;overflow:hidden;display:flex;flex-direction:column;min-height:680px;position:relative}
+.statusbar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px 4px;font-size:12px;color:var(--color-text-primary);font-weight:500}
+.statusbar .right{display:flex;gap:6px;align-items:center;color:var(--color-text-secondary)}
+.appbar{padding:8px 14px 12px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.appbar .icon-btn{background:none;border:none;color:var(--color-text-primary);width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-size:20px}
+.appbar .ttl{font-size:15px;font-weight:500;color:var(--color-text-primary);margin:0}
+.appbar .sub{font-size:11px;color:var(--color-text-secondary);margin:0}
+.appbar .me{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text-secondary)}
+.appbar .me-av{width:26px;height:26px;border-radius:50%;background:#534AB7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500}
+.body{flex:1;overflow-y:auto;padding:14px 16px 70px;-webkit-overflow-scrolling:touch}
+.tabbar{position:absolute;left:0;right:0;bottom:0;display:flex;background:var(--color-background-primary);border-top:0.5px solid var(--color-border-tertiary)}
+.tabbar button{flex:1;background:none;border:none;cursor:pointer;padding:8px 0 10px;font-size:10px;color:var(--color-text-secondary);display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabbar button.active{color:var(--color-text-info)}
+.tabbar button i{font-size:20px}
+.drawer{position:absolute;top:0;left:0;bottom:0;width:78%;background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);transform:translateX(-100%);transition:transform 0.18s;z-index:50;overflow-y:auto;padding:14px 0;border-radius:24px 0 0 24px}
+.drawer.open{transform:translateX(0)}
+.drawer-back{position:absolute;inset:0;background:rgba(0,0,0,0.3);opacity:0;pointer-events:none;transition:opacity 0.18s;z-index:49;border-radius:24px}
+.drawer-back.open{opacity:1;pointer-events:auto}
+.drawer .brand{padding:10px 16px 16px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.drawer .brand .logo{width:32px;height:32px;border-radius:8px;background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500}
+.drawer .brand .farm{font-size:13px;font-weight:500}
+.drawer .brand .who{font-size:11px;color:var(--color-text-secondary)}
+.drawer .grp{padding:14px 16px 4px;font-size:10px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:0.5px}
+.drawer .grp:first-of-type{padding-top:4px}
+.drawer .it{padding:9px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--color-text-primary)}
+.drawer .it i{font-size:17px;color:var(--color-text-secondary);width:18px}
+.drawer .it.active{background:var(--color-background-info);color:var(--color-text-info)}
+.drawer .it.active i{color:var(--color-text-info)}
+.drawer .it .badge{margin-left:auto;font-size:10px;background:var(--color-background-danger);color:var(--color-text-danger);padding:1px 6px;border-radius:999px}
+.metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.metric{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px}
+.metric-label{font-size:11px;color:var(--color-text-secondary);margin:0}
+.metric-num{font-size:20px;font-weight:500;color:var(--color-text-primary);margin:2px 0 0}
+.metric-sub{font-size:10px;color:var(--color-text-secondary);margin:1px 0 0}
+.section-title{font-size:11px;font-weight:500;color:var(--color-text-secondary);margin:14px 0 8px;text-transform:uppercase;letter-spacing:0.4px}
+.section-title:first-child{margin-top:0}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary);cursor:pointer}
+.row:last-child{border-bottom:none}
+.av{width:34px;height:34px;border-radius:50%;background:var(--color-background-info);color:var(--color-text-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0}
+.av.calf{background:#EAF3DE;color:#27500A}
+.av.bull{background:#E6F1FB;color:#0C447C}
+.av.dry{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.av.warn{background:#FAEEDA;color:#633806}
+.av.dgr{background:#FCEBEB;color:#791F1F}
+.row-main{flex:1;min-width:0}
+.row-name{font-size:13px;font-weight:500;color:var(--color-text-primary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-meta{font-size:11px;color:var(--color-text-secondary);margin:1px 0 0}
+.pill{display:inline-block;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:500;background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.pill.lact{background:#EAF3DE;color:#27500A}
+.pill.dry-p{background:#FAEEDA;color:#633806}
+.pill.calf-p{background:#E6F1FB;color:#0C447C}
+.pill.sick{background:#FCEBEB;color:#791F1F}
+.pill.preg{background:#FBEAF0;color:#72243E}
+.pill.heif{background:#EEEDFE;color:#3C3489}
+.pill.warn{background:#FAEEDA;color:#633806}
+.tile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tile{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:5px}
+.tile i{font-size:20px;color:var(--color-text-info)}
+.tile-t{font-size:12px;font-weight:500;color:var(--color-text-primary);margin:0}
+.tile-s{font-size:10px;color:var(--color-text-secondary);margin:0;line-height:1.4}
+.field{margin-bottom:12px}
+.field-label{display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:5px}
+.field-help{font-size:10px;color:var(--color-text-tertiary);margin:4px 0 0;line-height:1.4}
+.field-row{display:flex;gap:8px}
+.field-row > .field{flex:1}
+.kv{display:flex;justify-content:space-between;padding:7px 0;font-size:12px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--color-text-secondary)}
+.kv .v{color:var(--color-text-primary);font-weight:500;text-align:right}
+.btn{background:var(--color-text-primary);color:var(--color-background-primary);border:none;padding:11px 16px;border-radius:var(--border-radius-md);font-size:13px;font-weight:500;cursor:pointer;width:100%;margin-top:6px}
+.btn-g{background:transparent;color:var(--color-text-primary);border:0.5px solid var(--color-border-secondary);padding:11px 16px;border-radius:var(--border-radius-md);font-size:13px;cursor:pointer;width:100%;margin-top:6px}
+.btn-danger{background:#A32D2D;color:#fff}
+.banner{padding:9px 11px;border-radius:var(--border-radius-md);font-size:11px;margin-bottom:11px;line-height:1.5;display:flex;gap:7px;align-items:flex-start}
+.banner.info{background:#E6F1FB;color:#0C447C}
+.banner.warn{background:#FAEEDA;color:#633806}
+.banner.ok{background:#EAF3DE;color:#27500A}
+.banner.dgr{background:#FCEBEB;color:#791F1F}
+.banner i{font-size:14px;flex-shrink:0;margin-top:1px}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 11px}
+.chip{padding:5px 10px;background:var(--color-background-secondary);border-radius:999px;font-size:11px;color:var(--color-text-secondary);cursor:pointer;border:0.5px solid transparent}
+.chip.active{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.chip.dgr.active{background:#FCEBEB;color:#791F1F;border-color:#F09595}
+.chip.warn.active{background:#FAEEDA;color:#633806;border-color:#FAC775}
+.chip.ok.active{background:#EAF3DE;color:#27500A;border-color:#C0DD97}
+.calc{background:var(--color-background-info);color:var(--color-text-info);padding:11px 13px;border-radius:var(--border-radius-md);margin-bottom:13px}
+.calc-num{font-size:20px;font-weight:500;margin:2px 0}
+.calc-l{font-size:11px;opacity:0.85;margin:0}
+.calc-f{font-size:11px;opacity:0.85;margin:4px 0 0}
+.search{position:relative;margin-bottom:10px}
+.search input{width:100%;padding-left:32px;font-size:13px}
+.search i{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--color-text-tertiary);font-size:15px;pointer-events:none}
+.toggle{position:relative;width:36px;height:20px;background:var(--color-border-secondary);border-radius:999px;cursor:pointer;transition:background 0.15s}
+.toggle.on{background:var(--color-text-info)}
+.toggle:after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.15s}
+.toggle.on:after{transform:translateX(16px)}
+.picker-tabs{display:flex;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:3px;margin-bottom:10px}
+.picker-tabs button{flex:1;background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;font-size:11px;color:var(--color-text-secondary)}
+.picker-tabs button.active{background:var(--color-background-primary);color:var(--color-text-primary);font-weight:500}
+.sel-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);cursor:pointer}
+.cb{width:18px;height:18px;border:1.5px solid var(--color-border-secondary);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
+.cb.checked{background:var(--color-text-info);border-color:var(--color-text-info)}
+.summary-bar{display:flex;justify-content:space-between;align-items:center;background:var(--color-background-info);color:var(--color-text-info);padding:9px 12px;border-radius:var(--border-radius-md);font-size:12px;margin-bottom:10px}
+.summary-bar b{font-weight:500}
+.btn-link{background:none;border:none;color:var(--color-text-info);cursor:pointer;font-size:11px;padding:0;font-weight:500}
+.tag-add{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:var(--color-background-info);color:var(--color-text-info);border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:none}
+.empty{text-align:center;padding:24px 12px;color:var(--color-text-tertiary);font-size:12px}
+.empty .empty-icon{font-size:32px;color:var(--color-text-tertiary);margin-bottom:8px}
+.tlitem{position:relative;padding:0 0 12px 22px;font-size:12px}
+.tlitem:before{content:"";position:absolute;left:6px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--color-text-info)}
+.tlitem:after{content:"";position:absolute;left:9px;top:17px;bottom:0;width:1px;background:var(--color-border-tertiary)}
+.tlitem:last-child:after{display:none}
+.tldate{font-size:10px;color:var(--color-text-tertiary);margin:0 0 1px}
+.tltitle{font-size:12px;color:var(--color-text-primary);margin:0;font-weight:500}
+.tldesc{font-size:11px;color:var(--color-text-secondary);margin:1px 0 0}
+.modal-bg{position:absolute;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:flex-end;z-index:60;border-radius:24px}
+.sheet{background:var(--color-background-primary);width:100%;border-radius:18px 18px 0 0;padding:14px 16px 18px;max-height:80%;overflow-y:auto}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sheet-t{font-size:14px;font-weight:500;margin:0}
+.handle{width:36px;height:4px;background:var(--color-border-secondary);border-radius:2px;margin:0 auto 10px}
+.list-tap{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:0.5px solid var(--color-border-tertiary);cursor:pointer;font-size:13px}
+.list-tap i{color:var(--color-text-secondary);font-size:17px;width:20px}
+.fab{position:absolute;right:16px;bottom:80px;width:48px;height:48px;border-radius:50%;background:var(--color-text-primary);color:var(--color-background-primary);border:none;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:30}
+.score-row{display:flex;align-items:center;gap:6px;margin-bottom:11px}
+.score-row .lbl{font-size:11px;color:var(--color-text-secondary);width:80px;flex-shrink:0}
+.score-row .opts{display:flex;gap:4px;flex:1}
+.score-row .opts button{flex:1;background:var(--color-background-secondary);border:0.5px solid transparent;color:var(--color-text-secondary);font-size:11px;padding:7px 0;border-radius:6px;cursor:pointer}
+.score-row .opts button.active{background:var(--color-background-info);border-color:var(--color-border-info);color:var(--color-text-info);font-weight:500}
+.score-row .opts button.dgr.active{background:#FCEBEB;border-color:#F09595;color:#791F1F}
+.score-row .opts button.warn.active{background:#FAEEDA;border-color:#FAC775;color:#633806}
+.score-row .opts button.ok.active{background:#EAF3DE;border-color:#C0DD97;color:#27500A}
+</style>
+
+<div class="phone">
+  <div class="screen">
+    <div class="statusbar"><span>9:24</span><span class="right"><i class="ti ti-signal-4g" aria-hidden="true"></i><i class="ti ti-wifi" aria-hidden="true"></i><i class="ti ti-battery-3" aria-hidden="true"></i></span></div>
+    <div class="appbar" id="appbar"></div>
+    <div class="body" id="body"></div>
+    <div class="tabbar" id="tabbar"></div>
+    <div class="drawer-back" id="drawerback" onclick="closeDrawer()"></div>
+    <div class="drawer" id="drawer"></div>
+    <div id="modal-host"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const me={user:"Abraham K. Sikuku",initials:"AK",emp:"500208"};
+const animals=[
+  {id:"BELLA-129290",name:"BELLA",sex:"F",dob:"2019-09-28",herd:"Lactating group 1",repro:"Lactating",dim:127,parity:3,lastWt:485,milkSafe:null,inTreatment:0,pregnant:0},
+  {id:"MARIA-129440",name:"MARIA",sex:"F",dob:"2024-10-25",herd:"4-12 MONTHS",repro:"Heifer",dim:null,parity:0,lastWt:185,milkSafe:null,inTreatment:0,pregnant:0},
+  {id:"TESTHF-001/24",name:"TEST IVY",sex:"F",dob:"2024-04-09",herd:"Lactating group 1",repro:"Fresh / Lactating",dim:24,parity:1,lastWt:480,milkSafe:"2026-05-12",inTreatment:1,pregnant:0},
+  {id:"TESTBC-001/26",name:"TEST BLOSSOM",sex:"F",dob:"2026-04-15",herd:"0-2",repro:"Calf",dim:null,parity:0,lastWt:42,milkSafe:null,inTreatment:0,pregnant:0},
+  {id:"PUTIN-129508",name:"PUTIN",sex:"M",dob:"2024-10-20",herd:"BULLS",repro:"Bull",dim:null,parity:0,lastWt:520,milkSafe:null,inTreatment:0,pregnant:0},
+  {id:"DOLLY-129333",name:"DOLLY",sex:"F",dob:"2022-12-13",herd:"STEAMERS",repro:"Pregnant 8mo",dim:null,parity:2,lastWt:520,milkSafe:null,inTreatment:0,pregnant:1},
+  {id:"GRACY-129375",name:"GRACY",sex:"F",dob:"2024-04-30",herd:"12 MONTHS-SERVICE",repro:"Heifer / served",dim:null,parity:0,lastWt:340,milkSafe:null,inTreatment:0,pregnant:0},
+  {id:"AISHA-129264",name:"AISHA",sex:"F",dob:"2021-06-01",herd:"INCALF HEIFERS",repro:"Pregnant 5mo",dim:null,parity:0,lastWt:430,milkSafe:null,inTreatment:0,pregnant:1},
+  {id:"BROOKE-129297",name:"BROOKE",sex:"F",dob:"2025-03-17",herd:"4-12 MONTHS",repro:"Heifer",dim:null,parity:0,lastWt:165,milkSafe:null,inTreatment:0,pregnant:0},
+  {id:"DOHA-129331",name:"DOHA",sex:"F",dob:"2019-09-27",herd:"LACTATION GROUP 2",repro:"Lactating",dim:240,parity:4,lastWt:510,milkSafe:null,inTreatment:0,pregnant:0}
+];
+const herds=[
+  {n:"0-2",cat:"Calves <2 m",cnt:12,cc:"Calf rearing - WDL",bom:"Calf starter ration"},
+  {n:"2-4",cat:"Calves 2-4 m",cnt:18,cc:"Calf rearing - WDL",bom:"Weaner ration"},
+  {n:"4-12 MONTHS",cat:"Heifers 4-12 m",cnt:78,cc:"Youngstock - WDL",bom:"Growing heifer ration"},
+  {n:"12 MONTHS-SERVICE",cat:"Heifers 12+ m",cnt:42,cc:"Youngstock - WDL",bom:"Bulling heifer ration"},
+  {n:"INCALF HEIFERS",cat:"Pregnant heifers",cnt:34,cc:"Youngstock - WDL",bom:"In-calf heifer ration"},
+  {n:"Lactating group 1",cat:"Group 1 milkers",cnt:46,cc:"Lactating G1 - WDL",bom:"High-yield TMR (35 kg DMI)"},
+  {n:"LACTATION GROUP 2",cat:"Group 2 milkers",cnt:38,cc:"Lactating G2 - WDL",bom:"Mid-yield TMR (28 kg DMI)"},
+  {n:"Super high yielders",cat:"Top producers",cnt:8,cc:"Lactating G1 - WDL",bom:"Premium TMR (40 kg DMI)"},
+  {n:"STEAMERS",cat:"Pre-calving",cnt:18,cc:"Dry cow - WDL",bom:"Steaming-up ration"},
+  {n:"BULLS",cat:"Bulls",cnt:14,cc:"Bulls - WDL",bom:"Bull maintenance ration"}
+];
+const semenItems=["Semen Delta Stormer-F (4040030377)","Semen Delta Keen-F (4040030372)","Semen Delta Smash-F (SDS-H-201)"];
+
+const drawerStruct=[
+  {grp:"Overview",its:[
+    {id:"home",ic:"ti-home",l:"Dashboard"},
+    {id:"alerts",ic:"ti-bell",l:"Action queue",b:5}
+  ]},
+  {grp:"Records",its:[
+    {id:"animals",ic:"ti-list",l:"Animals"},
+    {id:"herds_list",ic:"ti-fence",l:"Herds"},
+    {id:"diagnoses",ic:"ti-search",l:"Diagnoses"},
+    {id:"cases",ic:"ti-stethoscope",l:"Health cases",b:3},
+    {id:"sales",ic:"ti-cash",l:"Sales"},
+    {id:"culls",ic:"ti-trash",l:"Culls / deaths"}
+  ]},
+  {grp:"Daily routine",its:[
+    {id:"ev_milk",ic:"ti-droplet",l:"Milk recording"},
+    {id:"ev_feed",ic:"ti-baby-bottle",l:"Calf feeding"},
+    {id:"ev_animal_feed",ic:"ti-grain",l:"Animal feeding"}
+  ]},
+  {grp:"Animal events",its:[
+    {id:"ev_diag",ic:"ti-search",l:"Diagnosis (random)"},
+    {id:"ev_birth",ic:"ti-baby-carriage",l:"Birth"},
+    {id:"ev_weight",ic:"ti-scale",l:"Weight recording"},
+    {id:"ev_movement",ic:"ti-arrows-right-left",l:"Movement"},
+    {id:"ev_vacc",ic:"ti-vaccine",l:"Vaccination"},
+    {id:"ev_dewm",ic:"ti-bug",l:"Deworming"},
+    {id:"ev_dehorn",ic:"ti-cut",l:"Dehorning"},
+    {id:"ev_hoof",ic:"ti-tools",l:"Hoof trimming"},
+    {id:"ev_heat",ic:"ti-flame",l:"Heat detection"},
+    {id:"ev_service",ic:"ti-heart",l:"Service / AI"},
+    {id:"ev_pd",ic:"ti-clipboard-check",l:"Pregnancy diagnosis"},
+    {id:"ev_calving",ic:"ti-baby-bottle",l:"Calving"},
+    {id:"ev_dryoff",ic:"ti-droplet-off",l:"Drying off"}
+  ]},
+  {grp:"Reports",its:[
+    {id:"r_milk",ic:"ti-chart-line",l:"Milk yield"},
+    {id:"r_repro",ic:"ti-heart-handshake",l:"Reproduction"},
+    {id:"r_health",ic:"ti-report-medical",l:"Health & costs"},
+    {id:"r_growth",ic:"ti-chart-bar",l:"Calf growth"}
+  ]},
+  {grp:"Inventory",its:[
+    {id:"inv_col",ic:"ti-droplet",l:"Colostrum bank"},
+    {id:"inv_drug",ic:"ti-pill",l:"Drugs"},
+    {id:"inv_semen",ic:"ti-test-pipe",l:"Semen straws"},
+    {id:"inv_feed",ic:"ti-grain",l:"Feed"}
+  ]},
+  {grp:"Setup",its:[
+    {id:"set_settings",ic:"ti-settings",l:"Livestock settings"}
+  ]}
+];
+
+let active="home";
+let stack=[];
+const appbar=document.getElementById("appbar");
+const body=document.getElementById("body");
+const tabbar=document.getElementById("tabbar");
+const drawer=document.getElementById("drawer");
+const drawerback=document.getElementById("drawerback");
+const modalHost=document.getElementById("modal-host");
+
+function setBar(title,sub,opts={}){
+  const back=opts.back?`<button class="icon-btn" onclick="goBack()" aria-label="Back"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>`:`<button class="icon-btn" onclick="openDrawer()" aria-label="Menu"><i class="ti ti-menu-2" aria-hidden="true"></i></button>`;
+  appbar.innerHTML=`${back}<div style="flex:1;min-width:0"><p class="ttl">${title}</p>${sub?`<p class="sub">${sub}</p>`:""}</div><div class="me"><div class="me-av">${me.initials}</div></div>`;
+}
+function setTabs(){
+  tabbar.innerHTML=`
+    <button class="${active==='home'?'active':''}" onclick="nav('home')"><i class="ti ti-home" aria-hidden="true"></i><span>Home</span></button>
+    <button class="${active==='animals'?'active':''}" onclick="nav('animals')"><i class="ti ti-list" aria-hidden="true"></i><span>Animals</span></button>
+    <button onclick="openSheet('quickActions')"><i class="ti ti-circle-plus" aria-hidden="true"></i><span>Record</span></button>
+    <button class="${active==='alerts'?'active':''}" onclick="nav('alerts')"><i class="ti ti-bell" aria-hidden="true"></i><span>Alerts</span></button>
+    <button onclick="openDrawer()"><i class="ti ti-menu-2" aria-hidden="true"></i><span>More</span></button>`;
+}
+function renderDrawer(){
+  drawer.innerHTML=`
+    <div class="brand"><div class="logo">K</div><div><div class="farm">Westwood Dairies</div><div class="who">Logged in: ${me.user}</div></div></div>
+    ${drawerStruct.map(g=>`<div class="grp">${g.grp}</div>${g.its.map(it=>`<div class="it ${active===it.id?'active':''}" onclick="navAndClose('${it.id}')"><i class="ti ${it.ic}" aria-hidden="true"></i><span>${it.l}</span>${it.b?`<span class="badge">${it.b}</span>`:""}</div>`).join("")}`).join("")}`;
+}
+window.openDrawer=()=>{drawer.classList.add("open");drawerback.classList.add("open")};
+window.closeDrawer=()=>{drawer.classList.remove("open");drawerback.classList.remove("open")};
+window.navAndClose=id=>{closeDrawer();nav(id)};
+window.nav=(id,push=true)=>{if(push&&active!==id)stack.push(active);active=id;setTabs();renderDrawer();render(id)};
+window.goBack=()=>{if(stack.length){active=stack.pop();setTabs();renderDrawer();render(active)}else{nav("home",false)}};
+
+function avFor(a){const i=a.name.split(" ").map(s=>s[0]).slice(0,2).join("");let c="";if(a.repro==="Calf")c="calf";else if(a.repro==="Bull")c="bull";else if(a.repro?.startsWith("Pregnant"))c="dry";return `<div class="av ${c}">${i}</div>`}
+function pillFor(a){
+  if(a.inTreatment)return `<span class="pill sick">In treatment</span>`;
+  if(a.repro==="Lactating"||a.repro==="Fresh / Lactating")return `<span class="pill lact">${a.dim} DIM</span>`;
+  if(a.repro==="Pregnant 8mo")return `<span class="pill dry-p">Steaming</span>`;
+  if(a.repro==="Pregnant 5mo")return `<span class="pill preg">In-calf</span>`;
+  if(a.repro==="Calf")return `<span class="pill calf-p">Calf</span>`;
+  if(a.repro==="Heifer / served")return `<span class="pill preg">Served</span>`;
+  if(a.repro==="Heifer")return `<span class="pill heif">Heifer</span>`;
+  if(a.repro==="Bull")return `<span class="pill">Bull</span>`;
+  return "";
+}
+
+function render(id){
+  closeSheet();
+  if(id==="home")rHome();
+  else if(id==="alerts")rAlerts();
+  else if(id==="animals")rAnimals();
+  else if(id==="herds_list")rHerdsList();
+  else if(id==="diagnoses")rDiagnosesList();
+  else if(id==="cases")rCases();
+  else if(id==="sales")rSales();
+  else if(id==="culls")rCulls();
+  else if(id==="ev_milk")rMilk();
+  else if(id==="ev_feed")rCalfFeed();
+  else if(id==="ev_animal_feed")rAnimalFeed();
+  else if(id==="ev_diag")rDiagnosis();
+  else if(id==="ev_movement")rMovement();
+  else if(id==="ev_dryoff")rDryoff();
+  else if(id==="ev_service")rService();
+  else if(id==="ev_calving")rCalving();
+  else if(id==="ev_pd")rPD();
+  else if(id==="ev_birth")rEvent("Birth",["birth_dam","calf","activity_cost"]);
+  else if(id==="ev_weight")rEvent("Weight recording",["picker","weight_bcs"]);
+  else if(id==="ev_vacc")rEvent("Vaccination",["picker","drugs"]);
+  else if(id==="ev_dewm")rEvent("Deworming",["picker","drugs"]);
+  else if(id==="ev_dehorn")rEvent("Dehorning",["picker","method","activity_cost"]);
+  else if(id==="ev_hoof")rEvent("Hoof trimming",["picker","feet","reason","activity_cost"]);
+  else if(id==="ev_heat")rEvent("Heat detection",["picker_single","heat_signs","plan"]);
+  else if(id==="r_milk")rMilkReport();
+  else if(id==="r_repro")rReproReport();
+  else if(id==="r_health")rHealthReport();
+  else if(id==="r_growth")rGrowthReport();
+  else if(id==="inv_col")rColostrum();
+  else if(id==="inv_drug")rDrugInv();
+  else if(id==="inv_semen")rSemenInv();
+  else if(id==="inv_feed")rFeedInv();
+  else if(id==="set_settings")rSettings();
+  else rHome();
+}
+
+function rHome(){
+  setBar("Westwood Dairies","Kapkolia · 462 head");
+  body.innerHTML=`
+    <div class="banner ok"><i class="ti ti-user" aria-hidden="true"></i><div>Signed in as <b>${me.user}</b>. Events you submit will be tagged to you.</div></div>
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">Today's milk</p><p class="metric-num">967 kg</p><p class="metric-sub">vs 940 yesterday</p></div>
+      <div class="metric"><p class="metric-label">Revenue est.</p><p class="metric-num">57,840</p><p class="metric-sub">KES at 60/kg</p></div>
+      <div class="metric"><p class="metric-label">Lactating</p><p class="metric-num">42</p><p class="metric-sub">avg 23 kg/cow</p></div>
+      <div class="metric"><p class="metric-label">Open cases</p><p class="metric-num">3</p><p class="metric-sub">1 mastitis, 2 lameness</p></div>
+    </div>
+    <p class="section-title">Action queue</p>
+    <div class="row" onclick="nav('alerts')"><div class="av warn"><i class="ti ti-vaccine" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">FMD vaccination overdue</p><p class="row-meta">4 cows · Group 1 · due 12 Apr</p></div><i class="ti ti-chevron-right" style="color:var(--color-text-tertiary)" aria-hidden="true"></i></div>
+    <div class="row" onclick="nav('alerts')"><div class="av dgr"><i class="ti ti-flame" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TEST IVY in withdrawal</p><p class="row-meta">Discard milk until 12 May</p></div><i class="ti ti-chevron-right" style="color:var(--color-text-tertiary)" aria-hidden="true"></i></div>
+    <div class="row" onclick="nav('alerts')"><div class="av calf"><i class="ti ti-droplet" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">Colostrum bank low</p><p class="row-meta">3 kg in stock · 2 calvings due</p></div><i class="ti ti-chevron-right" style="color:var(--color-text-tertiary)" aria-hidden="true"></i></div>
+    <p class="section-title">Quick actions</p>
+    <div class="tile-grid">
+      <button class="tile" onclick="nav('ev_milk')"><i class="ti ti-droplet" aria-hidden="true"></i><p class="tile-t">Milk session</p><p class="tile-s">Herd-level recording</p></button>
+      <button class="tile" onclick="nav('ev_diag')"><i class="ti ti-search" aria-hidden="true"></i><p class="tile-t">Check animal</p><p class="tile-s">Quick diagnosis</p></button>
+      <button class="tile" onclick="nav('ev_feed')"><i class="ti ti-baby-bottle" aria-hidden="true"></i><p class="tile-t">Feed calf</p><p class="tile-s">Colostrum or milk</p></button>
+      <button class="tile" onclick="nav('ev_animal_feed')"><i class="ti ti-grain" aria-hidden="true"></i><p class="tile-t">Feed herd</p><p class="tile-s">TMR per herd</p></button>
+    </div>`;
+  body.insertAdjacentHTML("beforeend",`<button class="fab" onclick="openSheet('quickActions')" aria-label="Record"><i class="ti ti-plus" aria-hidden="true"></i></button>`);
+}
+
+function rAlerts(){
+  setBar("Action queue","5 items need attention");
+  const alerts=[
+    {sev:"warn",ic:"ti-vaccine",t:"FMD vaccination overdue",s:"4 cows in Group 1 · due 12 Apr"},
+    {sev:"dgr",ic:"ti-flame",t:"TEST IVY in withdrawal",s:"Milk discard until 12 May"},
+    {sev:"calf",ic:"ti-droplet",t:"Colostrum bank low",s:"3 kg remaining · 2 calvings due"},
+    {sev:"warn",ic:"ti-arrow-up-right",t:"3 calves over 2 months",s:"Move 0-2 → 2-4 herd"},
+    {sev:"calf",ic:"ti-heart",t:"GRACY served 25 days ago",s:"Pregnancy diagnosis due"}
+  ];
+  body.innerHTML=alerts.map(a=>`<div class="row"><div class="av ${a.sev}"><i class="ti ${a.ic}" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">${a.t}</p><p class="row-meta">${a.s}</p></div><button class="tag-add">Resolve</button></div>`).join("");
+}
+
+function rAnimals(){
+  setBar("Animals","462 across 12 herds");
+  body.innerHTML=`
+    <div class="search"><i class="ti ti-search" aria-hidden="true"></i><input type="text" placeholder="Search by tag or name" oninput="filterA(this.value)" /></div>
+    <div class="chips">
+      <span class="chip active" onclick="chipA(this,'all')">All</span>
+      <span class="chip" onclick="chipA(this,'Lactating')">Lactating</span>
+      <span class="chip" onclick="chipA(this,'Heifer')">Heifers</span>
+      <span class="chip" onclick="chipA(this,'Calf')">Calves</span>
+      <span class="chip" onclick="chipA(this,'Pregnant')">In-calf</span>
+    </div>
+    <div id="alist">${aRows("all","")}</div>`;
+}
+function aRows(f,q){
+  let l=animals;
+  if(f!=="all")l=l.filter(a=>(a.repro||"").includes(f));
+  if(q)l=l.filter(a=>a.id.toLowerCase().includes(q.toLowerCase())||a.name.toLowerCase().includes(q.toLowerCase()));
+  if(!l.length)return `<div class="empty"><i class="ti ti-search-off empty-icon" aria-hidden="true"></i><div>No animals match</div></div>`;
+  return l.map(a=>`<div class="row" onclick="aDetail('${a.id}')">${avFor(a)}<div class="row-main"><p class="row-name">${a.name} <span style="color:var(--color-text-tertiary);font-weight:400;font-size:11px">${a.id}</span></p><p class="row-meta">${a.herd} · ${a.lastWt} kg</p></div>${pillFor(a)}</div>`).join("");
+}
+window.filterA=q=>document.getElementById("alist").innerHTML=aRows(window._cf||"all",q);
+window.chipA=(el,f)=>{document.querySelectorAll(".chips .chip").forEach(c=>c.classList.remove("active"));el.classList.add("active");window._cf=f;document.getElementById("alist").innerHTML=aRows(f,"")};
+window.aDetail=id=>{
+  const a=animals.find(x=>x.id===id);if(!a)return;
+  stack.push(active);active="";setTabs();renderDrawer();
+  setBar(a.name,a.id,{back:true});
+  const ageM=Math.floor((new Date()-new Date(a.dob))/(1000*60*60*24*30.44));
+  body.innerHTML=`
+    ${a.inTreatment?`<div class="banner dgr"><i class="ti ti-flame" aria-hidden="true"></i><div>In treatment · milk withdrawal until <b>${a.milkSafe}</b></div></div>`:""}
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">Sex / age</p><p class="metric-num" style="font-size:14px">${a.sex==="F"?"Female":"Male"}</p><p class="metric-sub">${ageM} months</p></div>
+      <div class="metric"><p class="metric-label">Last weight</p><p class="metric-num">${a.lastWt}<span style="font-size:11px;font-weight:400"> kg</span></p></div>
+      <div class="metric"><p class="metric-label">Herd</p><p class="metric-num" style="font-size:12px">${a.herd}</p></div>
+      <div class="metric"><p class="metric-label">Parity / DIM</p><p class="metric-num" style="font-size:14px">${a.parity}${a.dim!==null?` / ${a.dim}d`:""}</p></div>
+    </div>
+    <p class="section-title">Quick actions</p>
+    <div class="tile-grid">
+      <button class="tile" onclick="nav('ev_diag')"><i class="ti ti-search" aria-hidden="true"></i><p class="tile-t">Diagnose</p></button>
+      ${a.repro==="Calf"?`
+        <button class="tile" onclick="nav('ev_feed')"><i class="ti ti-baby-bottle" aria-hidden="true"></i><p class="tile-t">Feed</p></button>
+        <button class="tile" onclick="nav('ev_weight')"><i class="ti ti-scale" aria-hidden="true"></i><p class="tile-t">Weigh</p></button>
+        <button class="tile" onclick="nav('ev_movement')"><i class="ti ti-arrows-right-left" aria-hidden="true"></i><p class="tile-t">Move</p></button>
+      `:`
+        <button class="tile" onclick="nav('ev_vacc')"><i class="ti ti-vaccine" aria-hidden="true"></i><p class="tile-t">Vaccinate</p></button>
+        <button class="tile" onclick="nav('ev_service')"><i class="ti ti-heart" aria-hidden="true"></i><p class="tile-t">Service</p></button>
+        <button class="tile" onclick="nav('ev_movement')"><i class="ti ti-arrows-right-left" aria-hidden="true"></i><p class="tile-t">Move</p></button>
+      `}
+    </div>
+    <p class="section-title">Lifetime timeline</p>
+    <div class="tlitem"><p class="tldate">Yesterday 16:00</p><p class="tltitle">Mastitis case opened</p><p class="tldesc">Front-left quarter · Penicillin IMM ×3</p></div>
+    <div class="tlitem"><p class="tldate">Yesterday 09:00</p><p class="tltitle">Diagnosis: udder swelling</p><p class="tldesc">Lameness 0/4 · BCS 3.0 · escalated to case</p></div>
+    <div class="tlitem"><p class="tldate">25 Apr 2026</p><p class="tltitle">Anthrax vaccination</p><p class="tldesc">10 ml IM · 5d withdrawal</p></div>
+    <div class="tlitem"><p class="tldate">15 Apr 2026</p><p class="tltitle">Calving — live female</p><p class="tldesc">Calf TESTBC-001/26 · 36 kg</p></div>
+    <button class="btn-g" onclick="sendPrompt('Show full event history for ${a.id}')">View full history</button>`;
+};
+
+function rDiagnosis(){
+  setBar("Animal diagnosis","Quick health check");
+  body.innerHTML=`
+    <div class="banner info"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Walk past an animal, observe, record. If something's wrong, escalate to a Health Case at the bottom of this form.</div></div>
+    <div class="field">
+      <label class="field-label">Animal</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'single',title:'Select animal',include:a=>true,onPick:a=>{document.getElementById('dx_animal').textContent=a.name+' · '+a.id;window._dx_animal=a}})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="dx_animal" style="color:var(--color-text-secondary)">Search animal...</span>
+      </button>
+    </div>
+    <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+    <p class="section-title">General observation</p>
+    <div class="field">
+      <label class="field-label">Overall appearance</label>
+      <div class="chips" style="margin:0">
+        <span class="chip ok active" onclick="cycle(this)">Healthy</span>
+        <span class="chip warn" onclick="cycle(this)">Off-colour</span>
+        <span class="chip dgr" onclick="cycle(this)">Sick</span>
+      </div>
+    </div>
+    <div class="score-row">
+      <span class="lbl">BCS (1-5)</span>
+      <div class="opts">
+        <button class="dgr" onclick="pickScore(this)">1</button>
+        <button class="warn" onclick="pickScore(this)">2</button>
+        <button class="ok active" onclick="pickScore(this)">3</button>
+        <button class="warn" onclick="pickScore(this)">4</button>
+        <button class="dgr" onclick="pickScore(this)">5</button>
+      </div>
+    </div>
+    <div class="score-row">
+      <span class="lbl">Lameness</span>
+      <div class="opts">
+        <button class="ok active" onclick="pickScore(this)">0</button>
+        <button onclick="pickScore(this)">1</button>
+        <button class="warn" onclick="pickScore(this)">2</button>
+        <button class="dgr" onclick="pickScore(this)">3</button>
+      </div>
+    </div>
+    <div class="score-row">
+      <span class="lbl">Hydration</span>
+      <div class="opts">
+        <button class="ok active" onclick="pickScore(this)">Normal</button>
+        <button class="warn" onclick="pickScore(this)">Mild</button>
+        <button class="dgr" onclick="pickScore(this)">Severe</button>
+      </div>
+    </div>
+    <p class="section-title">System checks</p>
+    <div class="field">
+      <label class="field-label">What's wrong (tap any)</label>
+      <div class="chips" style="margin:0">
+        <span class="chip" onclick="this.classList.toggle('active')">Cough / nasal</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Diarrhoea</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Off feed</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Udder hot/swollen</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Milk abnormal</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Foot / hoof</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Eye discharge</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Skin lesion</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Vulva discharge</span>
+        <span class="chip" onclick="this.classList.toggle('active')">Bloat</span>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Provisional diagnosis (optional)</label><select><option>(none — observation only)</option><option>Mastitis (Clinical)</option><option>Mastitis (Subclinical)</option><option>Foot Rot</option><option>Lameness</option><option>Pneumonia</option><option>Calf Scours</option><option>Bloat</option><option>Pinkeye</option><option>Udder Oedema</option></select></div>
+    <div class="field"><label class="field-label">Notes</label><textarea rows="2" placeholder="What did you see / hear / smell?"></textarea></div>
+    <p class="section-title">Action taken</p>
+    <div class="field">
+      <div class="chips" style="margin:0">
+        <span class="chip ok active" onclick="dxAction(this,'none')">No action</span>
+        <span class="chip warn" onclick="dxAction(this,'monitor')">Monitor</span>
+        <span class="chip dgr" onclick="dxAction(this,'case')">Open case</span>
+        <span class="chip" onclick="dxAction(this,'vet')">Call vet</span>
+      </div>
+    </div>
+    <button class="btn" onclick="dxSubmit()">Submit diagnosis</button>`;
+}
+let dxActionChoice="none";
+window.dxAction=(el,v)=>{el.parentElement.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));el.classList.add("active");dxActionChoice=v};
+window.cycle=el=>{el.parentElement.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));el.classList.add("active")};
+window.pickScore=el=>{el.parentElement.querySelectorAll("button").forEach(b=>b.classList.remove("active"));el.classList.add("active")};
+function dxSubmit(){
+  if(dxActionChoice==="case"){
+    setBar("Diagnosis saved","Now opening Health Case",{back:true});
+    body.innerHTML=`
+      <div class="banner ok"><i class="ti ti-check" aria-hidden="true"></i><div><b>Diagnosis DX-2026-00187 saved</b><br/>Linked to ${window._dx_animal?window._dx_animal.name:"animal"}. Pre-filling Health Case from this diagnosis...</div></div>
+      <button class="btn" onclick="sendPrompt('Open the new Health Case prefilled from diagnosis DX-2026-00187')">Continue to Health Case</button>
+      <button class="btn-g" onclick="nav('home')">Done</button>`;
+  }else{
+    afterSubmit("Animal diagnosis");
+  }
+}
+
+function rDiagnosesList(){
+  setBar("Diagnoses","Routine health observations");
+  body.innerHTML=`
+    <button class="btn" onclick="nav('ev_diag')"><i class="ti ti-plus" aria-hidden="true"></i> New diagnosis</button>
+    <p class="section-title">Recent</p>
+    <div class="row"><div class="av warn"><i class="ti ti-search" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TEST IVY · Udder hot/swollen</p><p class="row-meta">Yesterday 9:00 · BCS 3.0 · escalated to case HC-160120</p></div><span class="pill warn">→ Case</span></div>
+    <div class="row"><div class="av calf"><i class="ti ti-search" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">BELLA · Routine check</p><p class="row-meta">Today 7:30 · BCS 3.5 · all clear</p></div><span class="pill lact">No action</span></div>
+    <div class="row"><div class="av calf"><i class="ti ti-search" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">DOLLY · Pre-calving check</p><p class="row-meta">Today 7:00 · BCS 4.0 · monitor (steaming)</p></div><span class="pill warn">Monitor</span></div>
+    <div class="row"><div class="av calf"><i class="ti ti-search" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TEST BLOSSOM · Calf check</p><p class="row-meta">Today 6:30 · alert · good appetite</p></div><span class="pill lact">No action</span></div>
+    <div class="row"><div class="av warn"><i class="ti ti-search" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">SONIA · Off feed</p><p class="row-meta">Mon 8 May · BCS 2.5 · monitoring</p></div><span class="pill warn">Monitor</span></div>
+    <div class="row"><div class="av dgr"><i class="ti ti-search" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">EDEN · Lameness 2/3</p><p class="row-meta">Sat 3 May · escalated to case HC-160093</p></div><span class="pill warn">→ Case</span></div>`;
+}
+
+function rHerdsList(){
+  setBar("Herds","12 herds · 462 animals");
+  body.innerHTML=herds.map(h=>`
+    <div class="row" onclick="hDetail('${h.n}')">
+      <div class="av"><i class="ti ti-fence" aria-hidden="true"></i></div>
+      <div class="row-main"><p class="row-name">${h.n}</p><p class="row-meta">${h.cat} · ${h.cnt} head · ${h.cc}</p></div>
+      <i class="ti ti-chevron-right" style="color:var(--color-text-tertiary)" aria-hidden="true"></i>
+    </div>`).join("");
+}
+window.hDetail=n=>{
+  const h=herds.find(x=>x.n===n);
+  stack.push(active);active="";setTabs();renderDrawer();
+  setBar(h.n,h.cat,{back:true});
+  const inHerd=animals.filter(a=>a.herd===n);
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">Animals</p><p class="metric-num">${h.cnt}</p></div>
+      <div class="metric"><p class="metric-label">Cost centre</p><p class="metric-num" style="font-size:12px">${h.cc}</p></div>
+    </div>
+    <p class="section-title">Feeding plan (TMR / BOM)</p>
+    <div style="background:var(--color-background-secondary);padding:11px 13px;border-radius:var(--border-radius-md);margin-bottom:14px">
+      <p style="margin:0;font-size:13px;font-weight:500">${h.bom}</p>
+      <p style="margin:3px 0 0;font-size:11px;color:var(--color-text-secondary)">Linked BOM determines cost-per-kg DMI for this herd</p>
+      <button class="btn-g" style="margin-top:8px;padding:7px 12px;font-size:11px;width:auto" onclick="sendPrompt('Show ration items in ${h.bom}')">View ration items</button>
+    </div>
+    <p class="section-title">Animals in herd ${inHerd.length?`(${inHerd.length} of ${h.cnt} shown)`:""}</p>
+    ${inHerd.length?inHerd.map(a=>`<div class="row" onclick="aDetail('${a.id}')">${avFor(a)}<div class="row-main"><p class="row-name">${a.name}</p><p class="row-meta">${a.id} · ${a.lastWt} kg</p></div>${pillFor(a)}</div>`).join(""):`<div class="empty">Not all herd members loaded in demo</div>`}
+    <p class="section-title">Quick actions</p>
+    <button class="btn-g" onclick="nav('ev_animal_feed')"><i class="ti ti-grain" aria-hidden="true"></i> Feed this herd</button>
+    <button class="btn-g" onclick="nav('ev_milk')"><i class="ti ti-droplet" aria-hidden="true"></i> Record milking</button>`;
+};
+
+function rCases(){
+  setBar("Health cases","3 open · 5 closed this month");
+  body.innerHTML=`
+    <button class="btn" onclick="sendPrompt('Open a new health case')"><i class="ti ti-plus" aria-hidden="true"></i> New case</button>
+    <p class="section-title">Open</p>
+    <div class="row"><div class="av dgr"><i class="ti ti-stethoscope" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TEST IVY · Mastitis (Clinical)</p><p class="row-meta">HC-2026-160120 · 870 KES · since 8 May</p></div><span class="pill sick">Open</span></div>
+    <div class="row"><div class="av warn"><i class="ti ti-stethoscope" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">ADAM · Udder Oedema</p><p class="row-meta">HC-2026-160094 · since 10 Mar</p></div><span class="pill sick">Open</span></div>
+    <div class="row"><div class="av warn"><i class="ti ti-stethoscope" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">EDEN · Mastitis (Clinical)</p><p class="row-meta">HC-2026-160093 · since 12 Mar</p></div><span class="pill sick">Open</span></div>
+    <p class="section-title">Recently closed</p>
+    <div class="row"><div class="av calf"><i class="ti ti-stethoscope" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">MC CAIN · Joint Injury</p><p class="row-meta">HC-2026-160095 · 500 KES · 3 days</p></div><span class="pill lact">Recovered</span></div>`;
+}
+
+function rSales(){
+  setBar("Sales","Animals sold to buyers");
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">YTD revenue</p><p class="metric-num">285,000</p><p class="metric-sub">3 sales · KES</p></div>
+      <div class="metric"><p class="metric-label">YTD net P&amp;L</p><p class="metric-num" style="color:var(--color-text-success)">+55,000</p><p class="metric-sub">vs book value</p></div>
+    </div>
+    <button class="btn" onclick="rSellForm()"><i class="ti ti-cash" aria-hidden="true"></i> Record sale</button>
+    <p class="section-title">Recent sales</p>
+    <div class="row"><div class="av calf"><i class="ti ti-cash" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TESTDAM-001/22 → Mwangi Butchery</p><p class="row-meta">9 May · 95,000 KES · loss 25,000</p></div></div>
+    <div class="row"><div class="av calf"><i class="ti ti-cash" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">ANAIAH-129273 → Eldoret Co-op</p><p class="row-meta">3 Apr · 95,000 KES · gain 15,000</p></div></div>
+    <div class="row"><div class="av calf"><i class="ti ti-cash" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">ARSHAVIN-129279 → Direct buyer</p><p class="row-meta">22 Mar · 95,000 KES · gain 65,000</p></div></div>`;
+}
+
+function rSellForm(){
+  stack.push("sales");active="";setTabs();renderDrawer();
+  setBar("Record sale","Posts gain/loss to GL",{back:true});
+  body.innerHTML=`
+    <div class="field">
+      <label class="field-label">Animal to sell</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start" onclick="pickerSheet({mode:'single',title:'Select animal',include:a=>true,onPick:a=>document.getElementById('sl_animal').textContent=a.name+' · '+a.id})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="sl_animal" style="color:var(--color-text-secondary)">Search animal...</span>
+      </button>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+      <div class="field"><label class="field-label">Sale price (KES)</label><input type="number" value="95000" id="sl_price" oninput="slCalc()" /></div>
+    </div>
+    <div class="field"><label class="field-label">Buyer name</label><input type="text" placeholder="Buyer / butchery / co-op" /></div>
+    <div class="field"><label class="field-label">Buyer phone</label><input type="text" placeholder="+254..." /></div>
+    <div class="field"><label class="field-label">Reason / notes</label><textarea rows="2" placeholder="End of productive life, surplus, etc."></textarea></div>
+    <div style="background:var(--color-background-secondary);padding:11px 13px;border-radius:var(--border-radius-md);margin-bottom:12px">
+      <div class="kv"><span class="k">Book value</span><span class="v">120,000 KES</span></div>
+      <div class="kv"><span class="k">Sale price</span><span class="v" id="sl_pricedisp">95,000 KES</span></div>
+      <div class="kv"><span class="k">Gain / loss</span><span class="v" id="sl_gl" style="color:var(--color-text-warning)">−25,000 KES</span></div>
+    </div>
+    <button class="btn" onclick="afterSubmit('Sale')">Submit sale</button>`;
+}
+window.slCalc=()=>{const p=+document.getElementById("sl_price").value||0;const gl=p-120000;document.getElementById("sl_pricedisp").textContent=p.toLocaleString()+" KES";const e=document.getElementById("sl_gl");e.textContent=(gl>=0?"+":"")+gl.toLocaleString()+" KES";e.style.color=gl>=0?"var(--color-text-success)":"var(--color-text-warning)"};
+
+function rCulls(){
+  setBar("Culls / deaths","Animals removed without sale");
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">YTD write-off</p><p class="metric-num">−620,000</p><p class="metric-sub">7 animals · KES</p></div>
+      <div class="metric"><p class="metric-label">Top reason</p><p class="metric-num" style="font-size:14px">Mastitis</p><p class="metric-sub">3 animals</p></div>
+    </div>
+    <button class="btn" onclick="rCullForm()"><i class="ti ti-trash" aria-hidden="true"></i> Record cull / death</button>
+    <p class="section-title">Recent</p>
+    <div class="row"><div class="av dgr"><i class="ti ti-trash" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">JACKI-129390 · Culled (Farm Use)</p><p class="row-meta">2 May · book 150,000 written off</p></div></div>
+    <div class="row"><div class="av dgr"><i class="ti ti-trash" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">VICTOR-129572 · Died — Disease</p><p class="row-meta">14 Apr · book 120,000 written off</p></div></div>`;
+}
+
+function rCullForm(){
+  stack.push("culls");active="";setTabs();renderDrawer();
+  setBar("Record cull / death","Write-off to expense",{back:true});
+  body.innerHTML=`
+    <div class="banner warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div>This removes the animal from the active herd and writes off its book value. No proceeds; cannot be undone except by amend/cancel.</div></div>
+    <div class="field">
+      <label class="field-label">Animal</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start" onclick="pickerSheet({mode:'single',title:'Select animal',include:a=>true,onPick:a=>document.getElementById('cl_animal').textContent=a.name+' · '+a.id})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="cl_animal" style="color:var(--color-text-secondary)">Search animal...</span>
+      </button>
+    </div>
+    <div class="field"><label class="field-label">Type</label><select><option>Culled (Farm Use)</option><option>Died — Natural Causes</option><option>Died — Disease</option><option>Died — Accident</option><option>Condemned</option><option>Slaughtered</option></select></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+      <div class="field"><label class="field-label">Salvage value</label><input type="number" value="0" placeholder="0" /></div>
+    </div>
+    <div class="field"><label class="field-label">Reason / cause</label><textarea rows="2" placeholder="e.g. Chronic mastitis, low yield, BCS critical..."></textarea></div>
+    <div class="field"><label class="field-label">Witness / authorised by</label><input type="text" placeholder="Manager or vet name" /></div>
+    <div style="background:var(--color-background-secondary);padding:11px 13px;border-radius:var(--border-radius-md);margin-bottom:12px">
+      <div class="kv"><span class="k">Book value</span><span class="v">120,000 KES</span></div>
+      <div class="kv"><span class="k">Salvage</span><span class="v">0 KES</span></div>
+      <div class="kv"><span class="k">Loss to expense</span><span class="v" style="color:var(--color-text-danger)">−120,000 KES</span></div>
+    </div>
+    <button class="btn btn-danger" onclick="afterSubmit('Cull / death')">Submit</button>`;
+}
+
+function rMilk(){
+  setBar("Milk recording","Lactating group 1 · AM");
+  body.innerHTML=`
+    <div class="banner warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div><b>1 cow in withdrawal</b> · TEST IVY · auto-discard 22 kg</div></div>
+    <div class="field"><label class="field-label">Herd</label><select><option>Lactating group 1</option><option>LACTATION GROUP 2</option><option>Super high yielders</option></select></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Session</label><select><option>AM</option><option>PM</option><option>Evening</option></select></div>
+      <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Total yield (kg)</label><input type="number" value="245" id="ms_t" oninput="msC()" /></div>
+      <div class="field"><label class="field-label">Discard (kg)</label><input type="number" value="22" id="ms_d" oninput="msC()" /></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);margin-bottom:8px">
+      <div><p style="margin:0;font-size:12px;font-weight:500">Entire session is colostrum</p><p style="margin:2px 0 0;font-size:10px;color:var(--color-text-secondary)">Posts to Colostrum (kg) item</p></div>
+      <div class="toggle" id="ms_col" onclick="this.classList.toggle('on');msC()"></div>
+    </div>
+    <div class="field"><label class="field-label">Colostrum portion (kg) — hybrid</label><input type="number" value="0" id="ms_ck" oninput="msC()" /><p class="field-help">If part of the herd's yield is colostrum (e.g. one fresh cow joined). Leave 0 if none.</p></div>
+    <div class="calc" id="ms_s"></div>
+    <button class="btn" onclick="afterSubmit('Milk recording')">Submit recording</button>`;
+  msC();
+}
+window.msC=()=>{const t=+document.getElementById("ms_t").value||0;const d=+document.getElementById("ms_d").value||0;const c=document.getElementById("ms_col").classList.contains("on");const ck=c?(t-d):(+document.getElementById("ms_ck").value||0);const m=t-d-ck;const r=Math.round(m*60).toLocaleString();const e=document.getElementById("ms_s");if(e)e.innerHTML=c?`<p class="calc-l">All yield → Colostrum bank</p><p class="calc-num">${(t-d).toFixed(1)} kg</p><p class="calc-f">Not sellable · 0 KES revenue</p>`:`<p class="calc-l">Net sellable milk</p><p class="calc-num">${m.toFixed(1)} kg → ${r} KES</p><p class="calc-f">${t} − ${d} discard${ck?` − ${ck} colostrum`:""}</p>`};
+
+function rCalfFeed(){
+  const calf=animals.find(a=>a.repro==="Calf");
+  const ageDays=Math.floor((new Date()-new Date(calf.dob))/(1000*60*60*24));
+  let rec,ft,phase,formula,item,wh;
+  if(ageDays<=1){rec=(calf.lastWt*0.10/2).toFixed(1);ft="Colostrum";phase="Day 1 — first feed within 6h";formula="10% birth weight ÷ 2";item="Colostrum (kg)";wh="Stores - WDL"}
+  else if(ageDays<=5){rec=(calf.lastWt*0.05/2).toFixed(1);ft="Transitional Milk";phase="Days 2-5";formula="5% body weight ÷ 2";item="WestWood Dairy Milk (kg)";wh="Finished Goods - WDL"}
+  else if(ageDays<=60){rec=(calf.lastWt*0.10/2).toFixed(1);ft="Whole Milk";phase="Pre-weaning";formula="10% body weight ÷ 2";item="WestWood Dairy Milk (kg)";wh="Finished Goods - WDL"}
+  else if(ageDays<=90){const tp=1-((ageDays-60)/30);rec=(calf.lastWt*0.10*tp/2).toFixed(1);ft="Whole Milk";phase="Weaning taper";formula="Tapering linearly to day 90";item="WestWood Dairy Milk (kg)";wh="Finished Goods - WDL"}
+  else{rec="0";ft="Starter Feed";phase="Weaned";formula="Whole milk feeding ended";item="Calf starter pellets";wh="Stores - WDL"}
+  setBar("Calf feeding",calf.name);
+  body.innerHTML=`
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><div class="av calf" style="width:42px;height:42px">${calf.name.split(" ").map(s=>s[0]).slice(0,2).join("")}</div><div style="flex:1"><p style="margin:0;font-size:13px;font-weight:500">${calf.name}</p><p style="margin:2px 0 0;font-size:11px;color:var(--color-text-secondary)">${ageDays} days · ${calf.lastWt} kg · ${calf.herd}</p></div><button class="btn-link" onclick="pickerSheet({mode:'single',title:'Switch calf',include:a=>a.repro==='Calf',onPick:a=>nav('ev_feed')})">Switch</button></div>
+    <div class="calc"><p class="calc-l">Recommended · ${phase}</p><p class="calc-num">${rec} kg ${ft}</p><p class="calc-f">${formula} · per Livestock Settings</p></div>
+    <div class="field"><label class="field-label">Feed type</label><select id="cf_type" onchange="cfTypeChange()"><option ${ft==="Colostrum"?"selected":""}>Colostrum</option><option ${ft==="Transitional Milk"?"selected":""}>Transitional Milk</option><option ${ft==="Whole Milk"?"selected":""}>Whole Milk</option><option>Milk Replacer</option><option>Starter Feed</option></select></div>
+    <div class="field"><label class="field-label">Feed item (stock)</label><select id="cf_item"><option>${item}</option><option>WestWood Dairy Milk (kg)</option><option>Colostrum (kg)</option><option>Calf starter pellets</option><option>Milk Replacer (Hi-Pro)</option></select><p class="field-help">Must be a stock item. Issued from source warehouse.</p></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Source warehouse</label><select><option>${wh}</option><option>Stores - WDL</option><option>Finished Goods - WDL</option></select></div>
+      <div class="field"><label class="field-label">Session</label><div class="chips" style="margin:0"><span class="chip active">AM</span><span class="chip">PM</span></div></div>
+    </div>
+    <div class="field"><label class="field-label">Quantity fed (kg)</label><input type="number" step="0.1" value="${rec}" /></div>
+    <div class="field"><label class="field-label">Remarks (optional)</label><textarea rows="2" placeholder="Optional notes"></textarea></div>
+    <button class="btn" onclick="afterSubmit('Calf feeding')">Submit</button>`;
+}
+window.cfTypeChange=()=>{const t=document.getElementById("cf_type").value;const it=document.getElementById("cf_item");const map={"Colostrum":"Colostrum (kg)","Transitional Milk":"WestWood Dairy Milk (kg)","Whole Milk":"WestWood Dairy Milk (kg)","Milk Replacer":"Milk Replacer (Hi-Pro)","Starter Feed":"Calf starter pellets"};const v=map[t];if(v)it.value=v};
+
+function rAnimalFeed(){
+  setBar("Animal feeding","Per herd · TMR / BOM");
+  body.innerHTML=`
+    <div class="banner info"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Records the daily feed delivered to a herd. Pulls the herd's BOM (TMR) for ration breakdown.</div></div>
+    <div class="field">
+      <label class="field-label">Herd</label>
+      <select id="af_herd" onchange="afHerdChange()">${herds.map(h=>`<option value="${h.n}" data-bom="${h.bom}" data-cnt="${h.cnt}" data-cc="${h.cc}">${h.n} (${h.cnt} head)</option>`).join("")}</select>
+    </div>
+    <div style="background:var(--color-background-secondary);padding:11px 13px;border-radius:var(--border-radius-md);margin-bottom:12px">
+      <p style="margin:0;font-size:11px;color:var(--color-text-secondary)">BOM / TMR</p>
+      <p id="af_bom" style="margin:3px 0 0;font-size:13px;font-weight:500">${herds[0].bom}</p>
+      <p id="af_cc" style="margin:5px 0 0;font-size:11px;color:var(--color-text-secondary)">Cost centre: ${herds[0].cc}</p>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+      <div class="field"><label class="field-label">Session</label><select><option>AM</option><option>PM</option><option>Full day</option></select></div>
+    </div>
+    <div class="field"><label class="field-label">Total feed delivered (kg)</label><input type="number" id="af_kg" value="380" oninput="afCalc()" /><p class="field-help" id="af_per">~8.3 kg per head</p></div>
+    <p class="section-title">Ration breakdown (from BOM)</p>
+    <div style="background:var(--color-background-secondary);padding:10px 12px;border-radius:var(--border-radius-md);margin-bottom:12px">
+      <div class="kv"><span class="k">Maize silage 60%</span><span class="v">228 kg</span></div>
+      <div class="kv"><span class="k">Lucerne hay 18%</span><span class="v">68 kg</span></div>
+      <div class="kv"><span class="k">Dairy concentrate 18%</span><span class="v">68 kg</span></div>
+      <div class="kv"><span class="k">Mineral premix 4%</span><span class="v">15 kg</span></div>
+    </div>
+    <div class="field"><label class="field-label">Remarks</label><textarea rows="2" placeholder="Optional notes (silage quality, leftovers, etc.)"></textarea></div>
+    <button class="btn" onclick="afterSubmit('Animal feeding')">Submit feeding</button>`;
+  afCalc();
+}
+window.afHerdChange=()=>{const sel=document.getElementById("af_herd");const o=sel.options[sel.selectedIndex];document.getElementById("af_bom").textContent=o.dataset.bom;document.getElementById("af_cc").textContent="Cost centre: "+o.dataset.cc;afCalc()};
+window.afCalc=()=>{const sel=document.getElementById("af_herd");const o=sel.options[sel.selectedIndex];const cnt=+o.dataset.cnt;const kg=+document.getElementById("af_kg").value||0;document.getElementById("af_per").textContent=`~${(kg/cnt).toFixed(1)} kg per head`};
+
+function rMovement(){
+  setBar("Movement","Move animals between herds");
+  body.innerHTML=`
+    <div class="field">
+      <label class="field-label">Animals to move</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'multi',title:'Select animals',include:a=>true,onPick:list=>{const ids=list.map(a=>a.id);document.getElementById('mv_count').textContent=ids.length+' selected';window._mv=ids}})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="mv_count" style="color:var(--color-text-secondary)">Select one or many...</span>
+      </button>
+      <p class="field-help">Search by tag, or select an entire herd at once.</p>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">From herd (auto)</label><input type="text" value="Mixed (per animal)" disabled /></div>
+      <div class="field"><label class="field-label">To herd</label><select>${herds.map(h=>`<option>${h.n}</option>`).join("")}</select></div>
+    </div>
+    <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+    <div class="field"><label class="field-label">Reason</label><div class="chips" style="margin:0"><span class="chip active">Routine age-out</span><span class="chip">Repro status</span><span class="chip">Other</span></div></div>
+    <button class="btn" onclick="afterSubmit('Movement')">Submit move</button>`;
+}
+
+function rDryoff(){
+  setBar("Drying off","From a milking herd");
+  body.innerHTML=`
+    <div class="banner info"><i class="ti ti-info-circle" aria-hidden="true"></i><div>The destination herd is automatic — STEAMERS, set in Livestock Settings.</div></div>
+    <div class="field">
+      <label class="field-label">Cow(s) to dry off</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'multi',title:'Select cows (lactating only)',include:a=>a.repro==='Lactating'||a.repro==='Fresh / Lactating',onPick:list=>document.getElementById('do_count').textContent=list.length+' selected'})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="do_count" style="color:var(--color-text-secondary)">Search lactating cows...</span>
+      </button>
+    </div>
+    <div class="field"><label class="field-label">From herd</label><select><option>Lactating group 1</option><option>LACTATION GROUP 2</option><option>Super high yielders</option></select></div>
+    <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+    <div class="field"><label class="field-label">Dry-cow therapy</label><select><option>Cloxacillin LA · all 4 quarters</option><option>Cefquinome LA · all 4 quarters</option><option>None — natural dry-off</option></select></div>
+    <button class="btn" onclick="afterSubmit('Drying off')">Submit dry-off</button>`;
+}
+
+function rService(){
+  setBar("Service / AI","Issue semen straw");
+  body.innerHTML=`
+    <div class="field">
+      <label class="field-label">Cow</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'single',title:'Select cow (eligible only)',include:a=>a.sex==='F'&&!a.pregnant&&a.repro!=='Calf',onPick:a=>document.getElementById('sv_animal').textContent=a.name+' · '+a.id})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="sv_animal" style="color:var(--color-text-secondary)">Search cow on heat...</span>
+      </button>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Service date</label><input type="date" value="2026-05-09" /></div>
+      <div class="field"><label class="field-label">Type</label><select><option>A.I.</option><option>Natural</option></select></div>
+    </div>
+    <div class="field">
+      <label class="field-label">Semen straw (Item)</label>
+      <select>${semenItems.map(s=>`<option>${s}</option>`).join("")}</select>
+      <p class="field-help">Link to Item master · stock-managed · 1 straw issued from Stores - WDL on submit.</p>
+    </div>
+    <div class="field"><label class="field-label">Sire (catalog · optional)</label><select><option>(none)</option><option>Delta Stormer (Holstein)</option><option>Delta Keen (Holstein)</option></select></div>
+    <div class="field"><label class="field-label">Remarks</label><textarea rows="2" placeholder="Heat signs, technician notes..."></textarea></div>
+    <button class="btn" onclick="afterSubmit('Service')">Submit service</button>`;
+}
+
+function rCalving(){
+  setBar("Calving","Birth event from existing pregnancy");
+  const pregnant=animals.filter(a=>a.pregnant);
+  body.innerHTML=`
+    ${pregnant.length===0?`<div class="banner warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div>No pregnant cows on record. <button class="btn-link" onclick="nav('ev_pd')">Add pregnancy ↗</button></div></div>`:""}
+    <div class="field">
+      <label class="field-label">Dam (mother)</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'single',title:'Select dam (pregnant only)',include:a=>a.pregnant===1,emptyAction:{label:'No pregnant cow? Add pregnancy',cb:()=>{closeSheet();nav('ev_pd')}},onPick:a=>document.getElementById('cv_dam').textContent=a.name+' · '+a.id})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="cv_dam" style="color:var(--color-text-secondary)">Search pregnant cow...</span>
+      </button>
+      <p class="field-help">If your cow isn't here, she has no pregnancy on record. Use the + button to add a Pregnancy Diagnosis first.</p>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Calving date</label><input type="date" value="2026-05-09" /></div>
+      <div class="field"><label class="field-label">Outcome</label><select><option>Live birth</option><option>Stillbirth</option><option>Abortion</option></select></div>
+    </div>
+    <p class="section-title">Calf details</p>
+    <div class="field"><label class="field-label">Calf book number</label><input type="text" placeholder="e.g. A001/26" /></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Calf burn name</label><input type="text" placeholder="e.g. BLOSSOM" /></div>
+      <div class="field"><label class="field-label">Sex</label><div class="chips" style="margin:0"><span class="chip active">Female</span><span class="chip">Male</span></div></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Birth weight (kg)</label><input type="number" step="0.1" placeholder="36" /></div>
+      <div class="field"><label class="field-label">Coat colour</label><input type="text" placeholder="Black & White" /></div>
+    </div>
+    <div class="field"><label class="field-label">Number of calves</label><input type="number" value="1" /></div>
+    <button class="btn" onclick="afterSubmit('Calving')">Submit calving</button>`;
+}
+
+function rPD(){
+  setBar("Pregnancy diagnosis","Confirm or rule out");
+  body.innerHTML=`
+    <div class="field">
+      <label class="field-label">Cow</label>
+      <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'single',title:'Select served cow',include:a=>a.sex==='F',onPick:a=>document.getElementById('pd_animal').textContent=a.name+' · '+a.id})">
+        <i class="ti ti-search" aria-hidden="true"></i><span id="pd_animal" style="color:var(--color-text-secondary)">Search served cow...</span>
+      </button>
+    </div>
+    <div class="field"><label class="field-label">Related service event</label><select><option>(auto-populated from cow's last unconfirmed service)</option><option>TESTHF-001/24-Service-160113 · 9 Jul 2025</option></select></div>
+    <div class="field"><label class="field-label">Diagnosis date</label><input type="date" value="2026-05-09" /></div>
+    <div class="field"><label class="field-label">Result</label><div class="chips" style="margin:0"><span class="chip active">Confirmed</span><span class="chip">Not pregnant</span><span class="chip">Aborted</span></div></div>
+    <div class="field"><label class="field-label">Remarks</label><textarea rows="2" placeholder="Vet observations..."></textarea></div>
+    <button class="btn" onclick="afterSubmit('Pregnancy diagnosis')">Submit PD</button>`;
+}
+
+function rEvent(title,fields){
+  setBar(title,"New event");
+  const f=name=>{
+    if(name==="picker"||name==="picker_single")return `
+      <div class="field"><label class="field-label">Animal(s)</label>
+        <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'${name==='picker_single'?'single':'multi'}',title:'Select animal',include:a=>true,onPick:${name==='picker_single'?"a=>document.getElementById('ev_pick').textContent=a.name+' · '+a.id":"list=>document.getElementById('ev_pick').textContent=list.length+' selected'"}})">
+          <i class="ti ti-search" aria-hidden="true"></i><span id="ev_pick" style="color:var(--color-text-secondary)">${name==='picker_single'?'Search animal...':'Single animal or many...'}</span>
+        </button>
+      </div>`;
+    if(name==="birth_dam")return `
+      <div class="field"><label class="field-label">Dam (mother)</label>
+        <button class="btn-g" style="text-align:left;display:flex;align-items:center;gap:9px;justify-content:flex-start;width:100%" onclick="pickerSheet({mode:'single',title:'Select dam',include:a=>a.sex==='F'&&a.parity>0,onPick:a=>document.getElementById('bt_dam').textContent=a.name+' · '+a.id})">
+          <i class="ti ti-search" aria-hidden="true"></i><span id="bt_dam" style="color:var(--color-text-secondary)">Search dam...</span>
+        </button>
+      </div>`;
+    if(name==="weight_bcs")return `<div class="field-row"><div class="field"><label class="field-label">Weight (kg)</label><input type="number" placeholder="480" /></div><div class="field"><label class="field-label">BCS (1-5)</label><input type="number" step="0.25" placeholder="3.5" /></div></div>`;
+    if(name==="drugs")return `<div class="field"><label class="field-label">Drugs administered (Items)</label>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:9px 11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:500">FMD Vaccine (Quadrivalent)<span>320 KES</span></div><div style="display:flex;gap:7px;font-size:10px;color:var(--color-text-secondary)"><span>2 ml SC</span>·<span>Batch FMD-26-B201</span>·<span>0d wd</span></div></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:9px 11px;margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:500">LSD Vaccine<span>280 KES</span></div><div style="display:flex;gap:7px;font-size:10px;color:var(--color-text-secondary)"><span>3 ml SC</span>·<span>Batch LSD-26-A012</span>·<span>0d wd</span></div></div>
+      <button class="tag-add"><i class="ti ti-plus" aria-hidden="true"></i> Add drug</button>
+    </div>`;
+    if(name==="method")return `<div class="field"><label class="field-label">Method</label><div class="chips" style="margin:0"><span class="chip active">Hot iron</span><span class="chip">Caustic paste</span><span class="chip">Surgical</span></div></div>`;
+    if(name==="activity_cost")return `<div class="field"><label class="field-label">Activity cost (KES)</label><input type="number" placeholder="0" /></div>`;
+    if(name==="feet")return `<div class="field"><label class="field-label">Feet</label><div class="chips" style="margin:0"><span class="chip">Front-L</span><span class="chip">Front-R</span><span class="chip">Hind-L</span><span class="chip">Hind-R</span><span class="chip active">All four</span></div></div>`;
+    if(name==="reason")return `<div class="field"><label class="field-label">Reason</label><div class="chips" style="margin:0"><span class="chip active">Routine</span><span class="chip">Lameness</span><span class="chip">Overgrowth</span></div></div>`;
+    if(name==="heat_signs")return `<div class="field"><label class="field-label">Heat signs</label><textarea rows="2" placeholder="Mounting, mucus, restless, vulva swelling..."></textarea></div>`;
+    if(name==="plan")return `<div class="field"><label class="field-label">Plan</label><div class="chips" style="margin:0"><span class="chip">Now</span><span class="chip active">Next 12-18h</span><span class="chip">Skip cycle</span></div></div>`;
+    if(name==="calf")return `<div class="field"><label class="field-label">Calf book number</label><input type="text" placeholder="e.g. A001/26" /></div>
+      <div class="field-row"><div class="field"><label class="field-label">Calf burn name</label><input type="text" placeholder="e.g. BLOSSOM" /></div><div class="field"><label class="field-label">Sex</label><div class="chips" style="margin:0"><span class="chip active">Female</span><span class="chip">Male</span></div></div></div>
+      <div class="field"><label class="field-label">Birth weight (kg)</label><input type="number" step="0.1" placeholder="36" /></div>`;
+    return "";
+  };
+  body.innerHTML=`
+    <div class="field"><label class="field-label">Date</label><input type="date" value="2026-05-09" /></div>
+    ${fields.map(f).join("")}
+    <div class="field"><label class="field-label">Remarks</label><textarea rows="2" placeholder="Optional notes"></textarea></div>
+    <button class="btn" onclick="afterSubmit('${title}')">Submit ${title.toLowerCase()}</button>`;
+}
+
+function afterSubmit(name){
+  setBar(name,"Submitted",{back:true});
+  body.innerHTML=`
+    <div class="banner ok"><i class="ti ti-check" aria-hidden="true"></i><div><b>${name} submitted</b><br/>Recorded by ${me.user}.</div></div>
+    <button class="btn" onclick="nav('home')">Done</button>
+    <button class="btn-g" onclick="nav(stack[stack.length-1]||'home')">Record another</button>`;
+}
+window.afterSubmit=afterSubmit;
+
+const sheets={
+  quickActions(){return{title:"Record an event",content:`
+    <p class="section-title">Daily routine</p>
+    <div class="list-tap" onclick="closeSheet();nav('ev_milk')"><i class="ti ti-droplet" aria-hidden="true"></i>Milk recording<i class="ti ti-chevron-right" style="margin-left:auto;color:var(--color-text-tertiary)" aria-hidden="true"></i></div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_feed')"><i class="ti ti-baby-bottle" aria-hidden="true"></i>Calf feeding<i class="ti ti-chevron-right" style="margin-left:auto;color:var(--color-text-tertiary)" aria-hidden="true"></i></div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_animal_feed')"><i class="ti ti-grain" aria-hidden="true"></i>Animal feeding (TMR)<i class="ti ti-chevron-right" style="margin-left:auto;color:var(--color-text-tertiary)" aria-hidden="true"></i></div>
+    <p class="section-title">Health & breeding</p>
+    <div class="list-tap" onclick="closeSheet();nav('ev_diag')"><i class="ti ti-search" aria-hidden="true"></i>Diagnosis (random check)</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_vacc')"><i class="ti ti-vaccine" aria-hidden="true"></i>Vaccination</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_dewm')"><i class="ti ti-bug" aria-hidden="true"></i>Deworming</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_heat')"><i class="ti ti-flame" aria-hidden="true"></i>Heat detection</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_service')"><i class="ti ti-heart" aria-hidden="true"></i>Service / AI</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_pd')"><i class="ti ti-clipboard-check" aria-hidden="true"></i>Pregnancy diagnosis</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_calving')"><i class="ti ti-baby-bottle" aria-hidden="true"></i>Calving</div>
+    <div class="list-tap" onclick="closeSheet();nav('cases')"><i class="ti ti-stethoscope" aria-hidden="true"></i>New health case</div>
+    <p class="section-title">Husbandry</p>
+    <div class="list-tap" onclick="closeSheet();nav('ev_weight')"><i class="ti ti-scale" aria-hidden="true"></i>Weight recording</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_movement')"><i class="ti ti-arrows-right-left" aria-hidden="true"></i>Movement</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_dehorn')"><i class="ti ti-cut" aria-hidden="true"></i>Dehorning</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_hoof')"><i class="ti ti-tools" aria-hidden="true"></i>Hoof trimming</div>
+    <div class="list-tap" onclick="closeSheet();nav('ev_dryoff')"><i class="ti ti-droplet-off" aria-hidden="true"></i>Drying off</div>
+    <p class="section-title">End of life</p>
+    <div class="list-tap" onclick="closeSheet();rSellForm()"><i class="ti ti-cash" aria-hidden="true"></i>Sell animal</div>
+    <div class="list-tap" onclick="closeSheet();rCullForm()"><i class="ti ti-trash" aria-hidden="true"></i>Cull / death</div>`}}
+};
+
+window.openSheet=(name)=>{const s=sheets[name]?.();if(!s)return;modalHost.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet"><div class="handle"></div><div class="sheet-h"><p class="sheet-t">${s.title}</p><button class="icon-btn" onclick="closeSheet()" aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>${s.content}</div></div>`};
+window.closeSheet=()=>{modalHost.innerHTML=""};
+
+let pickerState={mode:"single",selected:new Set(),title:"",include:()=>true,emptyAction:null,onPick:null,view:"all"};
+window.pickerSheet=(opts)=>{
+  pickerState={mode:opts.mode||"single",selected:new Set(),title:opts.title||"Select",include:opts.include||(()=>true),emptyAction:opts.emptyAction||null,onPick:opts.onPick||null,view:"all",query:""};
+  renderPicker();
+};
+function renderPicker(){
+  const list=animals.filter(pickerState.include).filter(a=>!pickerState.query||a.name.toLowerCase().includes(pickerState.query.toLowerCase())||a.id.toLowerCase().includes(pickerState.query.toLowerCase()));
+  const allSelected=list.length>0&&list.every(a=>pickerState.selected.has(a.id));
+  const herdGroups={};
+  list.forEach(a=>{(herdGroups[a.herd]=herdGroups[a.herd]||[]).push(a)});
+  const content=`
+    <div class="picker-tabs">
+      <button class="${pickerState.view==='all'?'active':''}" onclick="pickerSetView('all')">Search</button>
+      <button class="${pickerState.view==='herd'?'active':''}" onclick="pickerSetView('herd')">By herd</button>
+    </div>
+    ${pickerState.view==='all'?`
+      <div class="search"><i class="ti ti-search" aria-hidden="true"></i><input type="text" placeholder="Tag or name" oninput="pickerQuery(this.value)" value="${pickerState.query||''}" autofocus /></div>
+      ${list.length===0?`<div class="empty"><i class="ti ti-search-off empty-icon" aria-hidden="true"></i><div>No animals match</div>${pickerState.emptyAction?`<button class="tag-add" style="margin-top:10px" onclick="pickerEmptyAction()"><i class="ti ti-plus" aria-hidden="true"></i> ${pickerState.emptyAction.label}</button>`:""}</div>`:""}
+      ${pickerState.mode==='multi'&&list.length>0?`<div class="sel-row" onclick="pickerToggleAll()" style="font-weight:500"><div class="cb ${allSelected?'checked':''}">${allSelected?'<i class="ti ti-check" aria-hidden="true"></i>':''}</div><span>Select all (${list.length})</span></div>`:""}
+      ${list.map(a=>`<div class="sel-row" onclick="pickerToggle('${a.id}')">${pickerState.mode==='multi'?`<div class="cb ${pickerState.selected.has(a.id)?'checked':''}">${pickerState.selected.has(a.id)?'<i class="ti ti-check" aria-hidden="true"></i>':''}</div>`:""}${avFor(a)}<div class="row-main"><p class="row-name">${a.name}</p><p class="row-meta">${a.id} · ${a.herd}</p></div>${pillFor(a)}</div>`).join("")}
+    `:`
+      ${Object.entries(herdGroups).map(([herd,arr])=>{
+        const selectedInHerd=arr.filter(a=>pickerState.selected.has(a.id)).length;
+        const allInHerd=selectedInHerd===arr.length;
+        return `<div style="margin-bottom:14px">
+          <div class="sel-row" onclick="pickerToggleHerd('${herd}')" style="font-weight:500">
+            ${pickerState.mode==='multi'?`<div class="cb ${allInHerd?'checked':selectedInHerd>0?'checked':''}" style="${selectedInHerd>0&&!allInHerd?'background:var(--color-background-info);border-color:var(--color-text-info)':''}">${allInHerd?'<i class="ti ti-check" aria-hidden="true"></i>':selectedInHerd>0?'<i class="ti ti-minus" style="font-size:10px;color:var(--color-text-info)" aria-hidden="true"></i>':""}</div>`:""}
+            <i class="ti ti-fence" style="color:var(--color-text-secondary)" aria-hidden="true"></i><span>${herd}</span><span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);font-weight:400">${arr.length} head</span>
+          </div>
+          ${arr.map(a=>`<div class="sel-row" style="padding-left:24px" onclick="pickerToggle('${a.id}')">${pickerState.mode==='multi'?`<div class="cb ${pickerState.selected.has(a.id)?'checked':''}">${pickerState.selected.has(a.id)?'<i class="ti ti-check" aria-hidden="true"></i>':''}</div>`:""}${avFor(a)}<div class="row-main"><p class="row-name">${a.name}</p><p class="row-meta">${a.id} · ${a.lastWt} kg</p></div>${pillFor(a)}</div>`).join("")}
+        </div>`;
+      }).join("")}
+    `}
+    ${pickerState.mode==='multi'?`
+      <div class="summary-bar" style="position:sticky;bottom:0">
+        <span><b>${pickerState.selected.size}</b> selected</span>
+        <button class="btn" style="width:auto;padding:8px 16px;margin:0" onclick="pickerConfirm()">Confirm</button>
+      </div>
+    `:""}`;
+  modalHost.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet"><div class="handle"></div><div class="sheet-h"><p class="sheet-t">${pickerState.title}</p><button class="icon-btn" onclick="closeSheet()" aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>${content}</div></div>`;
+}
+window.pickerSetView=v=>{pickerState.view=v;renderPicker()};
+window.pickerQuery=q=>{pickerState.query=q;renderPicker()};
+window.pickerToggle=id=>{
+  if(pickerState.mode==='single'){const a=animals.find(x=>x.id===id);closeSheet();if(pickerState.onPick)pickerState.onPick(a)}
+  else{if(pickerState.selected.has(id))pickerState.selected.delete(id);else pickerState.selected.add(id);renderPicker()}
+};
+window.pickerToggleAll=()=>{
+  const list=animals.filter(pickerState.include).filter(a=>!pickerState.query||a.name.toLowerCase().includes(pickerState.query.toLowerCase())||a.id.toLowerCase().includes(pickerState.query.toLowerCase()));
+  const allSelected=list.length>0&&list.every(a=>pickerState.selected.has(a.id));
+  if(allSelected)list.forEach(a=>pickerState.selected.delete(a.id));else list.forEach(a=>pickerState.selected.add(a.id));
+  renderPicker();
+};
+window.pickerToggleHerd=h=>{
+  const arr=animals.filter(a=>a.herd===h&&pickerState.include(a));
+  const all=arr.every(a=>pickerState.selected.has(a.id));
+  if(all)arr.forEach(a=>pickerState.selected.delete(a.id));else arr.forEach(a=>pickerState.selected.add(a.id));
+  renderPicker();
+};
+window.pickerConfirm=()=>{const list=Array.from(pickerState.selected).map(id=>animals.find(a=>a.id===id)).filter(Boolean);closeSheet();if(pickerState.onPick)pickerState.onPick(list)};
+window.pickerEmptyAction=()=>{if(pickerState.emptyAction&&pickerState.emptyAction.cb)pickerState.emptyAction.cb()};
+
+function rMilkReport(){
+  setBar("Milk yield","Last 30 days");
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">30d total</p><p class="metric-num">28,460</p><p class="metric-sub">kg, +4.2%</p></div>
+      <div class="metric"><p class="metric-label">Per cow</p><p class="metric-num">22.6</p><p class="metric-sub">kg/day</p></div>
+      <div class="metric"><p class="metric-label">Revenue</p><p class="metric-num">1.69M</p><p class="metric-sub">KES</p></div>
+      <div class="metric"><p class="metric-label">Discarded</p><p class="metric-num">312</p><p class="metric-sub">kg, 1.1%</p></div>
+    </div>
+    <p class="section-title">Daily yield · 14 days</p>
+    <div style="position:relative;height:180px"><canvas id="rmc" role="img" aria-label="Daily yield last 14 days"></canvas></div>
+    <p class="section-title">By herd · 30 days</p>
+    <div class="kv"><span class="k">Lactating group 1</span><span class="v">14,920 kg</span></div>
+    <div class="kv"><span class="k">LACTATION GROUP 2</span><span class="v">8,540 kg</span></div>
+    <div class="kv"><span class="k">Super high yielders</span><span class="v">5,000 kg</span></div>`;
+  setTimeout(()=>{const c=document.getElementById("rmc");if(c)new Chart(c,{type:"line",data:{labels:["26","27","28","29","30","1","2","3","4","5","6","7","8","9"],datasets:[{label:"kg",data:[920,930,925,950,950,963,950,935,975,973,965,953,965,967],borderColor:"#185FA5",backgroundColor:"rgba(24,95,165,0.08)",fill:true,tension:0.3,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}})},10);
+}
+
+function rReproReport(){
+  setBar("Reproduction","Last 12 months");
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">Conception</p><p class="metric-num">62%</p><p class="metric-sub">target 60%</p></div>
+      <div class="metric"><p class="metric-label">Days open</p><p class="metric-num">112</p><p class="metric-sub">target 100</p></div>
+      <div class="metric"><p class="metric-label">Calving int.</p><p class="metric-num">395</p><p class="metric-sub">days</p></div>
+      <div class="metric"><p class="metric-label">Straws/preg</p><p class="metric-num">2.1</p><p class="metric-sub">target 2.0</p></div>
+    </div>
+    <p class="section-title">Open events</p>
+    <div class="row"><div class="av warn"><i class="ti ti-clock" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">AMALIA-129272</p><p class="row-meta">Served 55 days ago · PD overdue</p></div><span class="pill warn">Overdue</span></div>
+    <div class="row"><div class="av calf"><i class="ti ti-clock" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">BROOKE-129297</p><p class="row-meta">Served 38 days ago</p></div><span class="pill preg">Awaiting</span></div>`;
+}
+
+function rHealthReport(){
+  setBar("Health & costs","Last 12 months");
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">Vet spend</p><p class="metric-num">285,400</p><p class="metric-sub">KES YTD</p></div>
+      <div class="metric"><p class="metric-label">Cases</p><p class="metric-num">38</p><p class="metric-sub">14 mastitis</p></div>
+      <div class="metric"><p class="metric-label">Avg / case</p><p class="metric-num">7,510</p><p class="metric-sub">KES</p></div>
+      <div class="metric"><p class="metric-label">Discard loss</p><p class="metric-num">189k</p><p class="metric-sub">KES, 3,150 kg</p></div>
+    </div>
+    <p class="section-title">Top spenders</p>
+    <div class="row"><div class="av dgr"><i class="ti ti-stethoscope" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">EDEN-129339</p><p class="row-meta">3 cases · 35,200 KES total</p></div></div>
+    <div class="row"><div class="av warn"><i class="ti ti-stethoscope" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TEST IVY</p><p class="row-meta">1 case · 6,570 KES</p></div></div>`;
+}
+
+function rGrowthReport(){
+  setBar("Calf growth","Youngstock 0-12 months");
+  body.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">Avg ADG</p><p class="metric-num">780</p><p class="metric-sub">g/day, target 850</p></div>
+      <div class="metric"><p class="metric-label">On target</p><p class="metric-num">62%</p><p class="metric-sub">22 of 36 calves</p></div>
+      <div class="metric"><p class="metric-label">Mortality</p><p class="metric-num">2.8%</p><p class="metric-sub">target &lt;5%</p></div>
+      <div class="metric"><p class="metric-label">Wean wt</p><p class="metric-num">82</p><p class="metric-sub">kg @ d90</p></div>
+    </div>
+    <p class="section-title">Need attention</p>
+    <div class="row"><div class="av warn"><i class="ti ti-trending-down" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">TEST BLOSSOM · 24 d · 42 kg</p><p class="row-meta">ADG 250 g/d · below target</p></div></div>`;
+}
+
+function rColostrum(){
+  setBar("Colostrum bank","3.0 kg in stock");
+  body.innerHTML=`
+    <div class="banner warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div>Stock low. 2 calvings expected in 14 days requiring ~8 kg.</div></div>
+    <div class="metric-grid">
+      <div class="metric"><p class="metric-label">In stock</p><p class="metric-num">3.0</p><p class="metric-sub">kg, 1 batch</p></div>
+      <div class="metric"><p class="metric-label">Value</p><p class="metric-num">300</p><p class="metric-sub">KES</p></div>
+      <div class="metric"><p class="metric-label">Issued 30d</p><p class="metric-num">12.4</p><p class="metric-sub">kg</p></div>
+      <div class="metric"><p class="metric-label">Need 14d</p><p class="metric-num">~8</p><p class="metric-sub">kg</p></div>
+    </div>
+    <p class="section-title">Batches</p>
+    <div class="row"><div class="av calf"><i class="ti ti-droplet" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">COL-2026-04-15-A</p><p class="row-meta">From TEST IVY · 15 Apr</p></div><span class="pill lact">3.0 kg</span></div>`;
+}
+
+function rDrugInv(){
+  setBar("Drug inventory","23 SKUs");
+  body.innerHTML=`
+    <div class="banner warn"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div>2 items below safety stock</div></div>
+    ${[
+      {n:"FMD Vaccine",b:"FMD-26-B201",q:"42 doses",ok:1},
+      {n:"LSD Vaccine",b:"LSD-26-A012",q:"36 doses",ok:1},
+      {n:"Procaine Penicillin G",b:"PEN-25-K887",q:"3 vials",ok:0},
+      {n:"Albendazole 10%",b:"ALB-26-K112",q:"8 L",ok:1},
+      {n:"Ivermectin 1%",b:"IVE-26-B077",q:"2.4 L",ok:1},
+      {n:"Buparvaquone (Butalex)",b:"BUP-25-A103",q:"1 vial",ok:0}
+    ].map(d=>`<div class="row"><div class="av ${d.ok?'calf':'dgr'}"><i class="ti ti-pill" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">${d.n}</p><p class="row-meta">${d.b}</p></div><span class="pill ${d.ok?'lact':'sick'}">${d.q}</span></div>`).join("")}`;
+}
+
+function rSemenInv(){
+  setBar("Semen straws","Stock items · Stores - WDL");
+  body.innerHTML=`
+    <div class="banner info"><i class="ti ti-info-circle" aria-hidden="true"></i><div>Each semen straw is a stock Item. Service / AI events issue 1 unit on submit.</div></div>
+    <div class="row"><div class="av bull"><i class="ti ti-test-pipe" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">Semen Delta Stormer-F</p><p class="row-meta">Item 4040030377 · 2,400 KES/straw</p></div><span class="pill lact">28 straws</span></div>
+    <div class="row"><div class="av bull"><i class="ti ti-test-pipe" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">Semen Delta Keen-F</p><p class="row-meta">Item 4040030372 · 2,200 KES/straw</p></div><span class="pill lact">15 straws</span></div>`;
+}
+
+function rFeedInv(){
+  setBar("Feed inventory","Multiple warehouses");
+  body.innerHTML=`
+    <div class="row"><div class="av calf"><i class="ti ti-droplet" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">WestWood Dairy Milk (kg)</p><p class="row-meta">Finished Goods - WDL</p></div><span class="pill lact">485 kg</span></div>
+    <div class="row"><div class="av warn"><i class="ti ti-droplet" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">Colostrum (kg)</p><p class="row-meta">Stores - WDL</p></div><span class="pill sick">3 kg</span></div>
+    <div class="row"><div class="av calf"><i class="ti ti-grain" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">Calf starter pellets</p><p class="row-meta">Stores - WDL</p></div><span class="pill lact">240 kg</span></div>
+    <div class="row"><div class="av calf"><i class="ti ti-grain" aria-hidden="true"></i></div><div class="row-main"><p class="row-name">Maize silage</p><p class="row-meta">Silage Pit 1</p></div><span class="pill lact">42 t</span></div>`;
+}
+
+function rSettings(){
+  setBar("Livestock settings","Configuration");
+  body.innerHTML=`
+    <p class="section-title">Default herds</p>
+    <div class="kv"><span class="k">Calf herd</span><span class="v">0-2</span></div>
+    <div class="kv"><span class="k">Bull herd</span><span class="v">BULLS</span></div>
+    <div class="kv"><span class="k">Dry herd</span><span class="v">STEAMERS</span></div>
+    <p class="section-title">Calf feeding plan</p>
+    <div class="kv"><span class="k">Day 1 colostrum</span><span class="v">10% of birth wt</span></div>
+    <div class="kv"><span class="k">Days 2-5 transitional</span><span class="v">5% body wt / day</span></div>
+    <div class="kv"><span class="k">Day 6+ whole milk</span><span class="v">10% body wt / day</span></div>
+    <div class="kv"><span class="k">Weaning</span><span class="v">Day 60 → 90</span></div>
+    <p class="section-title">Reproduction</p>
+    <div class="kv"><span class="k">Min service age</span><span class="v">15 months</span></div>
+    <div class="kv"><span class="k">Min calving age</span><span class="v">24 months</span></div>
+    <p class="section-title">Accounting</p>
+    <div class="kv"><span class="k">Milk sales</span><span class="v">404001</span></div>
+    <div class="kv"><span class="k">Vet expense</span><span class="v">50101906</span></div>
+    <div class="kv"><span class="k">Feed expense</span><span class="v">50101905</span></div>
+    <div class="kv"><span class="k">Milk price</span><span class="v">60 KES/kg</span></div>`;
+}
+
+setTabs();renderDrawer();render("home");
+</script>

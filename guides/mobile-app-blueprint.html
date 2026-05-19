@@ -1,0 +1,2179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile App Engineering Blueprint</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-2: #fafafa;
+  --bg-3: #f4f4f5;
+  --text: #0a0a0a;
+  --text-2: #525252;
+  --text-3: #a3a3a3;
+  --line: #e5e5e5;
+  --line-2: #d4d4d4;
+  --code-bg: #fafafa;
+  --code-text: #171717;
+  --accent: #000000;
+  --warn-bg: #fafafa;
+  --warn-bd: #d4d4d4;
+  --shadow: 0 1px 0 rgba(0,0,0,.04);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--text); }
+
+/* Search */
+.search { padding: 12px 18px 4px; }
+.search input {
+  width: 100%; height: 30px; padding: 0 10px;
+  font-family: inherit; font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px;
+  color: var(--text); box-sizing: border-box;
+}
+.search input:focus { outline: none; border-color: var(--accent); }
+.search-status { padding: 4px 0 4px; font-size: 11px; color: var(--text-3); min-height: 14px; }
+
+/* Layout */
+.shell { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+@media (max-width: 900px) { .shell { grid-template-columns: 1fr; } .nav { display: none; } }
+.nav {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  background: var(--bg-2);
+  border-right: 1px solid var(--line);
+  padding: 24px 0;
+}
+.nav-brand {
+  padding: 0 24px 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.nav-brand .name { font-weight: 700; font-size: 14px; letter-spacing: -.01em; }
+.nav-brand .sub { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+.nav h4 {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--text-3); margin: 18px 24px 8px; padding-top: 6px;
+}
+.nav a {
+  display: block; padding: 5px 24px; font-size: 13px; color: var(--text-2);
+  text-decoration: none; border-left: 2px solid transparent;
+}
+.nav a:hover { color: var(--text); background: var(--bg-3); }
+.nav a.active { color: var(--text); border-left-color: var(--accent); font-weight: 600; }
+
+main { padding: 56px 64px 96px; max-width: 920px; }
+@media (max-width: 900px) { main { padding: 32px 20px 64px; } }
+
+/* Typography */
+h1 { font-size: 32px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 6px; }
+.lead { font-size: 17px; color: var(--text-2); margin: 0 0 32px; }
+h2 {
+  font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 56px 0 12px;
+  padding-top: 16px; border-top: 1px solid var(--line);
+}
+h2:first-of-type { border-top: none; padding-top: 0; margin-top: 36px; }
+h3 { font-size: 17px; font-weight: 700; margin: 32px 0 8px; }
+h4 { font-size: 14px; font-weight: 700; margin: 22px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
+p { margin: 8px 0 14px; }
+ul, ol { margin: 8px 0 14px; padding-left: 22px; }
+li { margin: 4px 0; }
+hr { border: none; border-top: 1px solid var(--line); margin: 36px 0; }
+strong { font-weight: 700; }
+
+.anchor { margin-left: 8px; opacity: 0; color: var(--text-3); text-decoration: none; font-weight: 400; }
+h2:hover .anchor, h3:hover .anchor { opacity: 1; }
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: var(--bg-2); font-weight: 600; }
+tr:nth-child(even) td { background: var(--bg-2); }
+
+/* Code */
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; color: var(--code-text); }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 12px 0; position: relative; }
+pre code { background: transparent; padding: 0; font-size: 13px; }
+.copy-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+  padding: 3px 8px; font-size: 11px; font-family: inherit; color: var(--text-2);
+  cursor: pointer;
+}
+.copy-btn:hover { color: var(--text); border-color: var(--line-2); }
+.copy-btn.copied { color: var(--accent); border-color: var(--accent); }
+
+/* Callout */
+.callout {
+  margin: 18px 0; padding: 12px 16px;
+  background: var(--warn-bg); border-left: 3px solid var(--warn-bd); border-radius: 0 6px 6px 0;
+}
+.callout p { margin: 0; }
+.callout .lbl { font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: .12em; color: var(--text-3); margin-right: 8px; }
+
+.toc { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 12px 0 32px; }
+.toc h4 { margin: 0 0 8px; font-size: 11px; }
+.toc ul { margin: 0; padding-left: 22px; }
+.toc li { font-size: 13px; }
+
+.diagram { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.6; white-space: pre; overflow-x: auto; margin: 12px 0; }
+
+.steps { padding-left: 22px; }
+.steps li { margin: 6px 0; }
+
+footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-3); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="nav" id="nav">
+  <div class="nav-brand">
+    <div class="name">Mobile App Blueprint</div>
+    <div class="sub">Org-wide engineering guide</div>
+  </div>
+
+  <div class="search">
+    <input id="search" placeholder="Search the guide" autocomplete="off" spellcheck="false"/>
+    <div class="search-status" id="searchStatus"></div>
+  </div>
+
+  <h4>Get started</h4>
+  <a href="#overview">Overview</a>
+  <a href="#fit">When this stack fits</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#repo">Repo layout</a>
+
+  <h4>Backend</h4>
+  <a href="#mirror">The mirror pattern</a>
+  <a href="#script-style">Server Script style</a>
+  <a href="#sandbox">Sandbox restrictions</a>
+  <a href="#doctypes">DocTypes &amp; fields</a>
+  <a href="#client-web">Client Scripts &amp; Web</a>
+  <a href="#mcp">Deployment via MCP</a>
+
+  <h4>Mobile</h4>
+  <a href="#stack">Stack</a>
+  <a href="#structure">Project structure</a>
+  <a href="#auth">Auth flow</a>
+  <a href="#client">Axios client</a>
+  <a href="#components">Component kit</a>
+  <a href="#visuals">Brand &amp; visuals</a>
+  <a href="#login">Login screen</a>
+  <a href="#sidemenu">Side menu</a>
+  <a href="#polling">Polling</a>
+  <a href="#ota">OTA updates</a>
+
+  <h4>Reference</h4>
+  <a href="#docs-pattern">Documentation pattern</a>
+  <a href="#recipes">Recipes</a>
+  <a href="#antipatterns">Anti-patterns</a>
+  <a href="#bootstrap">Bootstrap checklist</a>
+</aside>
+
+<main>
+<h1>Mobile App Engineering Blueprint</h1>
+<p class="lead">How we build mobile apps in this organization. The reference implementation is <code>upande-harvest</code> &mdash; this guide captures the patterns that make it reusable and asks you to follow them in every new app.</p>
+
+<div class="callout">
+  <p><span class="lbl">Audience</span>Engineers starting a new mobile app or extending an existing one. The patterns here are mandatory unless explicitly waived &mdash; they exist because we have hit every alternative the hard way.</p>
+</div>
+
+<div class="toc">
+  <h4>On this page</h4>
+  <ul>
+    <li><a href="#overview">1. Overview</a></li>
+    <li><a href="#fit">2. When this stack fits</a></li>
+    <li><a href="#architecture">3. Architecture at a glance</a></li>
+    <li><a href="#repo">4. Repo layout</a></li>
+    <li><a href="#mirror">5. Backend conventions: the mirror pattern</a></li>
+    <li><a href="#script-style">6. Server Script house style</a></li>
+    <li><a href="#sandbox">7. Frappe safe-exec sandbox</a></li>
+    <li><a href="#doctypes">8. DocTypes, Custom Fields, Property Setters</a></li>
+    <li><a href="#client-web">9. Client Scripts, Web Pages, Custom HTML Blocks</a></li>
+    <li><a href="#mcp">10. Deployment via MCP</a></li>
+    <li><a href="#stack">11. Mobile app stack</a></li>
+    <li><a href="#structure">12. Project structure</a></li>
+    <li><a href="#auth">13. Auth flow &amp; instance-URL discovery</a></li>
+    <li><a href="#client">14. Axios client + soft-error promotion</a></li>
+    <li><a href="#components">15. Component kit</a></li>
+    <li><a href="#visuals">16. Brand &amp; visual system</a></li>
+    <li><a href="#login">17. Login screen pattern</a></li>
+    <li><a href="#sidemenu">18. Side menu pattern</a></li>
+    <li><a href="#polling">19. Polling pattern</a></li>
+    <li><a href="#ota">20. OTA updates with EAS</a></li>
+    <li><a href="#docs-pattern">21. Developer documentation pattern</a></li>
+    <li><a href="#recipes">22. Recipes</a></li>
+    <li><a href="#antipatterns">23. Anti-patterns and lessons</a></li>
+    <li><a href="#bootstrap">24. Bootstrap checklist</a></li>
+  </ul>
+</div>
+
+<h2 id="overview">1. Overview <a href="#overview" class="anchor">#</a></h2>
+<p>This blueprint describes a single, coherent stack for building <strong>mobile-first operations apps</strong>: scanner-heavy, role-gated workflows backed by a Frappe site, with a small Expo / React Native client and a single self-contained HTML developer doc.</p>
+
+<p>The architectural choice that defines the whole approach: <strong>there is no installed Frappe app.</strong> All backend artefacts &mdash; DocTypes, Server Scripts, Custom Fields, Web Pages, Client Scripts, Custom HTML Blocks &mdash; live as JSON files in the repo and are pushed to a live Frappe site via MCP. Anyone with the repo and an MCP-connected site can rebuild the entire backend.</p>
+
+<p>That choice cascades:</p>
+<ul>
+  <li>Backend changes are PRs, not bench commands.</li>
+  <li>Schema diffs read like normal code diffs.</li>
+  <li>Dev / staging / prod parity is "push the same JSON to a different URL".</li>
+  <li>You don't need to maintain a Python app.</li>
+</ul>
+
+<h2 id="fit">2. When this stack fits <a href="#fit" class="anchor">#</a></h2>
+
+<table>
+<thead><tr><th>Good fit</th><th>Bad fit</th></tr></thead>
+<tbody>
+<tr><td>Mobile-first ops apps (warehouses, farms, plants, clinics, logistics)</td><td>Real-time chat / collaborative editing</td></tr>
+<tr><td>Heavy QR / barcode scanning</td><td>Heavy compute (image processing, ML, video)</td></tr>
+<tr><td>Multi-role workflows with focused screens per role</td><td>Public-facing high-traffic apps</td></tr>
+<tr><td>Frappe is already the system of record</td><td>Apps where the data plane must be entirely offline-first</td></tr>
+<tr><td>Read patterns tolerate 15&ndash;30 s polling</td><td>Sub-second collaborative state</td></tr>
+<tr><td>A small team that doesn't want a separate backend service</td><td>Apps that need a separate microservice fleet anyway</td></tr>
+</tbody>
+</table>
+
+<p>If you find yourself fighting this stack, you're probably building one of the bad-fit apps. Ask before reaching for an alternative &mdash; the answer is usually "split the bad-fit feature into a separate service and keep the rest on the blueprint."</p>
+
+<h2 id="architecture">3. Architecture at a glance <a href="#architecture" class="anchor">#</a></h2>
+
+<div class="diagram">┌───────────────────┐     ┌──────────────────────┐
+│  Mobile app       │     │  Web dashboards      │
+│  (Expo / RN)      │     │  (Frappe Web Pages)  │
+└────────┬──────────┘     └──────────┬───────────┘
+         │ POST /api/method/&lt;app&gt;.*    │ HTML/JS in browser
+         │ cookie + CSRF               │
+         ▼                             ▼
+┌─────────────────────────────────────────────────┐
+│              Frappe site (data plane)           │
+│  ┌───────────┐  ┌───────────────┐  ┌─────────┐  │
+│  │ DocTypes  │  │ Server Scripts│  │ Clients │  │
+│  │  + custom │  │  (API + event)│  │  + Web  │  │
+│  │  fields   │  │               │  │  pages  │  │
+│  └───────────┘  └───────────────┘  └─────────┘  │
+└─────────────────────────────────────────────────┘
+         ▲
+         │ MCP push (create_document / update_document)
+         │
+┌────────┴──────────┐
+│ frappe/*.json     │  ← source of truth in your repo
+│ (mirrored data)   │
+└───────────────────┘</div>
+
+<p>Three pillars: <strong>mobile app</strong> (primary UI), <strong>Frappe site</strong> (data plane and API surface), <strong>web dashboards</strong> (read-only operational views as Frappe Web Pages). All three speak to the same Server Script API.</p>
+
+<h2 id="repo">4. Repo layout <a href="#repo" class="anchor">#</a></h2>
+
+<pre><code>&lt;app-name&gt;/
+├── app/                          # expo-router pages (mobile screens)
+│   ├── _layout.tsx               # root provider stack
+│   ├── index.tsx                 # auth + ctx routing
+│   ├── login.tsx
+│   └── &lt;feature&gt;/                # nested feature folders
+│
+├── src/
+│   ├── api/
+│   │   └── client.ts             # axios instance + interceptors
+│   ├── components/               # shared UI primitives
+│   ├── constants/
+│   │   └── index.ts              # COLORS, polling cadence, version
+│   ├── services/
+│   │   ├── api.ts                # one method per server-script call
+│   │   ├── context.tsx           # ambient context provider
+│   │   └── sounds.ts             # beep / submit / error players
+│   ├── stores/
+│   │   └── authStore.ts          # zustand store (cookie, user)
+│   ├── types/
+│   │   └── index.ts              # all TypeScript shapes
+│   └── utils/
+│       └── url.ts                # instance-URL helper
+│
+├── assets/
+│   ├── images/&lt;your_logo&gt;.png
+│   └── audio/{beep,submit,error}.mp3
+│
+├── frappe/                       # backend mirror — source of truth
+│   ├── doctypes.json
+│   ├── server_scripts.json
+│   ├── client_scripts.json
+│   ├── custom_fields.json
+│   ├── property_setters.json
+│   ├── custom_html_blocks.json
+│   └── web_pages/
+│       ├── &lt;page1&gt;.html
+│       └── &lt;page2&gt;.html
+│
+├── docs/
+│   └── index.html                # the single-file dev doc
+│
+├── scripts/                      # ad-hoc one-shot tools
+│
+├── app.json                      # expo config
+├── eas.json                      # EAS build / OTA channels
+├── package.json
+├── tsconfig.json
+└── README.md</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="mirror">5. Backend conventions: the mirror pattern <a href="#mirror" class="anchor">#</a></h2>
+
+<p>Every backend artefact type that Frappe stores as a database record gets a JSON file in <code>frappe/</code>. Each file is a JSON array; each array element is an object whose top-level keys mirror the doc's fields:</p>
+
+<pre><code>[
+  {
+    "name": "&lt;doc name&gt;",
+    "module": "&lt;App Name&gt;",
+    "...": "..."
+  }
+]</code><button class="copy-btn">Copy</button></pre>
+
+<h3>Conventions</h3>
+<ul>
+  <li><strong>Sort order is irrelevant.</strong> Tools should sort consistently when writing.</li>
+  <li><strong>Don't store auto-generated fields</strong> like <code>creation</code>, <code>modified</code>, <code>owner</code>, <code>idx</code> &mdash; they're noisy and recreate-able.</li>
+  <li><strong>Store <code>disabled: 0</code></strong> explicitly for Server Scripts so dead scripts are visible.</li>
+  <li><strong>Store the <code>script</code> field as a single JSON-escaped string</strong> with <code>\n</code> for newlines. Pretty-printing inflates noise.</li>
+</ul>
+
+<h3>Naming</h3>
+<ul>
+  <li><strong>API endpoints</strong>: <code>&lt;app&gt;.&lt;verb&gt;_&lt;noun&gt;</code> &mdash; e.g. <code>harvest.scan_crate</code>, <code>clinic.book_appointment</code>. The <code>&lt;app&gt;</code> prefix is a logical namespace, not a Python module path.</li>
+  <li><strong>DocTypes</strong>: PascalCase, prefix with the app name when domain-specific (<code>Harvest Team</code>, <code>Clinic Patient Visit</code>). Generic doctypes (<code>Vehicle</code>, <code>Employee</code>) reuse Frappe / ERPNext defaults.</li>
+  <li><strong>Custom Fields</strong> on stock ERPNext doctypes: prefix with <code>custom_</code>.</li>
+  <li><strong>Roles</strong>: <code>&lt;App&gt; &lt;Role&gt;</code> &mdash; e.g. <code>Loading Clerk</code>, <code>Receiver</code>. Don't reuse stock Frappe role names.</li>
+</ul>
+
+<h2 id="script-style">6. Server Script house style <a href="#script-style" class="anchor">#</a></h2>
+<p>Every API Server Script follows this shape. Copy and adapt.</p>
+
+<pre><code>try:
+    # 1. Read body — fall back to form_dict so JSON & form-encoded both work
+    data = {}
+    try:
+        data = frappe.request.get_json(silent=True) or {}
+    except Exception:
+        data = {}
+    if not data:
+        data = dict(frappe.form_dict or {})
+
+    # 2. Pull and validate inputs
+    foo = str(data.get('foo') or '').strip()
+    qty = data.get('qty')
+    try:
+        qty = int(qty or 0)
+    except Exception:
+        qty = 0
+
+    # 3. Role gating (if needed) — see §7 for why we query tabHas Role
+    user = frappe.session.user
+    role_rows = frappe.db.sql('SELECT role FROM `tabHas Role` WHERE parent = %s', (user,))
+    roles = []
+    for r in role_rows:
+        if r and r[0]:
+            roles.append(r[0])
+    is_clerk = 'My Clerk Role' in roles
+
+    # 4. Branch on validation — soft-fail with {error: "..."} on a 200
+    if not is_clerk:
+        frappe.response['message'] = {'error': 'Only Clerks can do this'}
+    elif not foo:
+        frappe.response['message'] = {'error': 'foo is required'}
+    elif qty &lt; 1:
+        frappe.response['message'] = {'error': 'qty must be at least 1'}
+    else:
+        # 5. Do the work
+        doc = frappe.new_doc('My Thing')
+        doc.foo = foo
+        doc.qty = qty
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        # 6. Build response payload
+        frappe.response['message'] = {
+            'name': doc.name,
+            'foo': foo,
+            'qty': qty,
+        }
+except Exception as e:
+    frappe.db.rollback()
+    frappe.log_error('&lt;app&gt;.&lt;method&gt;', str(e))
+    frappe.response['message'] = {'error': str(e)}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>Conventions</h3>
+<ul>
+  <li><strong>Always wrap in <code>try / except</code></strong> &mdash; log via <code>frappe.log_error(name, str(e))</code>, return <code>{error: str(e)}</code>.</li>
+  <li><strong>Never set <code>frappe.response.http_status_code</code></strong> &mdash; the sandbox blocks <code>setattr</code> on <code>frappe.response</code>. Soft-fail on 200.</li>
+  <li><strong>Prefer <code>frappe.db.set_value</code></strong> for bulk updates &mdash; cheap, no doc-load overhead.</li>
+  <li><strong>Use <code>frappe.new_doc(...).insert(ignore_permissions=True)</code></strong> for new docs. Permissions are enforced by your role-gating, not Frappe's.</li>
+  <li><strong>Use <code>frappe.db.sql</code> only for <code>SELECT</code></strong> &mdash; DDL/DML raises <em>"Query must be of SELECT or read-only WITH type."</em></li>
+  <li><strong>Always <code>frappe.db.commit()</code></strong> after a multi-doc transaction; on exception the outer <code>rollback()</code> undoes any work done before commit.</li>
+</ul>
+
+<h2 id="sandbox">7. Frappe safe-exec sandbox <a href="#sandbox" class="anchor">#</a></h2>
+
+<p>Server Scripts run inside <code>frappe.utils.safe_exec.safe_exec</code>. The <code>frappe</code> object you see inside a script is <strong>not the real <code>frappe</code> Python module</strong> &mdash; it's a hand-curated <code>NamespaceDict</code> with a small allowlist of attributes. This single fact explains every restriction below.</p>
+
+<p>This section is the canonical reference for what does and doesn't work. Every restriction here was discovered by hitting it in production. Save yourself the round-trip and read this carefully before writing your first script.</p>
+
+<h3>7.1 Hard restrictions</h3>
+
+<table>
+<thead><tr><th>Pattern</th><th>What happens</th><th>Workaround</th></tr></thead>
+<tbody>
+<tr><td><code>import x</code> / <code>from x import y</code></td><td>Blocked at parse time.</td><td>Use what's already injected (<code>frappe</code>, <code>frappe.utils</code>, builtins). Anything not in the allowlist isn't reachable.</td></tr>
+<tr><td>Top-level <code>return</code></td><td>Blocked &mdash; safe-exec wraps the script body, there's no enclosing function.</td><td>Branch with <code>if / elif / else</code> instead. Set <code>frappe.response['message']</code> in each branch.</td></tr>
+<tr><td>Augmented assignment (<code>+=</code>, <code>-=</code>, etc.) at top level</td><td>Sometimes blocked, depends on the interpreter version.</td><td>Use <code>x = x + 1</code> &mdash; works everywhere.</td></tr>
+<tr><td>In-place slicing (e.g. <code>lst[2:4] = [...]</code>)</td><td>Blocked.</td><td>Build a new list and reassign.</td></tr>
+<tr><td><code>str.format()</code></td><td>Raises <em>"format is an unsafe attribute"</em>.</td><td>Use <code>+</code> string concatenation or <code>%</code>-style formatting (<code>"hello %s" % name</code>).</td></tr>
+<tr><td>f-strings</td><td>Likely blocked &mdash; they compile to <code>__format__</code> calls, which the sandbox treats as <code>format</code>.</td><td>Use <code>+</code> concatenation. <strong>Default to no f-strings in Server Scripts.</strong></td></tr>
+<tr><td><code>exec()</code>, <code>eval()</code>, <code>compile()</code>, <code>__import__()</code></td><td>Blocked.</td><td>Don't.</td></tr>
+<tr><td><code>os.system</code>, <code>os.popen</code>, <code>subprocess</code></td><td>Blocked &mdash; <code>os</code> isn't exposed at all.</td><td>Don't shell out from a Server Script.</td></tr>
+<tr><td><code>open()</code> outside the site folder</td><td>Blocked.</td><td>Use Frappe File doctype + <code>frappe.utils.file_lock</code> if you must.</td></tr>
+<tr><td><code>frappe.db.sql</code> with DDL or DML</td><td><em>"Query must be of SELECT or read-only WITH type."</em></td><td>Use <code>frappe.db.set_value</code> / <code>frappe.new_doc().insert()</code> / <code>frappe.delete_doc()</code>.</td></tr>
+<tr><td><code>frappe.response.http_status_code = 500</code></td><td>The sandbox blocks <code>setattr</code> on <code>frappe.response</code>.</td><td>Soft-fail on 200 with <code>{"error": "..."}</code>. The mobile <code>call&lt;T&gt;</code> wrapper promotes these to thrown errors anyway.</td></tr>
+<tr><td><code>hasattr(x, "y")</code> / <code>isinstance(x, T)</code> when <code>T</code> isn't in the safe builtins</td><td>NameError or silent fail.</td><td>Use <code>type(x).__name__ == "Foo"</code> only when you have to. Usually you don't &mdash; structure the code so types are known.</td></tr>
+<tr><td><code>"2026-01-01".isoformat()</code> on a date</td><td>Sometimes the date type isn't the real <code>datetime.date</code> &mdash; <code>isoformat()</code> isn't always present.</td><td>Use <code>str(value)</code> for dates &mdash; produces the canonical ISO format.</td></tr>
+<tr><td><code>gi_frame</code> traversal, <code>__builtins__</code> manipulation, <code>format_map</code> with generators</td><td>Blocked &mdash; sandbox-escape vectors.</td><td>Don't go there.</td></tr>
+</tbody>
+</table>
+
+<h3>7.2 What does NOT exist on the <code>frappe</code> object in safe-exec</h3>
+
+<p>The injected <code>frappe</code> looks complete but is missing many attributes. These are the ones we have specifically tripped over:</p>
+
+<ul>
+  <li><code>frappe.rename_field</code> &mdash; <em>"module has no attribute 'rename_field'"</em>. Use the whitelisted REST endpoint instead (see workaround below).</li>
+  <li><code>frappe.get_attr</code> &mdash; not exposed. Means you cannot dynamically resolve any whitelisted method through the sandbox.</li>
+  <li><code>frappe.get_roles</code> &mdash; not exposed. You'd think this would work; it doesn't. Query <code>tabHas Role</code> directly.</li>
+  <li><code>frappe.model.*</code>, <code>frappe.permissions.*</code>, etc. &mdash; submodule traversal silently resolves to <code>None</code>. Calling it gives <em>"NoneType is not callable"</em>, which is the most confusing error in the sandbox.</li>
+</ul>
+
+<div class="callout">
+  <p><span class="lbl">Why</span>The <code>frappe</code> object inside <code>safe_exec</code> is a <code>frappe._dict</code> NamespaceDict, not the real <code>frappe</code> Python module. It only knows about attributes the safe-exec author explicitly added. Anything else returns <code>None</code> through dict-lookup semantics.</p>
+</div>
+
+<h3>7.3 What IS available</h3>
+
+<p>The reliable allowlist:</p>
+<ul>
+  <li><code>frappe.session.user</code> &mdash; current user's name (typically email).</li>
+  <li><code>frappe.request.get_json(silent=True)</code> &mdash; JSON body.</li>
+  <li><code>frappe.form_dict</code> &mdash; form-encoded body fallback.</li>
+  <li><code>frappe.response['message']</code> &mdash; return payload.</li>
+  <li><code>frappe.db.sql</code> &mdash; SELECT only.</li>
+  <li><code>frappe.db.set_value</code>, <code>frappe.db.get_value</code>, <code>frappe.db.exists</code>, <code>frappe.db.count</code>, <code>frappe.db.commit</code>, <code>frappe.db.rollback</code>.</li>
+  <li><code>frappe.new_doc(...).insert(ignore_permissions=True)</code>.</li>
+  <li><code>frappe.get_doc(...)</code> &mdash; loads a doc; further mutations respect normal perms unless you pass <code>ignore_permissions</code> to whatever you call.</li>
+  <li><code>frappe.rename_doc</code> &mdash; auto-commits internally (the rename survives a later <code>rollback()</code>).</li>
+  <li><code>frappe.delete_doc</code>, <code>frappe.copy_doc</code>.</li>
+  <li><code>frappe.utils.now_datetime()</code>, <code>frappe.utils.nowdate()</code>, <code>frappe.utils.add_days</code>, <code>frappe.utils.flt</code>, <code>frappe.utils.cint</code>.</li>
+  <li><code>frappe.log_error(title, message)</code>.</li>
+  <li><code>lambda</code> &mdash; usable in <code>max(items.items(), key=lambda x: x[1])</code> patterns.</li>
+  <li><code>str()</code>, <code>int()</code>, <code>float()</code>, <code>list()</code>, <code>dict()</code>, <code>set()</code>, <code>tuple()</code>, <code>len()</code>, <code>range()</code>, <code>enumerate()</code>, <code>sorted()</code>, <code>min</code>, <code>max</code>, <code>sum</code>, <code>any</code>, <code>all</code> &mdash; standard builtins are fine.</li>
+</ul>
+
+<h3>7.4 Common workarounds</h3>
+
+<h4>Get the current user's roles</h4>
+<pre><code>user = frappe.session.user
+role_rows = frappe.db.sql('SELECT role FROM `tabHas Role` WHERE parent = %s', (user,))
+roles = []
+for r in role_rows:
+    if r and r[0]:
+        roles.append(r[0])
+is_clerk = 'My Clerk Role' in roles</code><button class="copy-btn">Copy</button></pre>
+
+<h4>Rename a field</h4>
+<p>Impossible from inside a Server Script &mdash; <code>frappe.rename_field</code> isn't exposed and submodule traversal returns <code>None</code>. Call the whitelisted REST endpoint instead:</p>
+<pre><code>POST /api/method/frappe.model.rename_field.rename_field
+  doctype=&lt;dt&gt;&amp;old_fieldname=&lt;old&gt;&amp;new_fieldname=&lt;new&gt;</code><button class="copy-btn">Copy</button></pre>
+
+<h4>Rename a DocType</h4>
+<pre><code>frappe.rename_doc('DocType', 'Old Name', 'New Name', force=True, ignore_permissions=True)</code><button class="copy-btn">Copy</button></pre>
+<p>Auto-commits internally &mdash; the rename survives a later <code>rollback()</code>.</p>
+
+<h4>Add a column to a doctype</h4>
+<p>Don't <code>ALTER TABLE</code> &mdash; DDL is blocked. Push a <code>Custom Field</code> doc via MCP from outside the sandbox; Frappe runs the migration on save.</p>
+
+<h4>String formatting without <code>.format()</code></h4>
+<pre><code># BAD: blocks
+msg = "User {0} did {1}".format(user, action)
+
+# GOOD: concatenation
+msg = "User " + str(user) + " did " + str(action)
+
+# ALSO GOOD: %-style
+msg = "User %s did %s" % (user, action)</code><button class="copy-btn">Copy</button></pre>
+
+<h4>Build response payloads carefully</h4>
+<pre><code># Bad — sets http_status_code, blocked by sandbox
+frappe.response.http_status_code = 500
+frappe.response['message'] = {"error": "boom"}
+
+# Good — soft-fail on 200; client wrapper promotes to throw
+frappe.response['message'] = {"error": "boom"}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>7.5 The "NoneType is not callable" trap</h3>
+<p>This is the single most confusing sandbox error. It happens when you do something like:</p>
+
+<pre><code>frappe.model.rename_field.rename_field(doctype, old, new)
+# Error: 'NoneType' object is not callable</code><button class="copy-btn">Copy</button></pre>
+
+<p>What's happening: the <code>frappe</code> NamespaceDict has no <code>model</code> attribute. Dict-lookup of an absent key returns <code>None</code>. Attribute access on <code>None</code> is intercepted to also return <code>None</code> (instead of raising). So <code>frappe.model.rename_field.rename_field</code> evaluates to <code>None</code>, and <em>then</em> you call it.</p>
+
+<p>The fix: assume any <code>frappe.&lt;submodule&gt;</code> traversal will silently fail. Stick to top-level <code>frappe</code> attributes that you've verified work. When in doubt, write a one-line probe script first:</p>
+
+<pre><code>try:
+    frappe.response['message'] = {"has_thing": frappe.thing is not None}
+except Exception as e:
+    frappe.response['message'] = {"error": str(e)}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>7.6 Sandbox checklist (the pre-write review)</h3>
+<p>Before writing a new Server Script, scan this list:</p>
+<ol class="steps">
+  <li>Am I importing anything? &rarr; <strong>No.</strong></li>
+  <li>Am I using <code>.format()</code> or f-strings? &rarr; <strong>Replace with <code>+</code> or <code>%</code>.</strong></li>
+  <li>Am I doing DDL/DML in <code>frappe.db.sql</code>? &rarr; <strong>Use <code>set_value</code> / <code>insert()</code> / <code>delete_doc</code>.</strong></li>
+  <li>Am I traversing <code>frappe.&lt;submodule&gt;</code>? &rarr; <strong>Stop. It returns <code>None</code>.</strong></li>
+  <li>Am I returning at the top level? &rarr; <strong>Use <code>else:</code> branches.</strong></li>
+  <li>Am I checking roles? &rarr; <strong>Query <code>tabHas Role</code>.</strong></li>
+  <li>Am I setting <code>http_status_code</code>? &rarr; <strong>Soft-fail on 200.</strong></li>
+  <li>Have I wrapped the whole body in <code>try / except</code>? &rarr; <strong>Yes, with <code>frappe.log_error(name, str(e))</code> and <code>{"error": str(e)}</code>.</strong></li>
+</ol>
+
+<h2 id="doctypes">8. DocTypes, Custom Fields, Property Setters <a href="#doctypes" class="anchor">#</a></h2>
+
+<h3>8.1 DocType JSON shape</h3>
+<p>Stored in <code>frappe/doctypes.json</code> as one object per doctype:</p>
+<pre><code>{
+  "name": "My Thing",
+  "module": "My App",
+  "custom": 1,
+  "istable": 0,
+  "is_submittable": 0,
+  "track_changes": 1,
+  "naming_rule": "Expression (old style)",
+  "autoname": "format:MT-{#####}",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "fields": [
+    {
+      "fieldname": "foo",
+      "label": "Foo",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "options": "Open\nClosed",
+      "default": "Open"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1, "write": 1, "create": 1, "delete": 1,
+      "report": 1, "export": 1, "share": 1, "print": 1, "email": 1
+    }
+  ]
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>8.2 Custom Fields (preferred over editing core doctypes)</h3>
+<p>Stored in <code>frappe/custom_fields.json</code>. Use these to extend either your own DocTypes or stock ERPNext doctypes &mdash; they're easier to push via MCP than mutating the parent doctype's <code>fields</code> array.</p>
+<pre><code>{
+  "dt": "My Thing",
+  "fieldname": "extra_data",
+  "label": "Extra Data",
+  "fieldtype": "Data",
+  "insert_after": "status"
+}</code><button class="copy-btn">Copy</button></pre>
+
+<div class="callout">
+  <p><span class="lbl">Note</span>Direct edits to the parent doctype's child <code>fields</code> array via MCP <em>often fail</em>. Push a <code>Custom Field</code> doc instead. The parent doctype's <code>fields</code> array in <code>doctypes.json</code> stays as the source-of-truth view; the live data is the union of doctype fields + custom fields.</p>
+</div>
+
+<h3>8.3 Property Setters</h3>
+<p>Stored in <code>frappe/property_setters.json</code>. Use to override a single property on a stock field.</p>
+<pre><code>{
+  "doc_type": "Customer",
+  "field_name": "tax_id",
+  "property": "reqd",
+  "value": "1",
+  "property_type": "Check"
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="client-web">9. Client Scripts, Web Pages, Custom HTML Blocks <a href="#client-web" class="anchor">#</a></h2>
+
+<h3>9.1 Client Scripts</h3>
+<p>Stored in <code>frappe/client_scripts.json</code>. JavaScript that runs in the Frappe desk.</p>
+<pre><code>{
+  "name": "My Thing — Quick Action",
+  "dt": "My Thing",
+  "view": "Form",
+  "enabled": 1,
+  "script": "frappe.ui.form.on('My Thing', { refresh(frm) { ... } });"
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>9.2 Web Pages</h3>
+<p>Stored as individual HTML files in <code>frappe/web_pages/&lt;route&gt;.html</code>. Pushed via the <code>Web Page</code> doctype's <code>main_section_html</code> field.</p>
+<p>Pattern: a single self-contained file with all CSS and JS inline, calling <code>frappe.call(...)</code> for data. Auto-refresh every 30 s. No external libraries beyond what Frappe already loads.</p>
+
+<h3>9.3 Custom HTML Blocks</h3>
+<p>Stored in <code>frappe/custom_html_blocks.json</code>. The Frappe workspace navigation widgets.</p>
+<pre><code>{
+  "name": "&lt;App&gt; Navigation",
+  "private": 0,
+  "script": "/* No JS needed */",
+  "style": "...",
+  "html": "..."
+}</code><button class="copy-btn">Copy</button></pre>
+<p>These render at the top of a workspace and act as a hub of links / shortcuts.</p>
+
+<h2 id="mcp">10. Deployment via MCP <a href="#mcp" class="anchor">#</a></h2>
+
+<p>Pushing the repo state to a live Frappe site uses MCP tools &mdash; Claude calls them as <code>create_document</code>, <code>update_document</code>, <code>delete_document</code>. The pattern:</p>
+
+<pre><code>For each entry in frappe/&lt;file&gt;.json:
+  if it doesn't exist on live → create_document
+  else                        → update_document</code><button class="copy-btn">Copy</button></pre>
+
+<h3>Bootstrapping a new instance</h3>
+<ol class="steps">
+  <li>Create the Frappe site (Frappe Cloud, bench, etc.).</li>
+  <li>Set up MCP access (an OAuth-connected Anthropic Frappe MCP server).</li>
+  <li>From a clean repo, instruct Claude to push every doctype, then every server script, then custom fields, then property setters, then web pages, then custom HTML blocks. Stop on the first failure and report.</li>
+</ol>
+
+<p>Order matters: doctypes before server scripts (scripts may reference the tables); custom fields after their parent doctypes exist; property setters last.</p>
+
+<h3>Updating a live site</h3>
+<p>After editing a JSON locally, instruct Claude to push only the changed entries (a <code>git diff</code> over the file is the simplest input).</p>
+
+<h3>Avoiding drift</h3>
+<p>A drift check is a one-shot script that for every entry in your local JSON, fetches the live record and compares the script body / fields. Easy to run before a release.</p>
+
+<h2 id="stack">11. Mobile app stack <a href="#stack" class="anchor">#</a></h2>
+
+<table>
+<thead><tr><th>Concern</th><th>Choice</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Framework</td><td>React Native + Expo (managed workflow)</td><td>OTA updates, no Xcode/Android Studio for most work</td></tr>
+<tr><td>Routing</td><td><code>expo-router</code> (file-based, <code>app/</code>)</td><td>Convention &gt; config, deep linking is free</td></tr>
+<tr><td>State</td><td><code>zustand</code> for auth, <code>useState</code> everywhere else, React Context for ambient state</td><td>No global state library — features are local</td></tr>
+<tr><td>Network</td><td><code>axios</code> with interceptors</td><td>Cookie + CSRF + soft-error promotion</td></tr>
+<tr><td>Camera</td><td><code>expo-camera</code></td><td>QR + barcode scanning</td></tr>
+<tr><td>Audio</td><td><code>expo-audio</code></td><td>Tone cues for scan / submit / error</td></tr>
+<tr><td>Persistence</td><td><code>@react-native-async-storage/async-storage</code></td><td>Cookie, instance URL, ambient context</td></tr>
+<tr><td>Build</td><td>EAS Build</td><td>Cloud builds, no local toolchain</td></tr>
+<tr><td>OTA</td><td><code>expo-updates</code> + <code>eas update</code></td><td>Ship JS-only changes without re-distributing APKs</td></tr>
+</tbody>
+</table>
+
+<h3>Initial setup</h3>
+<pre><code>npx create-expo-app &lt;app-name&gt; --template blank-typescript
+cd &lt;app-name&gt;
+
+# router
+npx expo install expo-router react-native-safe-area-context react-native-screens \
+  react-native-gesture-handler react-native-reanimated
+
+# core extras
+npx expo install expo-camera expo-audio expo-secure-store expo-sqlite \
+  @react-native-async-storage/async-storage expo-status-bar @expo/vector-icons
+
+# state + http
+npm install zustand axios
+
+# updates
+npx expo install expo-updates</code><button class="copy-btn">Copy</button></pre>
+
+<h3><code>app.json</code> baseline</h3>
+<pre><code>{
+  "expo": {
+    "name": "My App",
+    "slug": "my-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/logo.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.example.myapp"
+    },
+    "ios": { "supportsTablet": true },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        { "cameraPermission": "Allow My App to scan QR codes." }
+      ],
+      "expo-audio"
+    ],
+    "experiments": { "typedRoutes": true, "reactCompiler": true },
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": { "url": "https://u.expo.dev/&lt;your-eas-project-id&gt;" },
+    "extra": {
+      "router": {},
+      "eas": { "projectId": "&lt;your-eas-project-id&gt;" }
+    }
+  }
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h3><code>eas.json</code> baseline</h3>
+<pre><code>{
+  "cli": { "version": "&gt;= 18.7.0", "appVersionSource": "remote" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal" },
+    "preview": { "distribution": "internal", "channel": "preview" },
+    "production": { "autoIncrement": true, "channel": "production" }
+  },
+  "submit": { "production": {} }
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="structure">12. Project structure <a href="#structure" class="anchor">#</a></h2>
+
+<h3>Root layout (<code>app/_layout.tsx</code>)</h3>
+<pre><code>import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import "react-native-reanimated";
+
+import { useAuthStore } from "@/src/stores/authStore";
+
+export default function RootLayout() {
+  const hydrate = useAuthStore((s) =&gt; s.hydrate);
+  const hydrated = useAuthStore((s) =&gt; s.hydrated);
+
+  useEffect(() =&gt; { hydrate(); }, [hydrate]);
+
+  if (!hydrated) {
+    return (
+      &lt;View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}&gt;
+        &lt;ActivityIndicator /&gt;
+      &lt;/View&gt;
+    );
+  }
+
+  return (
+    &lt;GestureHandlerRootView style={{ flex: 1 }}&gt;
+      &lt;SafeAreaProvider&gt;
+        &lt;Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: "#F5F5F5" },
+          }}
+        /&gt;
+        &lt;StatusBar style="dark" /&gt;
+      &lt;/SafeAreaProvider&gt;
+    &lt;/GestureHandlerRootView&gt;
+  );
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>Index route (<code>app/index.tsx</code>)</h3>
+<pre><code>import { Redirect } from "expo-router";
+import { useAuthStore } from "@/src/stores/authStore";
+
+export default function Index() {
+  const isAuthed = useAuthStore((s) =&gt; s.isAuthenticated);
+  if (!isAuthed) return &lt;Redirect href="/login" /&gt;;
+  return &lt;Redirect href="/home" /&gt;;
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>Constants (<code>src/constants/index.ts</code>)</h3>
+<pre><code>import Constants from "expo-constants";
+
+export const API_BASE_URL: string | null =
+  (Constants.expoConfig?.extra?.apiBase as string | undefined) ?? null;
+
+export const APP_VERSION = "1.0.0";
+export const POLL_INTERVAL_MS = 30_000;
+
+// Single palette object — every component pulls from here.
+// Keep it short; resist the urge to add per-feature colors.
+export const COLORS = {
+  // Section / accent colors (often all the same in monochrome systems)
+  primary: "#000000",
+  // Status tones
+  success: "#000000",
+  danger:  "#A32D2D",
+  warn:    "#4B5563",
+  info:    "#000000",
+  // Surface / text
+  text:      "#000000",
+  textMuted: "#6B6B6B",
+  border:    "#D0D0D0",
+  bg:        "#FFFFFF",
+  bgMuted:   "#F5F5F5",
+} as const;</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="auth">13. Auth flow &amp; instance-URL discovery <a href="#auth" class="anchor">#</a></h2>
+
+<h3>13.1 The auth store (<code>src/stores/authStore.ts</code>)</h3>
+<pre><code>import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { login as apiLogin, logout as apiLogout } from "../api/auth";
+import { API_BASE_URL } from "../constants";
+
+type AuthState = {
+  user: { email: string; userId: string } | null;
+  instanceUrl: string | null;
+  isAuthenticated: boolean;
+  hydrated: boolean;
+  hydrate: () =&gt; Promise&lt;void&gt;;
+  login: (url: string, email: string, password: string) =&gt; Promise&lt;void&gt;;
+  logout: () =&gt; Promise&lt;void&gt;;
+};
+
+export const useAuthStore = create&lt;AuthState&gt;((set) =&gt; ({
+  user: null,
+  instanceUrl: null,
+  isAuthenticated: false,
+  hydrated: false,
+  hydrate: async () =&gt; {
+    let [email, url, cookie] = await Promise.all([
+      AsyncStorage.getItem("user_email"),
+      AsyncStorage.getItem("instanceurl"),
+      AsyncStorage.getItem("cookie"),
+    ]);
+    if (API_BASE_URL &amp;&amp; url !== API_BASE_URL) {
+      await AsyncStorage.multiRemove(["cookie", "user_email"]);
+      await AsyncStorage.setItem("instanceurl", API_BASE_URL);
+      url = API_BASE_URL; cookie = null; email = null;
+    }
+    set({
+      user: email ? { email, userId: "" } : null,
+      instanceUrl: url,
+      isAuthenticated: Boolean(cookie &amp;&amp; url),
+      hydrated: true,
+    });
+  },
+  login: async (url, email, password) =&gt; {
+    const result = await apiLogin(email, password, url);
+    set({
+      user: { email, userId: result.userId },
+      instanceUrl: result.fullUrl,
+      isAuthenticated: true,
+    });
+  },
+  logout: async () =&gt; {
+    await apiLogout();
+    set({ user: null, instanceUrl: null, isAuthenticated: false });
+  },
+}));</code><button class="copy-btn">Copy</button></pre>
+
+<h3>13.2 The auth API (<code>src/api/auth.ts</code>)</h3>
+<pre><code>import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getWorkingUrl } from "../utils/url";
+
+function parseCookie(setCookieHeader: string | null, name: string): string | null {
+  if (!setCookieHeader) return null;
+  const re = new RegExp(`(?:^|[;,\\s])${name}=([^;,\\s]+)`);
+  const match = re.exec(setCookieHeader);
+  return match ? match[1] : null;
+}
+
+export async function login(email: string, password: string, urlInput: string) {
+  const fullUrl = await getWorkingUrl(urlInput);
+  if (!fullUrl) throw new Error(`Could not reach "${urlInput}".`);
+
+  const body = new URLSearchParams();
+  body.append("usr", email);
+  body.append("pwd", password);
+
+  const response = await fetch(`${fullUrl}/api/method/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  const text = await response.text();
+  let parsed: any = text;
+  try { parsed = JSON.parse(text); } catch { throw new Error("Invalid instance — please check the URL."); }
+  if (!response.ok) {
+    throw new Error(parsed?.message ?? parsed?.exc ?? `Login failed (${response.status})`);
+  }
+
+  const setCookie = response.headers.get("set-cookie");
+  const sid = parseCookie(setCookie, "sid");
+  const userId = parseCookie(setCookie, "user_id");
+  if (!sid) throw new Error("Login succeeded but no session cookie returned");
+
+  await AsyncStorage.setItem("instanceurl", fullUrl);
+  await AsyncStorage.setItem("cookie", `sid=${sid}; user_id=${userId ?? ""}`);
+  await AsyncStorage.setItem("user_email", email);
+
+  return { fullUrl, sid, userId: userId ?? "" };
+}
+
+export async function logout() {
+  await AsyncStorage.multiRemove(["instanceurl", "cookie", "user_email"]);
+}</code><button class="copy-btn">Copy</button></pre>
+
+<h3>13.3 URL helper (<code>src/utils/url.ts</code>)</h3>
+<pre><code>export async function getWorkingUrl(input: string): Promise&lt;string | null&gt; {
+  const trimmed = input.trim().replace(/\/$/, "");
+  if (!trimmed) return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `https://${trimmed}`;
+}</code><button class="copy-btn">Copy</button></pre>
+
+<p>If you want to <em>probe</em> multiple URL shapes &mdash; the user typed <code>kaitet</code> and you try <code>https://kaitet.c.frappe.cloud</code> and other guesses &mdash; extend this to call <code>/api/method/ping</code> on each candidate and return the first 200.</p>
+
+<h2 id="client">14. Axios client + soft-error promotion <a href="#client" class="anchor">#</a></h2>
+
+<h3>14.1 The axios instance (<code>src/api/client.ts</code>)</h3>
+<pre><code>import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios, { type AxiosError } from "axios";
+import { router } from "expo-router";
+
+const api = axios.create({ timeout: 30000 });
+
+api.interceptors.request.use(async (config) =&gt; {
+  const baseURL = await AsyncStorage.getItem("instanceurl");
+  const cookie  = await AsyncStorage.getItem("cookie");
+  if (!baseURL) throw new Error("No instance URL configured");
+  if (!cookie)  throw new Error("Authentication Error: No cookies found");
+
+  config.baseURL = baseURL;
+  config.headers.Cookie = cookie;
+  config.headers["Content-Type"] = config.headers["Content-Type"] || "application/json";
+  config.headers["X-Frappe-CSRF-Token"] = "token";
+
+  console.log(
+    "[api →]",
+    (config.method ?? "GET").toUpperCase(),
+    `${config.baseURL ?? ""}${config.url ?? ""}`,
+    "payload:", config.data ?? null,
+  );
+  return config;
+});
+
+function extractFrappeError(err: AxiosError): string {
+  const data = err.response?.data as any;
+  if (data) {
+    if (typeof data._server_messages === "string") {
+      try {
+        const parsed = JSON.parse(data._server_messages) as string[];
+        const first = parsed[0];
+        if (first) {
+          try {
+            const obj = JSON.parse(first);
+            if (obj?.message) return obj.message;
+          } catch { return first; }
+        }
+      } catch {}
+    }
+    if (typeof data.exception === "string" &amp;&amp; data.exception) {
+      const line = data.exception.split("\n").pop()?.trim();
+      if (line) return line;
+    }
+    if (typeof data.message === "string" &amp;&amp; data.message) return data.message;
+    if (typeof data.message === "object" &amp;&amp; data.message?.error) return data.message.error;
+  }
+  if (err.response?.status) return `Request failed (${err.response.status})`;
+  return err.message || "Network error";
+}
+
+api.interceptors.response.use(
+  (r) =&gt; {
+    console.log("[api ←]", r.config.method?.toUpperCase(), r.config.url, r.status,
+                "response:", r.data);
+    return r;
+  },
+  async (err: AxiosError) =&gt; {
+    console.warn("[api ✗]", err.config?.method?.toUpperCase(), err.config?.url,
+                 err.response?.status ?? "no-response",
+                 "payload:", err.config?.data ?? null,
+                 "response:", err.response?.data ?? err.message);
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      await AsyncStorage.multiRemove(["cookie"]);
+      router.replace("/login");
+    }
+    return Promise.reject(new Error(extractFrappeError(err)));
+  },
+);
+
+export default api;</code><button class="copy-btn">Copy</button></pre>
+
+<h3>14.2 The typed call wrapper (<code>src/services/api.ts</code>)</h3>
+<pre><code>import client from "../api/client";
+import type { /* your types */ } from "../types";
+
+async function call&lt;T&gt;(method: string, body: object = {}): Promise&lt;T&gt; {
+  const res = await client.post&lt;{ message: T }&gt;(`/api/method/${method}`, body);
+  const msg = res.data.message as unknown as { error?: string } | T;
+  // Soft errors come back as 200 + {error: "..."} — promote them so callers
+  // don't accidentally treat them as success.
+  if (msg &amp;&amp; typeof msg === "object" &amp;&amp; "error" in msg &amp;&amp; (msg as any).error) {
+    throw new Error((msg as { error: string }).error);
+  }
+  return res.data.message;
+}
+
+export const api = {
+  // One method per server-script call. Keep the names
+  // close to the server-side names for grep-ability.
+
+  getSessionInfo: () =&gt; call&lt;SessionInfo&gt;("&lt;app&gt;.get_session_info"),
+
+  // Example: a list endpoint
+  listThings: (status?: string) =&gt; call&lt;Thing[]&gt;("&lt;app&gt;.list_things", { status }),
+
+  // Example: a create endpoint
+  createThing: (foo: string, qty: number) =&gt;
+    call&lt;Thing&gt;("&lt;app&gt;.create_thing", { foo, qty }),
+};</code><button class="copy-btn">Copy</button></pre>
+
+<div class="callout">
+  <p><span class="lbl">Convention</span>One method per server-script call. The wrapper keeps the network layer thin and forces every endpoint to be typed, named, and searchable from the IDE. Resist adding helpers, retries, or smart caching here &mdash; push that into the calling component if it's needed.</p>
+</div>
+
+<h2 id="components">15. Component kit <a href="#components" class="anchor">#</a></h2>
+
+<p>The minimum reusable primitives. Build these once and reuse.</p>
+
+<table>
+<thead><tr><th>Component</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>Screen</code></td><td>Page chrome: header with title + menu button, error/loading states, optional pull-to-refresh, footer slot.</td></tr>
+<tr><td><code>Card</code></td><td>White-bg titled section. Wraps every form / section.</td></tr>
+<tr><td><code>Alert</code></td><td>Tinted info / success / warn / danger box.</td></tr>
+<tr><td><code>Button</code></td><td>Primary / outline button with loading state.</td></tr>
+<tr><td><code>Select</code></td><td>Modal-style picker. Used everywhere you'd reach for a native dropdown.</td></tr>
+<tr><td><code>ScanZone</code></td><td>The big QR target. Opens <code>expo-camera</code>; falls back to typed input. Plays <code>beep.mp3</code> on every successful scan.</td></tr>
+<tr><td><code>WeightInput</code></td><td>Numeric input optimised for scales (large font, decimal pad).</td></tr>
+<tr><td><code>Stepper</code></td><td>Quantity +/- control.</td></tr>
+<tr><td><code>FieldRow</code></td><td>Read-only label/value pair.</td></tr>
+<tr><td><code>Metric</code> &amp; <code>MetricRow</code></td><td>Top-of-page KPI tiles with optional sub-lines.</td></tr>
+<tr><td><code>ContextPill</code></td><td>Always-visible header pill showing the current ambient context.</td></tr>
+<tr><td><code>SideMenu</code></td><td>Drawer modal: logo, user, current context, nav, sign out, version.</td></tr>
+<tr><td><code>ConfirmCard</code></td><td>Success card after a destructive / important action.</td></tr>
+</tbody>
+</table>
+
+<h3>Screen — full snippet</h3>
+<pre><code>import { MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import {
+  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable,
+  RefreshControl, ScrollView, StyleSheet, Text, View,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { COLORS } from "../constants";
+import { Button } from "./Button";
+import { SideMenu } from "./SideMenu";
+
+export function Screen({
+  title, color = COLORS.info, loading, error, onRetry, onRefresh,
+  hideMenu, children, footer,
+}: {
+  title?: string; color?: string;
+  loading?: boolean; error?: string | null;
+  onRetry?: () =&gt; void;
+  onRefresh?: () =&gt; Promise&lt;void&gt; | void;
+  hideMenu?: boolean;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const handleRefresh = onRefresh
+    ? async () =&gt; { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }
+    : undefined;
+  return (
+    &lt;SafeAreaView style={s.safe} edges={["top", "left", "right"]}&gt;
+      {title ? (
+        &lt;View style={[s.header, { borderBottomColor: color }]}&gt;
+          {!hideMenu ? (
+            &lt;Pressable onPress={() =&gt; setMenuOpen(true)} hitSlop={10} style={s.menuBtn}&gt;
+              &lt;MaterialCommunityIcons name="menu" size={24} color={COLORS.text} /&gt;
+            &lt;/Pressable&gt;
+          ) : null}
+          &lt;Text style={s.title}&gt;{title}&lt;/Text&gt;
+        &lt;/View&gt;
+      ) : null}
+      {!hideMenu ? &lt;SideMenu visible={menuOpen} onClose={() =&gt; setMenuOpen(false)} /&gt; : null}
+      &lt;KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}&gt;
+        {loading ? (
+          &lt;View style={s.center}&gt;&lt;ActivityIndicator size="large" color={color} /&gt;&lt;/View&gt;
+        ) : error ? (
+          &lt;View style={s.center}&gt;
+            &lt;Text style={s.errorTitle}&gt;Something went wrong&lt;/Text&gt;
+            &lt;Text style={s.errorMsg}&gt;{error}&lt;/Text&gt;
+            {onRetry ? &lt;Button label="Retry" onPress={onRetry} color={color} style={{ marginTop: 16, alignSelf: "stretch" }} /&gt; : null}
+          &lt;/View&gt;
+        ) : (
+          &lt;ScrollView
+            contentContainerStyle={s.content}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={handleRefresh ? &lt;RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={color} colors={[color]} /&gt; : undefined}
+          &gt;
+            {children}
+          &lt;/ScrollView&gt;
+        )}
+      &lt;/KeyboardAvoidingView&gt;
+      {footer ? (
+        &lt;View style={[s.footer, { paddingBottom: 16 + Math.max(insets.bottom, 8) }]}&gt;{footer}&lt;/View&gt;
+      ) : null}
+    &lt;/SafeAreaView&gt;
+  );
+}
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.bgMuted },
+  header: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 12,
+    backgroundColor: COLORS.bg, borderBottomWidth: 2, gap: 8,
+  },
+  menuBtn: { padding: 4 },
+  title: { fontSize: 18, fontWeight: "700", color: COLORS.text, flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  errorTitle: { fontSize: 16, fontWeight: "600", color: COLORS.danger },
+  errorMsg: { fontSize: 13, color: COLORS.textMuted, marginTop: 6, textAlign: "center" },
+  footer: {
+    padding: 16, backgroundColor: COLORS.bg,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border,
+  },
+});</code><button class="copy-btn">Copy</button></pre>
+
+<h3>Card + Alert — full snippet</h3>
+<pre><code>import React from "react";
+import { StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { COLORS } from "../constants";
+
+export function Card({ title, children, style }: { title?: string; children: React.ReactNode; style?: ViewStyle }) {
+  return (
+    &lt;View style={[s.card, style]}&gt;
+      {title ? &lt;Text style={s.title}&gt;{title}&lt;/Text&gt; : null}
+      {children}
+    &lt;/View&gt;
+  );
+}
+
+export function Alert({ tone = "info", children }: { tone?: "info" | "success" | "warn" | "danger"; children: React.ReactNode }) {
+  const color =
+    tone === "success" ? COLORS.success
+    : tone === "warn" ? COLORS.warn
+    : tone === "danger" ? COLORS.danger
+    : COLORS.info;
+  return (
+    &lt;View style={[s.alert, { borderLeftColor: color, backgroundColor: `${color}14` }]}&gt;
+      &lt;Text style={[s.alertText, { color: COLORS.text }]}&gt;{children}&lt;/Text&gt;
+    &lt;/View&gt;
+  );
+}
+
+const s = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.bg, borderRadius: 12,
+    borderWidth: 1, borderColor: COLORS.border,
+    padding: 14, marginBottom: 12,
+  },
+  title: { fontSize: 14, fontWeight: "600", color: COLORS.text, marginBottom: 8 },
+  alert: { borderLeftWidth: 4, padding: 10, borderRadius: 6, marginBottom: 12 },
+  alertText: { fontSize: 13, lineHeight: 18 },
+});</code><button class="copy-btn">Copy</button></pre>
+
+<h3>ScanZone — full snippet</h3>
+<pre><code>import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import React, { useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { COLORS } from "../constants";
+import { playBeep } from "../services/sounds";
+import { Button } from "./Button";
+
+export function ScanZone({
+  label, sublabel, onScan, done, disabled, color = COLORS.success,
+}: {
+  label: string; sublabel?: string;
+  onScan: (value: string) =&gt; void;
+  done?: boolean; disabled?: boolean; color?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [manual, setManual] = useState("");
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  const handle = (value: string) =&gt; {
+    setOpen(false); setManual(""); setScanned(false);
+    void playBeep();
+    onScan(value);
+  };
+
+  const openScanner = async () =&gt; {
+    if (!permission?.granted) {
+      const r = await requestPermission();
+      if (!r.granted) return;
+    }
+    setScanned(false);
+    setOpen(true);
+  };
+
+  return (
+    &lt;View style={{ marginBottom: 12 }}&gt;
+      &lt;Pressable
+        onPress={disabled ? undefined : openScanner}
+        style={[
+          s.zone,
+          done
+            ? { borderStyle: "solid", borderColor: color, backgroundColor: `${color}10` }
+            : { borderStyle: "dashed", borderColor: color },
+          disabled &amp;&amp; { opacity: 0.5 },
+        ]}
+      &gt;
+        &lt;MaterialCommunityIcons name={done ? "check-circle" : "qrcode-scan"} size={40} color={color} /&gt;
+        &lt;Text style={[s.label, { color: done ? color : COLORS.text }]}&gt;
+          {done ? `${label} — scanned` : label}
+        &lt;/Text&gt;
+        {sublabel &amp;&amp; !done ? &lt;Text style={s.sub}&gt;{sublabel}&lt;/Text&gt; : null}
+      &lt;/Pressable&gt;
+      &lt;Modal visible={open} animationType="slide" onRequestClose={() =&gt; setOpen(false)}&gt;
+        &lt;View style={s.cameraWrap}&gt;
+          &lt;CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ["qr", "code128", "ean13", "ean8", "upc_a", "upc_e"] }}
+            onBarcodeScanned={(r) =&gt; {
+              if (scanned) return;
+              setScanned(true);
+              handle(r.data);
+            }}
+          /&gt;
+          &lt;View style={s.cameraOverlay}&gt;
+            &lt;View style={s.cameraHeader}&gt;
+              &lt;Pressable onPress={() =&gt; setOpen(false)} style={s.cameraClose}&gt;
+                &lt;MaterialCommunityIcons name="close" size={24} color="#fff" /&gt;
+              &lt;/Pressable&gt;
+              &lt;Text style={s.cameraTitle}&gt;{label}&lt;/Text&gt;
+            &lt;/View&gt;
+            &lt;View style={s.cameraFrame} /&gt;
+            &lt;View style={s.manualWrap}&gt;
+              &lt;Text style={s.manualLabel}&gt;Damaged barcode? Type the value:&lt;/Text&gt;
+              &lt;TextInput
+                value={manual} onChangeText={setManual}
+                placeholder="e.g. ABC-1234" placeholderTextColor="#AAA"
+                autoCapitalize="characters" style={s.manualInput}
+              /&gt;
+              &lt;Button label="Submit" onPress={() =&gt; manual.trim() &amp;&amp; handle(manual.trim())} color={color} disabled={!manual.trim()} /&gt;
+            &lt;/View&gt;
+          &lt;/View&gt;
+        &lt;/View&gt;
+      &lt;/Modal&gt;
+    &lt;/View&gt;
+  );
+}
+
+const s = StyleSheet.create({
+  zone: {
+    borderWidth: 2, borderRadius: 12, paddingVertical: 22,
+    alignItems: "center", justifyContent: "center", gap: 6,
+  },
+  label: { fontSize: 15, fontWeight: "600" },
+  sub: { fontSize: 12, color: COLORS.textMuted, textAlign: "center" },
+  cameraWrap: { flex: 1, backgroundColor: "#000" },
+  cameraOverlay: { flex: 1, justifyContent: "space-between", padding: 16 },
+  cameraHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 40 },
+  cameraClose: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "#00000088", alignItems: "center", justifyContent: "center",
+  },
+  cameraTitle: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  cameraFrame: {
+    alignSelf: "center", width: 240, height: 240,
+    borderWidth: 2, borderColor: "#FFFFFFAA", borderRadius: 12,
+  },
+  manualWrap: {
+    backgroundColor: "#FFFFFFF2", borderRadius: 12, padding: 12,
+    marginBottom: 24, gap: 8,
+  },
+  manualLabel: { fontSize: 12, color: COLORS.textMuted },
+  manualInput: {
+    borderWidth: 1, borderColor: COLORS.border, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 10,
+    fontSize: 16, color: COLORS.text, backgroundColor: "#fff",
+  },
+});</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="visuals">16. Brand &amp; visual system <a href="#visuals" class="anchor">#</a></h2>
+
+<p>Every org app reads as a single product. The visual identity bits below are <strong>not</strong> "feel free to redesign" &mdash; they are the fixed parts. Customise <em>content</em>; keep the <em>chrome</em> consistent.</p>
+
+<h3>16.1 Single brand asset</h3>
+
+<p>One PNG drives the entire visual identity:</p>
+
+<pre><code>assets/images/logo.png    # 512×512 transparent PNG, brand mark only</code><button class="copy-btn">Copy</button></pre>
+
+<p>That same file is used in every visible brand surface:</p>
+<ul>
+  <li>App icon (<code>app.json</code> &rarr; <code>expo.icon</code>)</li>
+  <li>Android adaptive-icon foreground (<code>expo.android.adaptiveIcon.foregroundImage</code>)</li>
+  <li>Splash screen image (<code>expo-splash-screen</code> plugin)</li>
+  <li>Login screen logo (<code>app/login.tsx</code>, 220&times;80 frame)</li>
+  <li>Side menu brand mark (<code>SideMenu.tsx</code>, 140&times;36 frame)</li>
+  <li>Web favicon (if you ship a web build)</li>
+</ul>
+
+<p>Don't introduce per-screen logos, badges, or banners. The brand is the single mark, repeated.</p>
+
+<h3>16.2 App icon &amp; adaptive icon</h3>
+
+<pre><code>// app.json
+{
+  "expo": {
+    "icon": "./assets/images/logo.png",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/logo.png"
+      }
+    },
+    "web": { "favicon": "./assets/images/logo.png" }
+  }
+}</code><button class="copy-btn">Copy</button></pre>
+
+<p>Adaptive-icon background stays white. Don't tint it per app.</p>
+
+<h3>16.3 Splash screen</h3>
+
+<p>Configured via the <code>expo-splash-screen</code> plugin. Same logo, centred on white, with a contained image width:</p>
+
+<pre><code>// app.json — plugins
+[
+  "expo-splash-screen",
+  {
+    "image": "./assets/images/logo.png",
+    "imageWidth": 240,
+    "resizeMode": "contain",
+    "backgroundColor": "#ffffff",
+    "dark": { "backgroundColor": "#000000" }
+  }
+]</code><button class="copy-btn">Copy</button></pre>
+
+<p>No taglines, no colour swooshes, no marketing copy. Logo + white. The dev-time Expo Go banner that overlays the splash isn't there in production builds.</p>
+
+<h3>16.4 Status bar</h3>
+
+<p>Always dark text on light background. Set once in <code>_layout.tsx</code>:</p>
+
+<pre><code>&lt;StatusBar style="dark" /&gt;</code><button class="copy-btn">Copy</button></pre>
+
+<p>Don't toggle per screen.</p>
+
+<h3>16.5 Page chrome (the Screen component)</h3>
+
+<p>Every page wraps in <code>Screen</code>. The chrome is fixed:</p>
+
+<ul>
+  <li>Page background: <code>COLORS.bgMuted</code> (<code>#F5F5F5</code>).</li>
+  <li>Card / header / footer background: <code>COLORS.bg</code> (<code>#FFFFFF</code>).</li>
+  <li>Header border-bottom: 2 px in the page's accent colour (passed via the <code>color</code> prop).</li>
+  <li>Hamburger button on the left (opens <code>SideMenu</code>); title fills the rest.</li>
+  <li>16 px content padding, 32 px bottom padding inside the scroll view.</li>
+  <li>Footer (when present): hairline top border + safe-area bottom inset.</li>
+  <li>Pull-to-refresh wired through <code>onRefresh</code>; tinted with the page colour.</li>
+  <li>Loading and error states are <code>Screen</code>'s job &mdash; pass <code>loading</code> / <code>error</code> / <code>onRetry</code> props rather than rolling your own spinners.</li>
+</ul>
+
+<p>Resist redesigning page chrome per feature. If the chrome doesn't fit, the feature is wrong.</p>
+
+<h3>16.6 Typography scale</h3>
+
+<p>System font (no custom fonts unless explicitly required). Sizes:</p>
+
+<table>
+<thead><tr><th>Use</th><th>Size / style</th></tr></thead>
+<tbody>
+<tr><td>Page title (Screen header)</td><td>18, weight 700</td></tr>
+<tr><td>Card title</td><td>14, weight 600</td></tr>
+<tr><td>Body text</td><td>13&ndash;15, weight 400/500</td></tr>
+<tr><td>Field label (above input)</td><td>11, uppercase, letterSpacing 0.4, <code>COLORS.textMuted</code></td></tr>
+<tr><td>Helper / muted text</td><td>11&ndash;12, <code>COLORS.textMuted</code></td></tr>
+<tr><td>Big metric value</td><td>22&ndash;36, weight 700, <code>fontVariant: ["tabular-nums"]</code></td></tr>
+<tr><td>Scan codes / IDs (crate, pallet, DN)</td><td>13&ndash;14, weight 600, <code>fontFamily: "monospace"</code></td></tr>
+<tr><td>Section group heading</td><td>11, uppercase, letterSpacing 0.4, weight 700, <code>COLORS.textMuted</code></td></tr>
+</tbody>
+</table>
+
+<p>Tabular numerics on metrics so digits don't dance during polling refreshes. Monospace on any user-facing identifier (crate IDs, DN numbers, license plates) so they're easy to read at a glance.</p>
+
+<h3>16.7 Spacing &amp; radius</h3>
+
+<ul>
+  <li><strong>Border radius</strong>: 8 (inputs / chips / small buttons), 12 (cards / scan zone), 14 (modals).</li>
+  <li><strong>Padding</strong>: 14 inside cards, 16 around screen content, 10&ndash;12 inside list rows, 24 around modals.</li>
+  <li><strong>Gap between cards</strong>: <code>marginBottom: 12</code> on the card itself.</li>
+  <li><strong>Tap targets</strong>: <code>hitSlop={8}</code> minimum on icon buttons, <code>hitSlop={10}</code> on header chrome.</li>
+  <li><strong>Hairline borders</strong>: <code>StyleSheet.hairlineWidth</code> for row dividers, <code>1</code> for card borders, <code>2</code> for the header underline.</li>
+  <li><strong>Card shadow</strong>: none. We use border + radius + white bg, not drop shadows.</li>
+</ul>
+
+<h3>16.8 Modals</h3>
+
+<p>Always centred. Semi-transparent black backdrop. Buttons row at the bottom: outline <em>Cancel</em> + filled primary action.</p>
+
+<pre><code>&lt;Modal visible={open} transparent animationType="fade" onRequestClose={() =&gt; (busy ? null : setOpen(false))}&gt;
+  &lt;View style={{ flex: 1, backgroundColor: "#00000066", padding: 24, justifyContent: "center" }}&gt;
+    &lt;View style={{ backgroundColor: COLORS.bg, borderRadius: 14, padding: 16, gap: 12 }}&gt;
+      &lt;Text style={{ fontSize: 16, fontWeight: "700", color: COLORS.text }}&gt;Modal title&lt;/Text&gt;
+      &lt;Text style={{ fontSize: 12, color: COLORS.textMuted, lineHeight: 17 }}&gt;
+        Helpful copy explaining the action.
+      &lt;/Text&gt;
+      {/* …form fields, warnings, etc. */}
+      &lt;View style={{ flexDirection: "row", gap: 8 }}&gt;
+        &lt;Button label="Cancel" variant="outline" color={COLORS.textMuted} onPress={...} style={{ flex: 1 }} disabled={busy} /&gt;
+        &lt;Button label="Confirm" color={COLORS.primary} onPress={...} style={{ flex: 2 }} loading={busy} /&gt;
+      &lt;/View&gt;
+    &lt;/View&gt;
+  &lt;/View&gt;
+&lt;/Modal&gt;</code><button class="copy-btn">Copy</button></pre>
+
+<h3>16.9 Colors</h3>
+
+<p>A monochrome system reads as a single corporate product. Resist per-feature accents &mdash; distinguish sections by <strong>icons</strong> and <strong>layout</strong>, not colour. Keep <code>COLORS</code> to ~12 keys (see §12 for the canonical object).</p>
+
+<p>If you need a section-specific accent, add a single key per section (e.g. <code>COLORS.harvesting</code>, <code>COLORS.packing</code>) and pass it as the <code>color</code> prop to <code>Screen</code> / <code>ScanZone</code>. Status tones (success / danger / warn / info) stay shared.</p>
+
+<p>The only colour with real meaning is <code>danger</code> &mdash; reserve it for actual errors. Don't paint warnings in red because "it stands out more"; use the <code>warn</code> tone.</p>
+
+<h3>16.10 Sounds</h3>
+
+<p>Three cue tones, preloaded once and replayed on demand. Source three short MP3s (&le;500 ms each):</p>
+<ul>
+  <li><code>beep.mp3</code> &mdash; every successful scan (<code>playBeep()</code>, fired automatically by <code>ScanZone</code>)</li>
+  <li><code>submit.mp3</code> &mdash; successful action (<code>playSubmit()</code> &mdash; call after a successful API write)</li>
+  <li><code>error.mp3</code> &mdash; failed action (<code>playError()</code> &mdash; call in the catch branch of any submit)</li>
+</ul>
+<p>Files live in <code>assets/audio/</code>. Free sources: freesound.org, zapsplat.com, or generate with <code>sfxr</code>.</p>
+
+<p>Sounds are <em>not</em> optional. They're the fastest feedback the user gets and let them keep their eyes on the physical task instead of the screen.</p>
+
+<h3>16.11 Iconography</h3>
+
+<p>Single icon library: <code>@expo/vector-icons</code> &rarr; <code>MaterialCommunityIcons</code>. Don't mix sets.</p>
+
+<p>Icons are 18&ndash;24 px in headers, 16&ndash;20 px inline with text. Always paired with a text label except in dense list rows where context is unambiguous (e.g. close <code>&times;</code> on a removable chip).</p>
+
+<h3>16.12 Empty &amp; loading states</h3>
+
+<p>Use the standard primitives, not bespoke ones:</p>
+
+<ul>
+  <li><strong>Page-level loading</strong>: <code>Screen</code>'s <code>loading</code> prop &mdash; centred spinner in the page accent colour.</li>
+  <li><strong>Inline loading on a button</strong>: <code>&lt;Button loading /&gt;</code>.</li>
+  <li><strong>List empty state</strong>: an <code>&lt;Alert tone="info"&gt;</code> in the same Card, with one sentence telling the user why it's empty and what to do.</li>
+  <li><strong>Page error</strong>: <code>Screen</code>'s <code>error</code> + <code>onRetry</code> props.</li>
+</ul>
+
+<p>No custom skeletons, no shimmer effects, no per-feature empty illustrations. The same emptiness reads the same everywhere.</p>
+
+<pre><code>// src/services/sounds.ts
+import { AudioModule, createAudioPlayer, type AudioPlayer } from "expo-audio";
+
+let scanPlayer: AudioPlayer | null = null;
+let submitPlayer: AudioPlayer | null = null;
+let errorPlayer: AudioPlayer | null = null;
+let configured = false;
+
+async function ensureConfigured() {
+  if (configured) return;
+  configured = true;
+  try {
+    await AudioModule.setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+    });
+  } catch {}
+}
+
+function ensurePlayers() {
+  if (!scanPlayer)   scanPlayer   = createAudioPlayer(require("../../assets/audio/beep.mp3"));
+  if (!submitPlayer) submitPlayer = createAudioPlayer(require("../../assets/audio/submit.mp3"));
+  if (!errorPlayer)  errorPlayer  = createAudioPlayer(require("../../assets/audio/error.mp3"));
+}
+
+function fireAndForget(p: AudioPlayer | null) {
+  if (!p) return;
+  try { p.seekTo(0); p.play(); } catch {}
+}
+
+export async function playBeep()   { await ensureConfigured(); ensurePlayers(); fireAndForget(scanPlayer); }
+export async function playSubmit() { await ensureConfigured(); ensurePlayers(); fireAndForget(submitPlayer); }
+export async function playError()  { await ensureConfigured(); ensurePlayers(); fireAndForget(errorPlayer); }</code><button class="copy-btn">Copy</button></pre>
+
+<div class="callout">
+  <p><span class="lbl">Gotcha</span><code>playsInSilentMode: true</code> is required for iOS to play with the ringer off &mdash; ops users almost always have their phones silenced.</p>
+</div>
+
+<h2 id="login">17. Login screen pattern <a href="#login" class="anchor">#</a></h2>
+
+<p>A single screen that handles the logo, an instance-URL configuration toggle, email + password inputs (with show/hide on the password), and persistent session detection.</p>
+
+<pre><code>// app/login.tsx
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Button } from "@/src/components/Button";
+import { Card } from "@/src/components/Card";
+import { Screen } from "@/src/components/Screen";
+import { API_BASE_URL, COLORS } from "@/src/constants";
+import { useAuthStore } from "@/src/stores/authStore";
+import { getWorkingUrl } from "@/src/utils/url";
+
+export default function Login() {
+  const router = useRouter();
+  const login = useAuthStore((s) =&gt; s.login);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [instanceUrl, setInstanceUrl] = useState("");
+  const [urlLoaded, setUrlLoaded] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [draftUrl, setDraftUrl] = useState("");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [urlErr, setUrlErr] = useState&lt;string | null&gt;(null);
+  const [err, setErr] = useState&lt;string | null&gt;(null);
+
+  useEffect(() =&gt; {
+    (async () =&gt; {
+      const stored = (await AsyncStorage.getItem("instanceurl")) ?? "";
+      const initial = stored || API_BASE_URL || "";
+      if (API_BASE_URL &amp;&amp; stored &amp;&amp; stored !== API_BASE_URL) {
+        await AsyncStorage.multiRemove(["cookie", "user_email"]);
+        await AsyncStorage.setItem("instanceurl", API_BASE_URL);
+      } else if (initial &amp;&amp; stored !== initial) {
+        await AsyncStorage.setItem("instanceurl", initial);
+      }
+      setInstanceUrl(initial);
+      setDraftUrl(initial);
+      setUrlLoaded(true);
+    })();
+  }, []);
+
+  const saveUrl = async () =&gt; {
+    const u = draftUrl.trim();
+    if (!u) { setUrlErr("Enter a URL"); return; }
+    const resolved = (await getWorkingUrl(u)) ?? u;
+    if (resolved !== instanceUrl) {
+      await AsyncStorage.multiRemove(["cookie", "user_email"]);
+    }
+    await AsyncStorage.setItem("instanceurl", resolved);
+    setInstanceUrl(resolved);
+    setDraftUrl(resolved);
+    setUrlErr(null);
+    setConfigOpen(false);
+  };
+
+  const submit = async () =&gt; {
+    if (!instanceUrl) {
+      setErr("Instance URL not configured. Tap 'Configure instance' below.");
+      setConfigOpen(true);
+      return;
+    }
+    if (!email.trim() || !password) { setErr("Email and password are required."); return; }
+    setSubmitting(true); setErr(null);
+    try {
+      await login(instanceUrl, email.trim(), password);
+      router.replace("/");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Login failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!urlLoaded) return &lt;Screen loading hideMenu&gt;{null}&lt;/Screen&gt;;
+
+  return (
+    &lt;Screen hideMenu&gt;
+      &lt;View style={s.logoWrap}&gt;
+        &lt;Image source={require("../assets/images/logo.png")} style={s.logo} resizeMode="contain" /&gt;
+      &lt;/View&gt;
+      &lt;Card&gt;
+        &lt;Text style={s.intro}&gt;Sign in with your Frappe user account.&lt;/Text&gt;
+        &lt;Text style={s.meta}&gt;Instance: &lt;Text style={{ fontWeight: "600" }}&gt;{instanceUrl || "not set"}&lt;/Text&gt;&lt;/Text&gt;
+      &lt;/Card&gt;
+
+      &lt;Card&gt;
+        &lt;Text style={s.label}&gt;Email&lt;/Text&gt;
+        &lt;TextInput value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" style={s.input} /&gt;
+
+        &lt;Text style={[s.label, { marginTop: 10 }]}&gt;Password&lt;/Text&gt;
+        &lt;View style={s.pwRow}&gt;
+          &lt;TextInput
+            value={password} onChangeText={setPassword}
+            secureTextEntry={!showPassword} autoCapitalize="none"
+            style={s.pwInput} placeholder="••••••••" placeholderTextColor={COLORS.textMuted}
+          /&gt;
+          &lt;Pressable onPress={() =&gt; setShowPassword((v) =&gt; !v)} hitSlop={8}&gt;
+            &lt;Text style={s.pwToggle}&gt;{showPassword ? "Hide" : "Show"}&lt;/Text&gt;
+          &lt;/Pressable&gt;
+        &lt;/View&gt;
+        {err ? &lt;Text style={s.err}&gt;{err}&lt;/Text&gt; : null}
+      &lt;/Card&gt;
+
+      &lt;Button label="Sign in" onPress={submit} loading={submitting} color={COLORS.info} /&gt;
+
+      &lt;Pressable onPress={() =&gt; { setDraftUrl(instanceUrl); setConfigOpen(true); }} style={{ paddingVertical: 12 }}&gt;
+        &lt;Text style={s.configLink}&gt;Configure instance URL&lt;/Text&gt;
+      &lt;/Pressable&gt;
+
+      &lt;Modal visible={configOpen} transparent animationType="fade" onRequestClose={() =&gt; setConfigOpen(false)}&gt;
+        &lt;View style={s.modalWrap}&gt;
+          &lt;View style={s.modalCard}&gt;
+            &lt;Text style={s.modalTitle}&gt;Instance URL&lt;/Text&gt;
+            &lt;TextInput
+              value={draftUrl}
+              onChangeText={(v) =&gt; { setDraftUrl(v); if (urlErr) setUrlErr(null); }}
+              autoCapitalize="none" autoCorrect={false} keyboardType="url"
+              placeholder="https://your-site.c.frappe.cloud"
+              placeholderTextColor={COLORS.textMuted}
+              style={s.modalInput}
+            /&gt;
+            &lt;Text style={s.modalHint}&gt;Enter the full instance URL.&lt;/Text&gt;
+            {urlErr ? &lt;Text style={s.urlErr}&gt;{urlErr}&lt;/Text&gt; : null}
+            &lt;View style={s.modalBtns}&gt;
+              &lt;Button label="Cancel" variant="outline" color={COLORS.textMuted}
+                onPress={() =&gt; { setConfigOpen(false); setUrlErr(null); }} style={{ flex: 1 }} /&gt;
+              &lt;Button label="Save" onPress={saveUrl} color={COLORS.info} style={{ flex: 2 }} /&gt;
+            &lt;/View&gt;
+          &lt;/View&gt;
+        &lt;/View&gt;
+      &lt;/Modal&gt;
+    &lt;/Screen&gt;
+  );
+}
+
+const s = StyleSheet.create({
+  logoWrap: { alignItems: "center", paddingVertical: 24 },
+  logo: { width: 220, height: 80 },
+  intro: { fontSize: 14, color: COLORS.text },
+  meta: { fontSize: 12, color: COLORS.textMuted, marginTop: 6 },
+  label: { fontSize: 11, color: COLORS.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 },
+  input: {
+    borderWidth: 1, borderColor: COLORS.border, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 10, fontSize: 15,
+    color: COLORS.text, backgroundColor: COLORS.bg,
+  },
+  pwRow: {
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 1, borderColor: COLORS.border, borderRadius: 8,
+    backgroundColor: COLORS.bg, paddingHorizontal: 10,
+  },
+  pwInput: { flex: 1, fontSize: 15, color: COLORS.text, paddingVertical: 10 },
+  pwToggle: { color: COLORS.info, fontSize: 13, fontWeight: "600", padding: 6 },
+  err: { color: COLORS.danger, fontSize: 13, marginTop: 4 },
+  configLink: { textAlign: "center", color: COLORS.info, fontSize: 13, fontWeight: "500" },
+  modalWrap: { flex: 1, backgroundColor: "#00000066", padding: 24, justifyContent: "center" },
+  modalCard: { backgroundColor: COLORS.bg, borderRadius: 14, padding: 16 },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: COLORS.text, marginBottom: 8 },
+  modalInput: {
+    borderWidth: 1, borderColor: COLORS.border, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 10, fontSize: 15,
+    color: COLORS.text, backgroundColor: COLORS.bg,
+  },
+  modalHint: { fontSize: 11, color: COLORS.textMuted, marginTop: 6 },
+  urlErr: { fontSize: 12, color: COLORS.danger, marginTop: 6, lineHeight: 16 },
+  modalBtns: { flexDirection: "row", gap: 8, marginTop: 14 },
+});</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="sidemenu">18. Side menu pattern <a href="#sidemenu" class="anchor">#</a></h2>
+
+<p>A drawer modal with logo, user identity, current ambient state (shift / role / location), grouped nav links, "change context" + sign-out actions, and a version footer.</p>
+
+<pre><code>// src/components/SideMenu.tsx
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { APP_VERSION, COLORS } from "../constants";
+import { useAuthStore } from "../stores/authStore";
+
+type IconName = React.ComponentProps&lt;typeof MaterialCommunityIcons&gt;["name"];
+type Item = { label: string; route: string; icon: IconName };
+
+const SECTIONS: { title: string; items: Item[] }[] = [
+  // Customize per app
+  {
+    title: "Section A",
+    items: [
+      { label: "Page 1", route: "/page1", icon: "view-dashboard" },
+      { label: "Page 2", route: "/page2", icon: "qrcode-scan" },
+    ],
+  },
+];
+
+export function SideMenu({ visible, onClose }: { visible: boolean; onClose: () =&gt; void }) {
+  const router = useRouter();
+  const user = useAuthStore((s) =&gt; s.user);
+  const logout = useAuthStore((s) =&gt; s.logout);
+
+  const go = (route: string) =&gt; { onClose(); router.replace(route as any); };
+  const onLogout = async () =&gt; { onClose(); await logout(); router.replace("/login"); };
+
+  return (
+    &lt;Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}&gt;
+      &lt;Pressable style={s.backdrop} onPress={onClose}&gt;
+        &lt;Pressable style={s.panel} onPress={() =&gt; {}}&gt;
+          &lt;SafeAreaView style={{ flex: 1 }} edges={["top", "left", "bottom"]}&gt;
+            &lt;View style={s.header}&gt;
+              &lt;Image source={require("../../assets/images/logo.png")} style={s.brandLogo} resizeMode="contain" /&gt;
+              &lt;Pressable onPress={onClose} hitSlop={10} style={s.close}&gt;
+                &lt;MaterialCommunityIcons name="close" size={22} color={COLORS.text} /&gt;
+              &lt;/Pressable&gt;
+            &lt;/View&gt;
+
+            &lt;View style={s.user}&gt;
+              &lt;Text style={s.userEmail}&gt;{user?.email ?? "—"}&lt;/Text&gt;
+            &lt;/View&gt;
+
+            &lt;ScrollView contentContainerStyle={{ paddingBottom: 24 }}&gt;
+              {SECTIONS.map((section) =&gt; (
+                &lt;View key={section.title} style={s.section}&gt;
+                  &lt;Text style={s.sectionTitle}&gt;{section.title}&lt;/Text&gt;
+                  {section.items.map((item) =&gt; (
+                    &lt;Pressable key={item.route} style={s.row} onPress={() =&gt; go(item.route)}&gt;
+                      &lt;MaterialCommunityIcons name={item.icon} size={20} color={COLORS.text} /&gt;
+                      &lt;Text style={s.rowLabel}&gt;{item.label}&lt;/Text&gt;
+                    &lt;/Pressable&gt;
+                  ))}
+                &lt;/View&gt;
+              ))}
+
+              &lt;View style={s.footer}&gt;
+                &lt;Pressable style={s.row} onPress={onLogout}&gt;
+                  &lt;MaterialCommunityIcons name="logout" size={20} color={COLORS.danger} /&gt;
+                  &lt;Text style={[s.rowLabel, { color: COLORS.danger }]}&gt;Sign out&lt;/Text&gt;
+                &lt;/Pressable&gt;
+              &lt;/View&gt;
+              &lt;Text style={s.version}&gt;Version {APP_VERSION}&lt;/Text&gt;
+            &lt;/ScrollView&gt;
+          &lt;/SafeAreaView&gt;
+        &lt;/Pressable&gt;
+      &lt;/Pressable&gt;
+    &lt;/Modal&gt;
+  );
+}
+
+const s = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "#00000066", flexDirection: "row" },
+  panel: {
+    width: "82%", maxWidth: 320, height: "100%",
+    backgroundColor: COLORS.bg,
+    borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: COLORS.border,
+  },
+  header: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 2, borderBottomColor: COLORS.text,
+  },
+  brandLogo: { width: 140, height: 36 },
+  close: { padding: 4 },
+  user: {
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border,
+  },
+  userEmail: { fontSize: 13, fontWeight: "600", color: COLORS.text },
+  section: { paddingTop: 12, paddingBottom: 4 },
+  sectionTitle: {
+    fontSize: 11, color: COLORS.textMuted,
+    textTransform: "uppercase", letterSpacing: 0.6,
+    paddingHorizontal: 16, marginBottom: 6,
+  },
+  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  rowLabel: { fontSize: 14, color: COLORS.text },
+  footer: { marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
+  version: { fontSize: 11, color: COLORS.textMuted, textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
+});</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="polling">19. Polling pattern <a href="#polling" class="anchor">#</a></h2>
+
+<p>The default data refresh strategy. Every screen that displays server state polls every <code>POLL_INTERVAL_MS</code> (default 30 s). Pull-to-refresh is wired through the <code>Screen</code> component's <code>onRefresh</code> prop.</p>
+
+<pre><code>const fetchState = useCallback(async () =&gt; {
+  try {
+    const data = await api.getThings();
+    setThings(data);
+    setError(null);
+  } catch (e) {
+    setError(e instanceof Error ? e.message : String(e));
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+useEffect(() =&gt; {
+  fetchState();
+  const id = setInterval(fetchState, POLL_INTERVAL_MS);
+  return () =&gt; clearInterval(id);
+}, [fetchState]);</code><button class="copy-btn">Copy</button></pre>
+
+<p><strong>Don't</strong> introduce websockets / real-time subscriptions until you have a real reason. Polling is dumb, debuggable, cheap to rate-limit, and survives transient network failures.</p>
+
+<p>If a screen has multiple data sources, batch them in one <code>fetchState</code>:</p>
+
+<pre><code>const fetchState = useCallback(async () =&gt; {
+  const [a, b, c] = await Promise.all([
+    api.getA(), api.getB(), api.getC(),
+  ]);
+  setA(a); setB(b); setC(c);
+}, []);</code><button class="copy-btn">Copy</button></pre>
+
+<h2 id="ota">20. OTA updates with EAS <a href="#ota" class="anchor">#</a></h2>
+
+<p>Once the app is shipped, ship JS-only changes via OTA. No Play Store rollout for every fix.</p>
+
+<h3>Setup (one-time)</h3>
+<pre><code>npx expo install expo-updates</code><button class="copy-btn">Copy</button></pre>
+
+<p>Add to <code>app.json</code>:</p>
+<pre><code>"runtimeVersion": { "policy": "appVersion" },
+"updates": { "url": "https://u.expo.dev/&lt;your-eas-project-id&gt;" }</code><button class="copy-btn">Copy</button></pre>
+
+<p>Add <code>channel</code> to each EAS build profile in <code>eas.json</code>:</p>
+<pre><code>"preview":    { "distribution": "internal", "channel": "preview" },
+"production": { "autoIncrement": true, "channel": "production" }</code><button class="copy-btn">Copy</button></pre>
+
+<p>Build one new APK to embed the OTA runtime:</p>
+<pre><code>eas build -p android --profile production</code><button class="copy-btn">Copy</button></pre>
+
+<h3>After every code change</h3>
+<pre><code>eas update --branch production --message "Fix the thing"</code><button class="copy-btn">Copy</button></pre>
+
+<p>The app pulls the update on next launch and applies it silently.</p>
+
+<h3>What OTA can NOT update</h3>
+<ul>
+  <li>Native dependencies (new packages with native code).</li>
+  <li>New Android/iOS permissions.</li>
+  <li>SDK upgrades that require rebuilding native code.</li>
+  <li>Anything in <code>app.json</code> that affects native config.</li>
+</ul>
+<p>For those, build a new APK.</p>
+
+<h2 id="docs-pattern">21. Developer documentation pattern <a href="#docs-pattern" class="anchor">#</a></h2>
+
+<p>Every app gets a single <code>docs/index.html</code> &mdash; the same file you're reading right now, with different content. Sticky sidebar nav, Cmd-K search, anchor links, copy buttons, scroll-spy.</p>
+
+<p>The scaffold is the HTML/CSS/JS you see in this file's source. Save the page (View Source &rarr; copy) and paste into your new app's <code>docs/index.html</code>, then strip the content sections and fill in your own. The shell stays identical so the org-wide reading experience is consistent.</p>
+
+<h3>Suggested section structure for any app</h3>
+<ol class="steps">
+  <li><strong>Overview</strong> &mdash; one paragraph, who uses it, what problem it solves</li>
+  <li><strong>Getting started</strong> &mdash; prerequisites, dev server, first run</li>
+  <li><strong>Architecture</strong> &mdash; diagram + the three pillars</li>
+  <li><strong>Domain model</strong> &mdash; the doctypes and what they represent (table form)</li>
+  <li><strong>State lifecycle</strong> &mdash; status state machines</li>
+  <li><strong>Process flow</strong> &mdash; role-by-role end-to-end walkthrough</li>
+  <li><strong>Mobile app</strong> &mdash; stack, pages, components, services</li>
+  <li><strong>Backend</strong> &mdash; overview, doctypes table, server scripts</li>
+  <li><strong>API reference</strong> &mdash; every endpoint, body, return type</li>
+  <li><strong>Authentication</strong> &mdash; flow + role gating</li>
+  <li><strong>Error model</strong> &mdash; HTTP / soft / per-item errors</li>
+  <li><strong>Deploying</strong> &mdash; mobile + backend, OTA setup</li>
+  <li><strong>Schema migrations</strong> &mdash; recent changes log + how-to</li>
+  <li><strong>Troubleshooting</strong> &mdash; every error you've ever hit, with the fix</li>
+  <li><strong>Glossary</strong> &mdash; every domain term in one place</li>
+</ol>
+
+<p>This structure scales from a 3-screen MVP to a 30-page production app without restructuring.</p>
+
+<h2 id="recipes">22. Recipes <a href="#recipes" class="anchor">#</a></h2>
+
+<h3>22.1 Add a new screen</h3>
+<ol class="steps">
+  <li>Create <code>app/&lt;feature&gt;.tsx</code> using the <code>Screen</code> component.</li>
+  <li>Add it to <code>SECTIONS</code> in <code>SideMenu.tsx</code>.</li>
+  <li>If it needs data: add the API method(s) in <code>services/api.ts</code> and the type(s) in <code>types/index.ts</code>.</li>
+</ol>
+
+<h3>22.2 Add a new API endpoint</h3>
+<ol class="steps">
+  <li><strong>Backend</strong>:
+    <ul>
+      <li>Push a new Server Script via MCP <code>create_document</code>:
+        <pre><code>{
+  "name": "&lt;app&gt;.do_thing",
+  "script_type": "API",
+  "api_method": "&lt;app&gt;.do_thing",
+  "module": "&lt;App&gt;",
+  "script": "..."
+}</code><button class="copy-btn">Copy</button></pre>
+      </li>
+      <li>Append it to <code>frappe/server_scripts.json</code>.</li>
+    </ul>
+  </li>
+  <li><strong>Frontend</strong>:
+    <ul>
+      <li>Add the call in <code>src/services/api.ts</code>:
+        <pre><code>doThing: (foo: string) =&gt; call&lt;DoThingResult&gt;("&lt;app&gt;.do_thing", { foo }),</code><button class="copy-btn">Copy</button></pre>
+      </li>
+      <li>Add the return type in <code>src/types/index.ts</code>.</li>
+    </ul>
+  </li>
+</ol>
+
+<h3>22.3 Add a new DocType</h3>
+<ol class="steps">
+  <li>Push it via MCP <code>create_document</code> for <code>DocType</code>. (If creating in parallel with link-target doctypes that don't exist yet, expect retries &mdash; Frappe enforces ordering.)</li>
+  <li>Append the same JSON object to <code>frappe/doctypes.json</code>.</li>
+  <li>After creation, the doctype's table exists immediately and is queryable.</li>
+</ol>
+
+<h3>22.4 Add a custom field to an existing doctype</h3>
+<ol class="steps">
+  <li>Push via MCP <code>create_document</code> for <code>Custom Field</code>.</li>
+  <li>Append to <code>frappe/custom_fields.json</code>.</li>
+  <li>Also append the same field shape to the doctype's <code>fields</code> array in <code>frappe/doctypes.json</code> so the source-of-truth view is consistent.</li>
+</ol>
+
+<h3>22.5 Add a role-gated action</h3>
+<ol class="steps">
+  <li>Create the role in Frappe (push via MCP <code>create_document</code> for <code>Role</code>).</li>
+  <li>In the relevant Server Script, gate with the standard role check (see §6).</li>
+  <li>Expose the role flag in <code>get_session_info</code> (or the equivalent endpoint).</li>
+  <li>In the app, hide the UI when the flag is false.</li>
+  <li>Server check is the security boundary; UI hide is just UX.</li>
+</ol>
+
+<h3>22.6 Add a scanner-based flow</h3>
+<pre><code>const onScan = async (id: string) =&gt; {
+  setScanErr(null);
+  try {
+    const result = await api.scanThing(id.trim());
+    setLastScan(result);
+    void playSubmit();
+  } catch (e) {
+    setScanErr(e instanceof Error ? e.message : String(e));
+    void playError();
+  }
+};
+
+return (
+  &lt;Card title="Scan"&gt;
+    &lt;ScanZone label="Scan a code" onScan={onScan} color={COLORS.primary} /&gt;
+    {scanErr ? &lt;Alert tone="danger"&gt;{scanErr}&lt;/Alert&gt; : null}
+  &lt;/Card&gt;
+);</code><button class="copy-btn">Copy</button></pre>
+
+<h3>22.7 Add a new Web Page dashboard</h3>
+<ol class="steps">
+  <li>Author the HTML at <code>frappe/web_pages/&lt;route&gt;.html</code> &mdash; single self-contained file with inline CSS/JS, calling <code>frappe.call</code> for data.</li>
+  <li>Push via MCP <code>create_document</code> for <code>Web Page</code>.</li>
+  <li>Add a link to it from your Custom HTML Block / workspace nav.</li>
+</ol>
+
+<h2 id="antipatterns">23. Anti-patterns and lessons <a href="#antipatterns" class="anchor">#</a></h2>
+
+<p>These are the things we did wrong at first and corrected. Skip them entirely.</p>
+
+<h3>23.1 Don't keep state offline when multiple users need it</h3>
+<p>If two phones are participating in the same workflow, the state belongs on the server. AsyncStorage drafts work for single-user pages but break the moment you need multi-user collaboration.</p>
+
+<h3>23.2 Always re-check roles on the server</h3>
+<p>UI hide is not security. Every clerk-only / receiver-only / admin-only action gets a server-side <code>'&lt;Role&gt;' not in roles &rarr; error</code> check. The UI flag is for UX only.</p>
+
+<h3>23.3 Idempotent endpoints over "already done?" queries</h3>
+<p>If an action is naturally idempotent (e.g. status flip with <code>WHERE status = X</code> filter), prefer the simple "click again, do nothing" model over tracking "has this been done?" state. Less schema, less code, less drift.</p>
+
+<h3>23.4 Single source of truth for each artefact</h3>
+<p>Don't have a Client Script <em>and</em> a mobile button do the same thing. Pick one (the mobile button) and delete the other. Two paths means you'll always wonder which the user used.</p>
+
+<h3>23.5 Server Scripts as the API surface &mdash; not RPC</h3>
+<p>Resist treating Server Scripts as "remote function calls that match what the UI happens to need." Each script is a <em>resource verb</em>: <code>create_thing</code>, <code>release_thing</code>, <code>list_open_things</code>. If the UI grows new needs, add a new script &mdash; don't bolt parameters onto an existing one until it's bloated.</p>
+
+<h3>23.6 No <code>bench migrate</code> dance</h3>
+<p>If you find yourself running <code>bench migrate</code> to sync schema, you're working too hard. Push schema changes via MCP <code>Custom Field</code> / <code>DocType</code> updates. The whole point of this stack is the JSON files <em>are</em> the schema.</p>
+
+<h3>23.7 Don't over-design the API client</h3>
+<p>The <code>call&lt;T&gt;</code> wrapper is 6 lines. Resist adding caching, retry, batching, request deduplication, optimistic updates. If a screen needs that, do it in the screen. The wrapper stays dumb.</p>
+
+<h3>23.8 Separate scripts dir for one-shots</h3>
+<p>Anything that's "run this once to migrate something" goes in <code>scripts/</code>, not in the main code. This keeps the active codebase's intent clear.</p>
+
+<h3>23.9 The single-file docs scale</h3>
+<p>Don't split the developer doc into 20 .md files. One big <code>docs/index.html</code> with sticky nav and search reads better, ships easier, and the search makes "where was that thing about X" trivial.</p>
+
+<h3>23.10 Soft errors &gt; HTTP errors</h3>
+<p>Most of the things you'd want to return 4xx for (validation, business-rule violations, role rejections) ride happily on a 200 with <code>{error: "..."}</code>. The <code>call&lt;T&gt;</code> wrapper promotes them to thrown errors anyway, so the UI sees the same flow. Use real HTTP errors only for actual transport failures.</p>
+
+<h3>23.11 Polling beats websockets until it doesn't</h3>
+<p>Until you have a <em>demonstrated</em> user complaint about staleness, 30 s polling is the right answer. Keep it. The day someone says "I need this updated every second," that's when websockets earn their complexity.</p>
+
+<h3>23.12 Resist per-feature state machines</h3>
+<p>Most lifecycle problems collapse into a single <code>status</code> field on the canonical doctype with a small enum of values. Don't model state as separate doctypes ("Crate Allocation Open", "Crate Allocation Closed") &mdash; just <code>status: Open | Closed</code> and gate logic on it.</p>
+
+<h3>23.13 Probe the sandbox before assuming</h3>
+<p>When you're about to write a Server Script that uses something you haven't used before (a method on <code>frappe.utils</code>, a date format, a builtin), write a 3-line probe script first that just tries it and returns success/failure. Cheaper than 20 minutes of debugging "why is this returning <code>None</code>?".</p>
+
+<h2 id="bootstrap">24. Bootstrap checklist <a href="#bootstrap" class="anchor">#</a></h2>
+
+<p>For a fresh app, in order:</p>
+<ol class="steps">
+  <li><code>npx create-expo-app &lt;name&gt; --template blank-typescript</code></li>
+  <li>Install dependencies (see §11).</li>
+  <li>Scaffold <code>src/</code> folders per §4 / §12.</li>
+  <li>Copy <code>src/api/client.ts</code>, <code>src/services/api.ts</code>, <code>src/services/sounds.ts</code>, <code>src/utils/url.ts</code>, <code>src/stores/authStore.ts</code>, <code>src/api/auth.ts</code>, <code>src/constants/index.ts</code> from the snippets above.</li>
+  <li>Copy components (<code>Screen</code>, <code>Card</code>/<code>Alert</code>, <code>Button</code>, <code>ScanZone</code>, <code>Select</code>, <code>SideMenu</code>, &hellip;) from §15.</li>
+  <li>Drop in <code>app/_layout.tsx</code>, <code>app/index.tsx</code>, <code>app/login.tsx</code>.</li>
+  <li>Source 3 short MP3s (beep, submit, error). Add an app logo.</li>
+  <li>Set up the EAS project: <code>eas init</code>, copy <code>eas.json</code>, copy <code>app.json</code> template (replace the IDs), run <code>eas update:configure</code>.</li>
+  <li>Stand up the Frappe site, connect MCP.</li>
+  <li>Create <code>frappe/</code> folder with empty <code>doctypes.json</code>, <code>server_scripts.json</code>, <code>custom_fields.json</code>, etc. (<code>[]</code> to start).</li>
+  <li>Push your first DocType + first Server Script via MCP. Verify with <code>curl /api/method/...</code>.</li>
+  <li>Wire up <code>app/index.tsx</code> to redirect authed users to your first feature page.</li>
+  <li>Drop the <code>docs/index.html</code> scaffold (§21). Fill in §1 Overview and §2 Getting started.</li>
+  <li>First build: <code>eas build -p android --profile preview</code>. Distribute internally.</li>
+</ol>
+
+<p>That's the whole template. Reuse, customise, ship.</p>
+
+<footer>
+  <p>Mobile App Engineering Blueprint. The reference implementation is <code>upande-harvest</code>; everything in this guide is generic and reusable. Treat it as the canonical starting point for new apps in this organisation.</p>
+</footer>
+</main>
+</div>
+
+<script>
+// Copy buttons
+document.querySelectorAll(".copy-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const code = btn.parentElement.querySelector("code");
+    if (!code) return;
+    navigator.clipboard.writeText(code.innerText).then(() => {
+      const t = btn.textContent;
+      btn.textContent = "Copied"; btn.classList.add("copied");
+      setTimeout(() => { btn.textContent = t; btn.classList.remove("copied"); }, 1200);
+    }).catch(() => {});
+  });
+});
+
+// Search
+const mainEl = document.querySelector("main");
+let sectionGroups = [];
+function buildIndex() {
+  sectionGroups = [];
+  const kids = Array.from(mainEl.children);
+  let cur = null;
+  for (const el of kids) {
+    if (el.tagName === "H2") {
+      if (cur) sectionGroups.push(cur);
+      cur = { id: el.id, heading: el, body: [], text: el.textContent.toLowerCase() };
+    } else if (cur) {
+      cur.body.push(el);
+      cur.text += " " + el.textContent.toLowerCase();
+    }
+  }
+  if (cur) sectionGroups.push(cur);
+}
+const searchEl = document.getElementById("search");
+const searchStatus = document.getElementById("searchStatus");
+function applySearch() {
+  const q = (searchEl.value || "").trim().toLowerCase();
+  const navLinks = document.querySelectorAll('.nav a[href^="#"]');
+  const tocLis = document.querySelectorAll('.toc li');
+  if (!q) {
+    sectionGroups.forEach(g => { g.heading.style.display = ""; g.body.forEach(b => b.style.display = ""); });
+    navLinks.forEach(a => a.style.display = "");
+    tocLis.forEach(li => li.style.display = "");
+    searchStatus.textContent = "";
+    return;
+  }
+  const matchedIds = new Set();
+  sectionGroups.forEach(g => {
+    const hit = g.text.includes(q);
+    g.heading.style.display = hit ? "" : "none";
+    g.body.forEach(b => b.style.display = hit ? "" : "none");
+    if (hit) matchedIds.add(g.id);
+  });
+  navLinks.forEach(a => {
+    const id = a.getAttribute("href").slice(1);
+    a.style.display = matchedIds.has(id) ? "" : "none";
+  });
+  tocLis.forEach(li => {
+    const a = li.querySelector('a');
+    const id = a ? a.getAttribute("href").slice(1) : "";
+    li.style.display = matchedIds.has(id) ? "" : "none";
+  });
+  searchStatus.textContent = matchedIds.size
+    ? matchedIds.size + " match" + (matchedIds.size === 1 ? "" : "es")
+    : "No matches";
+}
+if (searchEl) {
+  searchEl.addEventListener("input", applySearch);
+  searchEl.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { searchEl.value = ""; applySearch(); searchEl.blur(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      searchEl.focus(); searchEl.select();
+    }
+  });
+}
+window.addEventListener("load", () => { buildIndex(); applySearch(); });
+
+// Active nav link
+const navLinks = Array.from(document.querySelectorAll(".nav a[href^='#']"));
+const targets = navLinks.map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
+function updateActive() {
+  const y = window.scrollY + 100;
+  let active = targets[0];
+  for (const t of targets) { if (t.offsetTop <= y) active = t; }
+  navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + active.id));
+}
+document.addEventListener("scroll", updateActive, { passive: true });
+window.addEventListener("load", updateActive);
+</script>
+</body>
+</html>

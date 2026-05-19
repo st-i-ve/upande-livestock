@@ -1,98 +1,123 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from "expo-router";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Avatar, type AvatarTone } from "@/components/Avatar";
+import { Banner } from "@/components/Banner";
+import { Row } from "@/components/Row";
+import { Screen } from "@/components/Screen";
+import { SectionTitle } from "@/components/SectionTitle";
+import { Tile, TileGrid } from "@/components/Tile";
+import { APP, COLORS, RADIUS } from "@/constants/theme";
+import { safetyAlerts, todaysMilk, todaysMilkRecorded } from "@/data/mock";
 
-export default function HomeScreen() {
+const QUICK_ACTIONS: { icon: any; label: string; href: string }[] = [
+  { icon: "water",                label: "Milk recording",   href: "/events/milk" },
+  { icon: "baby-bottle-outline",  label: "Calf feeding",     href: "/events/calf-feed" },
+  { icon: "grain",                label: "Animal feeding",   href: "/events/animal-feed" },
+  { icon: "magnify",              label: "Diagnosis",        href: "/events/diagnosis" },
+  { icon: "needle",               label: "Vaccination",      href: "/events/vaccination" },
+  { icon: "bug",                  label: "Deworming",        href: "/events/deworming" },
+  { icon: "fire",                 label: "Heat detection",   href: "/events/heat" },
+  { icon: "heart",                label: "Service / AI",     href: "/events/service" },
+  { icon: "clipboard-check",      label: "Pregnancy diag.",  href: "/events/pd" },
+  { icon: "baby-bottle-outline",  label: "Calving",          href: "/events/calving" },
+  { icon: "baby-carriage",        label: "Birth",            href: "/events/birth" },
+  { icon: "scale",                label: "Weight",           href: "/events/weight" },
+  { icon: "arrow-left-right",     label: "Movement",         href: "/events/movement" },
+  { icon: "content-cut",          label: "Dehorning",        href: "/events/dehorning" },
+  { icon: "tools",                label: "Hoof trimming",    href: "/events/hoof" },
+  { icon: "water-off",            label: "Drying off",       href: "/events/dryoff" },
+];
+
+export default function Home() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <Screen title={APP.farm} subtitle={APP.location}>
+      <Banner tone="success" icon="account">
+        Signed in as <Text style={{ fontWeight: "700" }}>{APP.user}</Text>. Events you submit will be tagged to you.
+      </Banner>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* Two compact tiles: today's recorded milk vs open cases. */}
+      <View style={s.topRow}>
+        <View style={s.topCell}>
+          <Text style={s.topLabel}>Today's milk</Text>
+          <Text style={s.topValue}>{todaysMilkRecorded} kg</Text>
+          <Text style={s.topSub}>recorded so far</Text>
+        </View>
+        <View style={s.topCell}>
+          <Text style={s.topLabel}>Open cases</Text>
+          <Text style={s.topValue}>3</Text>
+          <Text style={s.topSub}>1 mastitis, 2 lameness</Text>
+        </View>
+      </View>
+
+      <SectionTitle>Today's milk by herd</SectionTitle>
+      {todaysMilk.map((r) => (
+        <View key={r.herd} style={s.herdRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.herdName} numberOfLines={1}>{r.herd}</Text>
+            <Text style={s.herdMeta}>{r.cnt} cows · expected ~{r.expected} kg/day</Text>
+          </View>
+          <View style={s.session}>
+            <Text style={s.sessLbl}>AM</Text>
+            <Text style={[s.sessVal, r.am === null && s.sessPending]}>
+              {r.am !== null ? `${r.am} kg` : "pending"}
+            </Text>
+          </View>
+          <View style={s.session}>
+            <Text style={s.sessLbl}>PM</Text>
+            <Text style={[s.sessVal, r.pm === null && s.sessPending]}>
+              {r.pm !== null ? `${r.pm} kg` : "pending"}
+            </Text>
+          </View>
+        </View>
+      ))}
+
+      <SectionTitle>Action queue · milk safety</SectionTitle>
+      {safetyAlerts.map((a, i) => (
+        <Row
+          key={i}
+          left={<Avatar icon={a.ic as any} tone={a.sev as AvatarTone} />}
+          title={a.t}
+          meta={a.s}
+          chevron
+          onPress={() => router.push("/(tabs)/alerts")}
+        />
+      ))}
+
+      <SectionTitle>Quick actions</SectionTitle>
+      <TileGrid>
+        {QUICK_ACTIONS.map((q) => (
+          <Tile key={q.href} icon={q.icon} title={q.label} onPress={() => router.push(q.href as any)} />
+        ))}
+      </TileGrid>
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+const s = StyleSheet.create({
+  topRow: { flexDirection: "row", gap: 8, marginBottom: 6 },
+  topCell: {
+    flex: 1,
+    backgroundColor: COLORS.bgMuted,
+    borderRadius: RADIUS.md,
+    padding: 12,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  topLabel: { fontSize: 11, color: COLORS.textMuted },
+  topValue: { fontSize: 22, fontWeight: "700", color: COLORS.text, marginTop: 2, fontVariant: ["tabular-nums"] },
+  topSub: { fontSize: 10, color: COLORS.textMuted, marginTop: 2 },
+  herdRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.borderSubtle,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  herdName: { fontSize: 13, fontWeight: "600", color: COLORS.text },
+  herdMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
+  session: { alignItems: "flex-end", minWidth: 56 },
+  sessLbl: { fontSize: 9, color: COLORS.textSubtle, textTransform: "uppercase", letterSpacing: 0.5 },
+  sessVal: { fontSize: 12, color: COLORS.text, fontWeight: "600", fontVariant: ["tabular-nums"] },
+  sessPending: { color: COLORS.textSubtle, fontWeight: "400", fontStyle: "italic" },
 });
