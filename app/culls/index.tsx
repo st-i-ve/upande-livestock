@@ -17,7 +17,7 @@ export default function CullsList() {
           { label: "Top reason", value: "Mastitis", sub: "3 animals", small: true },
         ]}
       />
-      <Button label="Record cull / death" icon="delete" variant="danger" onPress={() => router.push("/culls/new")} />
+      <Button label="Record cull / death" icon="delete" variant="danger" onPress={() => router.push("/(tabs)/record/culls/new")} />
       <SectionTitle>Recent</SectionTitle>
       <Row left={<Avatar icon="delete" tone="danger" />} title="JACKI-129390 · Culled (Farm Use)" meta="2 May · book 150,000 written off" />
       <Row left={<Avatar icon="delete" tone="danger" />} title="VICTOR-129572 · Died — Disease" meta="14 Apr · book 120,000 written off" />
