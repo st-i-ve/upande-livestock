@@ -17,7 +17,7 @@ export default function SalesList() {
           { label: "YTD net P&L", value: "+55,000", sub: "vs book value" },
         ]}
       />
-      <Button label="Record sale" icon="cash" onPress={() => router.push("/sales/new")} />
+      <Button label="Record sale" icon="cash" onPress={() => router.push("/(tabs)/record/sales/new")} />
       <SectionTitle>Recent sales</SectionTitle>
       <Row left={<Avatar icon="cash" tone="calf" />} title="TESTDAM-001/22 → Mwangi Butchery" meta="9 May · 95,000 KES · loss 25,000" />
       <Row left={<Avatar icon="cash" tone="calf" />} title="ANAIAH-129273 → Eldoret Co-op" meta="3 Apr · 95,000 KES · gain 15,000" />
