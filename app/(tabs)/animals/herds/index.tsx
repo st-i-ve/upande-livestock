@@ -16,7 +16,7 @@ export default function HerdsList() {
           title={h.n}
           meta={`${h.cat} · ${h.cnt} head · ${h.cc}`}
           chevron
-          onPress={() => router.push(`/herds/${encodeURIComponent(h.n)}`)}
+          onPress={() => router.push(`/(tabs)/animals/herds/${encodeURIComponent(h.n)}`)}
         />
       ))}
     </Screen>
