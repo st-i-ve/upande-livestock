@@ -94,32 +94,11 @@ export const safetyAlerts: Alert[] = [
   { sev: "default", ic: "food-off", t: "BULLS not fed today", s: "14 head · skipping AM ration" },
 ];
 
-// Drawer is reordered: Daily routine and Animal events sit before Records,
-// so operators land on the things they tap most often.
+// Drawer mirrors the bottom-tab structure; events live under the Record tab now.
 export const drawerStruct: DrawerGroup[] = [
   { grp: "Overview", its: [
     { id: "home", ic: "home", l: "Dashboard", href: "/(tabs)" },
     { id: "alerts", ic: "bell", l: "Action queue", href: "/(tabs)/alerts", b: 6 },
-  ]},
-  { grp: "Daily routine", its: [
-    { id: "ev_milk", ic: "water", l: "Milk recording", href: "/events/milk" },
-    { id: "ev_feed", ic: "baby-bottle-outline", l: "Calf feeding", href: "/events/calf-feed" },
-    { id: "ev_animal_feed", ic: "grain", l: "Animal feeding", href: "/events/animal-feed" },
-  ]},
-  { grp: "Animal events", its: [
-    { id: "ev_diag", ic: "magnify", l: "Diagnosis (random)", href: "/events/diagnosis" },
-    { id: "ev_birth", ic: "baby-carriage", l: "Birth", href: "/events/birth" },
-    { id: "ev_weight", ic: "scale", l: "Weight recording", href: "/events/weight" },
-    { id: "ev_movement", ic: "arrow-left-right", l: "Movement", href: "/events/movement" },
-    { id: "ev_vacc", ic: "needle", l: "Vaccination", href: "/events/vaccination" },
-    { id: "ev_dewm", ic: "bug", l: "Deworming", href: "/events/deworming" },
-    { id: "ev_dehorn", ic: "content-cut", l: "Dehorning", href: "/events/dehorning" },
-    { id: "ev_hoof", ic: "tools", l: "Hoof trimming", href: "/events/hoof" },
-    { id: "ev_heat", ic: "fire", l: "Heat detection", href: "/events/heat" },
-    { id: "ev_service", ic: "heart", l: "Service / AI", href: "/events/service" },
-    { id: "ev_pd", ic: "clipboard-check", l: "Pregnancy diagnosis", href: "/events/pd" },
-    { id: "ev_calving", ic: "baby-bottle-outline", l: "Calving", href: "/events/calving" },
-    { id: "ev_dryoff", ic: "water-off", l: "Drying off", href: "/events/dryoff" },
   ]},
   { grp: "Records", its: [
     { id: "animals", ic: "format-list-bulleted", l: "Animals", href: "/(tabs)/animals" },

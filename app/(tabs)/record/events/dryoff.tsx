@@ -28,7 +28,7 @@ export default function Dryoff() {
       <Field label="Dry-cow therapy">
         <Picker value={therapy} onChange={setTherapy} options={["Cloxacillin LA · all 4 quarters", "Cefquinome LA · all 4 quarters", "None — natural dry-off"]} />
       </Field>
-      <Button label="Submit dry-off" onPress={() => router.replace("/event-success?name=Drying off")} />
+      <Button label="Submit dry-off" onPress={() => router.replace("/(tabs)/record/success?name=Drying off")} />
     </Screen>
   );
 }

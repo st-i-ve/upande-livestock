@@ -46,7 +46,7 @@ export default function SaleNew() {
           vColor={gl < 0 ? COLORS.danger : undefined}
         />
       </View>
-      <Button label="Submit sale" onPress={() => router.replace("/event-success?name=Sale")} />
+      <Button label="Submit sale" onPress={() => router.replace("/(tabs)/record/success?name=Sale")} />
     </Screen>
   );
 }

@@ -61,7 +61,7 @@ export default function AnimalFeed() {
         ))}
       </View>
       <Field label="Remarks"><Textarea placeholder="Optional notes (silage quality, leftovers, etc.)" /></Field>
-      <Button label="Submit feeding" onPress={() => router.replace("/event-success?name=Animal feeding")} />
+      <Button label="Submit feeding" onPress={() => router.replace("/(tabs)/record/success?name=Animal feeding")} />
     </Screen>
   );
 }

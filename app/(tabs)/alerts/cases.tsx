@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React from "react";
 
 import { Avatar } from "@/components/Avatar";
@@ -10,7 +11,7 @@ import { SectionTitle } from "@/components/SectionTitle";
 export default function Cases() {
   return (
     <Screen title="Health cases" subtitle="3 open · 5 closed this month" back>
-      <Button label="New case" icon="plus" />
+      <Button label="New case" icon="plus" onPress={() => router.push("/(tabs)/record/cases/new")} />
       <SectionTitle>Open</SectionTitle>
       <Row
         left={<Avatar icon="stethoscope" tone="danger" />}

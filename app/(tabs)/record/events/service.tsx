@@ -33,7 +33,7 @@ export default function Service() {
         <Picker value={sire} onChange={setSire} options={["(none)", "Delta Stormer (Holstein)", "Delta Keen (Holstein)"]} />
       </Field>
       <Field label="Remarks"><Textarea placeholder="Heat signs, technician notes..." /></Field>
-      <Button label="Submit service" onPress={() => router.replace("/event-success?name=Service")} />
+      <Button label="Submit service" onPress={() => router.replace("/(tabs)/record/success?name=Service")} />
     </Screen>
   );
 }

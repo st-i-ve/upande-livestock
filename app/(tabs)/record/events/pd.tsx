@@ -38,7 +38,7 @@ export default function PD() {
         </Chips>
       </Field>
       <Field label="Remarks"><Textarea placeholder="Vet observations..." /></Field>
-      <Button label="Submit PD" onPress={() => router.replace("/event-success?name=Pregnancy diagnosis")} />
+      <Button label="Submit PD" onPress={() => router.replace("/(tabs)/record/success?name=Pregnancy diagnosis")} />
     </Screen>
   );
 }
