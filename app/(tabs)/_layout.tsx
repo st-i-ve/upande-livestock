@@ -1,30 +1,48 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { COLORS } from "@/constants/theme";
 
-const ACTIVE_SIZE = 26;
-const INACTIVE_SIZE = 22;
+const ICON_INACTIVE = 22;
+const ICON_ACTIVE = 26;
+const BAR_CONTENT_HEIGHT = 64;
+const CIRCLE_DIAMETER = 58;
+const CIRCLE_LIFT = 22;
+
+const labelStyle = {
+  fontSize: 10,
+  fontWeight: "500" as const,
+  letterSpacing: 0.4,
+  marginTop: 2,
+};
 
 function RecordTabButton(props: BottomTabBarButtonProps) {
+  const selected = props.accessibilityState?.selected;
   return (
     <Pressable
       onPress={props.onPress}
       onLongPress={props.onLongPress}
       accessibilityRole="button"
-      accessibilityState={{ selected: props.accessibilityState?.selected }}
-      style={s.recordWrap}
+      accessibilityLabel="Record"
+      accessibilityState={{ selected }}
+      android_ripple={null}
+      style={s.recordCell}
     >
-      <View style={s.recordCircle}>
+      <View style={[s.recordCircle, selected && s.recordCircleSelected]}>
         <MaterialCommunityIcons name="plus" size={28} color={COLORS.bg} />
       </View>
+      <Text style={[s.recordLabel, selected && s.recordLabelSelected]}>Record</Text>
     </Pressable>
   );
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -32,14 +50,20 @@ export default function TabLayout() {
         tabBarActiveTintColor: COLORS.text,
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
-          borderTopWidth: 0.5,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: COLORS.borderSubtle,
           backgroundColor: COLORS.bg,
-          height: 60,
-          paddingTop: 6,
+          height: BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingTop: 8,
+          paddingBottom: insets.bottom + 6,
           overflow: "visible",
+          elevation: 0,
         },
-        tabBarLabelStyle: { fontSize: 10 },
+        tabBarItemStyle: {
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
+        tabBarLabelStyle: labelStyle,
       }}
     >
       <Tabs.Screen
@@ -48,8 +72,8 @@ export default function TabLayout() {
           title: "Home",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
-              name="home"
-              size={focused ? ACTIVE_SIZE : INACTIVE_SIZE}
+              name={focused ? "home" : "home-outline"}
+              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
               color={color}
             />
           ),
@@ -62,7 +86,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name="format-list-bulleted"
-              size={focused ? ACTIVE_SIZE : INACTIVE_SIZE}
+              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
               color={color}
             />
           ),
@@ -71,7 +95,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="record"
         options={{
-          title: "",
+          tabBarLabel: () => null,
           tabBarButton: (props) => <RecordTabButton {...props} />,
         }}
       />
@@ -81,13 +105,21 @@ export default function TabLayout() {
           title: "Alerts",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
-              name="bell"
-              size={focused ? ACTIVE_SIZE : INACTIVE_SIZE}
+              name={focused ? "bell" : "bell-outline"}
+              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
               color={color}
             />
           ),
           tabBarBadge: 5,
-          tabBarBadgeStyle: { backgroundColor: COLORS.danger, fontSize: 10 },
+          tabBarBadgeStyle: {
+            backgroundColor: COLORS.danger,
+            color: COLORS.bg,
+            fontSize: 10,
+            fontWeight: "600",
+            minWidth: 16,
+            height: 16,
+            lineHeight: 16,
+          },
         }}
       />
       <Tabs.Screen
@@ -97,7 +129,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
               name="menu"
-              size={focused ? ACTIVE_SIZE : INACTIVE_SIZE}
+              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
               color={color}
             />
           ),
@@ -108,24 +140,41 @@ export default function TabLayout() {
 }
 
 const s = StyleSheet.create({
-  recordWrap: {
+  recordCell: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 4,
   },
   recordCircle: {
     position: "absolute",
-    top: -20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    top: -CIRCLE_LIFT,
+    width: CIRCLE_DIAMETER,
+    height: CIRCLE_DIAMETER,
+    borderRadius: CIRCLE_DIAMETER / 2,
     backgroundColor: COLORS.text,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 10,
+    borderWidth: 3,
+    borderColor: COLORS.bg,
+  },
+  recordCircleSelected: {
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+  },
+  recordLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    letterSpacing: 0.4,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  recordLabelSelected: {
+    color: COLORS.text,
   },
 });
