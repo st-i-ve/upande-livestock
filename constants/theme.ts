@@ -29,6 +29,16 @@ export const COLORS = {
 export const RADIUS = { sm: 6, md: 8, lg: 12, xl: 14 } as const;
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
 
+// Poppins font families. Use the exact variant matching the desired weight —
+// React Native does not synthesise bold from a regular font file, so we load
+// every weight we want to use explicitly via @expo-google-fonts/poppins.
+export const FONT_FAMILY = {
+  regular: "Poppins_400Regular",
+  medium: "Poppins_500Medium",
+  semibold: "Poppins_600SemiBold",
+  bold: "Poppins_700Bold",
+} as const;
+
 export const FONT = {
   page: { size: 16, weight: "600" as const },
   card: { size: 14, weight: "600" as const },

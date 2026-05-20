@@ -7,8 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/constants/theme";
 
-const ICON_INACTIVE = 22;
-const ICON_ACTIVE = 26;
+const ICON_SIZE = 28;
 const BAR_CONTENT_HEIGHT = 64;
 const CIRCLE_DIAMETER = 46;
 const CIRCLE_LIFT = 14;
@@ -70,12 +69,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? "home" : "home-outline"}
-              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
-              color={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="home" size={ICON_SIZE} color={color} />
           ),
         }}
       />
@@ -83,12 +78,8 @@ export default function TabLayout() {
         name="animals"
         options={{
           title: "Animals",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name="format-list-bulleted"
-              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
-              color={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="cow" size={ICON_SIZE} color={color} />
           ),
         }}
       />
@@ -103,12 +94,8 @@ export default function TabLayout() {
         name="alerts"
         options={{
           title: "Alerts",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? "bell" : "bell-outline"}
-              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
-              color={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="bell" size={ICON_SIZE} color={color} />
           ),
           tabBarBadge: 5,
           tabBarBadgeStyle: {
@@ -126,12 +113,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? "account" : "account-outline"}
-              size={focused ? ICON_ACTIVE : ICON_INACTIVE}
-              color={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="account" size={ICON_SIZE} color={color} />
           ),
         }}
       />
