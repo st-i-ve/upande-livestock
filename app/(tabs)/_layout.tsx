@@ -123,12 +123,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="more"
+        name="profile"
         options={{
-          title: "More",
+          title: "Profile",
           tabBarIcon: ({ color, focused }) => (
             <MaterialCommunityIcons
-              name="menu"
+              name={focused ? "account" : "account-outline"}
               size={focused ? ICON_ACTIVE : ICON_INACTIVE}
               color={color}
             />

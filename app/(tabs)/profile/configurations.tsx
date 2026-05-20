@@ -4,22 +4,12 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/Screen";
-import { APP, COLORS, RADIUS } from "@/constants/theme";
+import { COLORS } from "@/constants/theme";
 import { drawerStruct } from "@/data/mock";
 
-export default function More() {
+export default function Configurations() {
   return (
-    <Screen title="Menu" subtitle={APP.farm}>
-      <View style={s.brand}>
-        <View style={s.logo}>
-          <Text style={s.logoText}>K</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.farm}>{APP.farm}</Text>
-          <Text style={s.who}>Logged in: {APP.user}</Text>
-        </View>
-      </View>
-
+    <Screen title="Configurations" subtitle="Reports, inventory & settings" back>
       {drawerStruct.map((g) => (
         <View key={g.grp}>
           <Text style={s.grp}>{g.grp}</Text>
@@ -46,23 +36,6 @@ export default function More() {
 }
 
 const s = StyleSheet.create({
-  brand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    backgroundColor: COLORS.bgMuted,
-    borderRadius: RADIUS.md,
-    marginBottom: 12,
-  },
-  logo: {
-    width: 36, height: 36, borderRadius: 8,
-    backgroundColor: COLORS.text,
-    alignItems: "center", justifyContent: "center",
-  },
-  logoText: { color: COLORS.bg, fontWeight: "700" },
-  farm: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  who: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
   grp: {
     fontSize: 10,
     fontWeight: "600",
@@ -78,7 +51,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 4,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.borderSubtle,
   },
