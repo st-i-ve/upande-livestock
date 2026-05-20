@@ -49,7 +49,7 @@ export default function HerdDetail() {
             key={a.id}
             a={a}
             meta={`${a.id} · ${a.lastWt} kg`}
-            onPress={() => router.push(`/animal/${encodeURIComponent(a.id)}`)}
+            onPress={() => router.push(`/(tabs)/animals/${encodeURIComponent(a.id)}`)}
           />
         ))
       ) : (
