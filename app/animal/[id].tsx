@@ -5,5 +5,5 @@ import { AnimalDetail } from "@/components/screens/AnimalDetail";
 
 export default function AnimalDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  return <AnimalDetail id={id ?? ""} />;
+  return <AnimalDetail id={id} />;
 }
