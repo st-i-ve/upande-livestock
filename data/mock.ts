@@ -96,31 +96,23 @@ export const safetyAlerts: Alert[] = [
 
 // Drawer mirrors the bottom-tab structure; events live under the Record tab now.
 export const drawerStruct: DrawerGroup[] = [
-  { grp: "Overview", its: [
-    { id: "home", ic: "home", l: "Dashboard", href: "/(tabs)" },
-    { id: "alerts", ic: "bell", l: "Action queue", href: "/(tabs)/alerts", b: 6 },
-  ]},
-  { grp: "Records", its: [
-    { id: "animals", ic: "format-list-bulleted", l: "Animals", href: "/(tabs)/animals" },
-    { id: "herds", ic: "fence", l: "Herds", href: "/(tabs)/animals/herds" },
-    { id: "diagnoses", ic: "magnify", l: "Diagnoses", href: "/(tabs)/alerts/diagnoses" },
-    { id: "cases", ic: "stethoscope", l: "Health cases", href: "/(tabs)/alerts/cases", b: 3 },
-    { id: "sales", ic: "cash", l: "Sales", href: "/(tabs)/more/sales" },
-    { id: "culls", ic: "delete-outline", l: "Culls / deaths", href: "/(tabs)/more/culls" },
+  { grp: "Archives", its: [
+    { id: "sales", ic: "cash", l: "Sales", href: "/(tabs)/profile/sales" },
+    { id: "culls", ic: "delete-outline", l: "Culls / deaths", href: "/(tabs)/profile/culls" },
   ]},
   { grp: "Reports", its: [
-    { id: "r_milk", ic: "chart-line", l: "Milk yield", href: "/(tabs)/more/reports/milk" },
-    { id: "r_repro", ic: "heart-multiple", l: "Reproduction", href: "/(tabs)/more/reports/repro" },
-    { id: "r_health", ic: "file-document", l: "Health & costs", href: "/(tabs)/more/reports/health" },
-    { id: "r_growth", ic: "chart-bar", l: "Calf growth", href: "/(tabs)/more/reports/growth" },
+    { id: "r_milk", ic: "chart-line", l: "Milk yield", href: "/(tabs)/profile/reports/milk" },
+    { id: "r_repro", ic: "heart-multiple", l: "Reproduction", href: "/(tabs)/profile/reports/repro" },
+    { id: "r_health", ic: "file-document", l: "Health & costs", href: "/(tabs)/profile/reports/health" },
+    { id: "r_growth", ic: "chart-bar", l: "Calf growth", href: "/(tabs)/profile/reports/growth" },
   ]},
   { grp: "Inventory", its: [
-    { id: "inv_col", ic: "water", l: "Colostrum bank", href: "/(tabs)/more/inventory/colostrum" },
-    { id: "inv_drug", ic: "pill", l: "Drugs", href: "/(tabs)/more/inventory/drugs" },
-    { id: "inv_semen", ic: "test-tube", l: "Semen straws", href: "/(tabs)/more/inventory/semen" },
-    { id: "inv_feed", ic: "grain", l: "Feed", href: "/(tabs)/more/inventory/feed" },
+    { id: "inv_col", ic: "water", l: "Colostrum bank", href: "/(tabs)/profile/inventory/colostrum" },
+    { id: "inv_drug", ic: "pill", l: "Drugs", href: "/(tabs)/profile/inventory/drugs" },
+    { id: "inv_semen", ic: "test-tube", l: "Semen straws", href: "/(tabs)/profile/inventory/semen" },
+    { id: "inv_feed", ic: "grain", l: "Feed", href: "/(tabs)/profile/inventory/feed" },
   ]},
-  { grp: "Setup", its: [{ id: "set_settings", ic: "cog", l: "Livestock settings", href: "/(tabs)/more/settings" }]},
+  { grp: "Settings", its: [{ id: "set_settings", ic: "cog", l: "Livestock settings", href: "/(tabs)/profile/settings" }]},
 ];
 
 // Backwards-compatible aliases — older screens import these.
