@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { COLORS, FONT_FAMILY } from "@/constants/theme";
 import { allAlerts } from "@/data/mock";
 
 type Sev = "danger" | "default";
@@ -69,18 +69,11 @@ export default function Alerts() {
 }
 
 const s = StyleSheet.create({
-  list: {
-    borderRadius: RADIUS.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    overflow: "hidden",
-  },
+  list: {},
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    paddingHorizontal: 14,
     paddingVertical: 14,
   },
   iconWrap: {
@@ -113,6 +106,6 @@ const s = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: COLORS.borderSubtle,
-    marginLeft: 14 + 40 + 12, // align with the title (after icon)
+    marginLeft: 40 + 12, // align with the title (after icon)
   },
 });
