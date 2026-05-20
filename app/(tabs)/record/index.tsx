@@ -23,7 +23,7 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     { icon: "heart", label: "Service / AI", href: "/events/service" },
     { icon: "clipboard-check", label: "Pregnancy diagnosis", href: "/events/pd" },
     { icon: "baby-bottle-outline", label: "Calving", href: "/events/calving" },
-    { icon: "stethoscope", label: "New health case", href: "/cases" },
+    { icon: "stethoscope", label: "New health case", href: "/(tabs)/alerts/cases" },
   ]},
   { title: "Husbandry", items: [
     { icon: "scale", label: "Weight recording", href: "/events/weight" },
