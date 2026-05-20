@@ -4,7 +4,7 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { APP, COLORS, FONT } from "@/constants/theme";
+import { COLORS, FONT } from "@/constants/theme";
 
 export function Screen({
   title,
@@ -24,30 +24,19 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const nav = useNavigation();
   const canGoBack = nav.canGoBack();
-
-  const onLeft = () => {
-    if (back && canGoBack) router.back();
-    else router.push("/(tabs)/more");
-  };
+  const showBack = !!back && canGoBack;
 
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
       <View style={s.appbar}>
-        <Pressable onPress={onLeft} hitSlop={10} style={s.iconBtn}>
-          <MaterialCommunityIcons
-            name={back && canGoBack ? "arrow-left" : "menu"}
-            size={22}
-            color={COLORS.text}
-          />
-        </Pressable>
+        {showBack ? (
+          <Pressable onPress={() => router.back()} hitSlop={10} style={s.iconBtn}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.text} />
+          </Pressable>
+        ) : null}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={s.title} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
-        </View>
-        <View style={s.me}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{APP.initials}</Text>
-          </View>
         </View>
       </View>
       {scroll ? (
@@ -80,13 +69,6 @@ const s = StyleSheet.create({
   iconBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   title: { fontSize: FONT.page.size, fontWeight: FONT.page.weight, color: COLORS.text },
   subtitle: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
-  me: { flexDirection: "row", alignItems: "center", gap: 6 },
-  avatar: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: COLORS.text,
-    alignItems: "center", justifyContent: "center",
-  },
-  avatarText: { color: COLORS.bg, fontSize: 11, fontWeight: "600" },
   body: { padding: 14 },
   footer: {
     padding: 14, backgroundColor: COLORS.bg,
