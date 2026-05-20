@@ -105,22 +105,22 @@ export const drawerStruct: DrawerGroup[] = [
     { id: "herds", ic: "fence", l: "Herds", href: "/(tabs)/animals/herds" },
     { id: "diagnoses", ic: "magnify", l: "Diagnoses", href: "/(tabs)/alerts/diagnoses" },
     { id: "cases", ic: "stethoscope", l: "Health cases", href: "/(tabs)/alerts/cases", b: 3 },
-    { id: "sales", ic: "cash", l: "Sales", href: "/sales" },
-    { id: "culls", ic: "delete-outline", l: "Culls / deaths", href: "/culls" },
+    { id: "sales", ic: "cash", l: "Sales", href: "/(tabs)/more/sales" },
+    { id: "culls", ic: "delete-outline", l: "Culls / deaths", href: "/(tabs)/more/culls" },
   ]},
   { grp: "Reports", its: [
-    { id: "r_milk", ic: "chart-line", l: "Milk yield", href: "/reports/milk" },
-    { id: "r_repro", ic: "heart-multiple", l: "Reproduction", href: "/reports/repro" },
-    { id: "r_health", ic: "file-document", l: "Health & costs", href: "/reports/health" },
-    { id: "r_growth", ic: "chart-bar", l: "Calf growth", href: "/reports/growth" },
+    { id: "r_milk", ic: "chart-line", l: "Milk yield", href: "/(tabs)/more/reports/milk" },
+    { id: "r_repro", ic: "heart-multiple", l: "Reproduction", href: "/(tabs)/more/reports/repro" },
+    { id: "r_health", ic: "file-document", l: "Health & costs", href: "/(tabs)/more/reports/health" },
+    { id: "r_growth", ic: "chart-bar", l: "Calf growth", href: "/(tabs)/more/reports/growth" },
   ]},
   { grp: "Inventory", its: [
-    { id: "inv_col", ic: "water", l: "Colostrum bank", href: "/inventory/colostrum" },
-    { id: "inv_drug", ic: "pill", l: "Drugs", href: "/inventory/drugs" },
-    { id: "inv_semen", ic: "test-tube", l: "Semen straws", href: "/inventory/semen" },
-    { id: "inv_feed", ic: "grain", l: "Feed", href: "/inventory/feed" },
+    { id: "inv_col", ic: "water", l: "Colostrum bank", href: "/(tabs)/more/inventory/colostrum" },
+    { id: "inv_drug", ic: "pill", l: "Drugs", href: "/(tabs)/more/inventory/drugs" },
+    { id: "inv_semen", ic: "test-tube", l: "Semen straws", href: "/(tabs)/more/inventory/semen" },
+    { id: "inv_feed", ic: "grain", l: "Feed", href: "/(tabs)/more/inventory/feed" },
   ]},
-  { grp: "Setup", its: [{ id: "set_settings", ic: "cog", l: "Livestock settings", href: "/settings" }]},
+  { grp: "Setup", its: [{ id: "set_settings", ic: "cog", l: "Livestock settings", href: "/(tabs)/more/settings" }]},
 ];
 
 // Backwards-compatible aliases — older screens import these.
