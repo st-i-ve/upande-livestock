@@ -89,7 +89,7 @@ export default function Movement() {
       <Button
         label="Submit move"
         disabled={selected.length === 0}
-        onPress={() => router.replace("/event-success?name=Movement")}
+        onPress={() => router.replace("/(tabs)/record/success?name=Movement")}
       />
     </Screen>
   );

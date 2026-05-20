@@ -20,7 +20,7 @@ const DX = [
 export default function Diagnoses() {
   return (
     <Screen title="Diagnoses" subtitle="Routine health observations" back>
-      <Button label="New diagnosis" icon="plus" onPress={() => router.push("/events/diagnosis")} />
+      <Button label="New diagnosis" icon="plus" onPress={() => router.push("/(tabs)/record/events/diagnosis")} />
       <SectionTitle>Recent</SectionTitle>
       {DX.map((d, i) => (
         <Row

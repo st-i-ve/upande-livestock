@@ -41,7 +41,7 @@ export default function GenericEvent() {
       <Field label="Remarks"><Textarea placeholder="Optional notes" /></Field>
       <Button
         label={`Submit ${spec.title.toLowerCase()}`}
-        onPress={() => router.replace(`/event-success?name=${encodeURIComponent(spec.title)}`)}
+        onPress={() => router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`)}
       />
     </Screen>
   );

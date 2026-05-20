@@ -261,8 +261,8 @@ export default function Diagnosis() {
         label="Submit diagnosis"
         onPress={() => router.replace(
           diagnosis === "Confirmed disease"
-            ? "/event-success?name=Diagnosis (escalated to case)"
-            : "/event-success?name=Animal diagnosis",
+            ? "/(tabs)/record/success?name=Diagnosis (escalated to case)"
+            : "/(tabs)/record/success?name=Animal diagnosis",
         )}
       />
     </Screen>

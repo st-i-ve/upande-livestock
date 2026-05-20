@@ -42,7 +42,7 @@ export default function CullNew() {
         <KV k="Salvage" v="0 KES" />
         <KV k="Loss to expense" v="−120,000 KES" vColor={COLORS.danger} />
       </View>
-      <Button label="Submit" variant="danger" onPress={() => router.replace("/event-success?name=Cull / death")} />
+      <Button label="Submit" variant="danger" onPress={() => router.replace("/(tabs)/record/success?name=Cull / death")} />
     </Screen>
   );
 }

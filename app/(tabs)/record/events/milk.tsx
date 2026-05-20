@@ -99,7 +99,7 @@ export default function Milk() {
         />
       )}
 
-      <Button label="Submit recording" onPress={() => router.replace("/event-success?name=Milk recording")} />
+      <Button label="Submit recording" onPress={() => router.replace("/(tabs)/record/success?name=Milk recording")} />
     </Screen>
   );
 }

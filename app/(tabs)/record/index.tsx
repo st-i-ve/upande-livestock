@@ -11,30 +11,30 @@ type Item = { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string;
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   { title: "Daily routine", items: [
-    { icon: "water", label: "Milk recording", href: "/events/milk" },
-    { icon: "baby-bottle-outline", label: "Calf feeding", href: "/events/calf-feed" },
-    { icon: "grain", label: "Animal feeding (TMR)", href: "/events/animal-feed" },
+    { icon: "water", label: "Milk recording", href: "/(tabs)/record/events/milk" },
+    { icon: "baby-bottle-outline", label: "Calf feeding", href: "/(tabs)/record/events/calf-feed" },
+    { icon: "grain", label: "Animal feeding (TMR)", href: "/(tabs)/record/events/animal-feed" },
   ]},
   { title: "Health & breeding", items: [
-    { icon: "magnify", label: "Diagnosis (random check)", href: "/events/diagnosis" },
-    { icon: "needle", label: "Vaccination", href: "/events/vaccination" },
-    { icon: "bug", label: "Deworming", href: "/events/deworming" },
-    { icon: "fire", label: "Heat detection", href: "/events/heat" },
-    { icon: "heart", label: "Service / AI", href: "/events/service" },
-    { icon: "clipboard-check", label: "Pregnancy diagnosis", href: "/events/pd" },
-    { icon: "baby-bottle-outline", label: "Calving", href: "/events/calving" },
-    { icon: "stethoscope", label: "New health case", href: "/(tabs)/alerts/cases" },
+    { icon: "magnify", label: "Diagnosis (random check)", href: "/(tabs)/record/events/diagnosis" },
+    { icon: "needle", label: "Vaccination", href: "/(tabs)/record/events/vaccination" },
+    { icon: "bug", label: "Deworming", href: "/(tabs)/record/events/deworming" },
+    { icon: "fire", label: "Heat detection", href: "/(tabs)/record/events/heat" },
+    { icon: "heart", label: "Service / AI", href: "/(tabs)/record/events/service" },
+    { icon: "clipboard-check", label: "Pregnancy diagnosis", href: "/(tabs)/record/events/pd" },
+    { icon: "baby-bottle-outline", label: "Calving", href: "/(tabs)/record/events/calving" },
+    { icon: "stethoscope", label: "New health case", href: "/(tabs)/record/cases/new" },
   ]},
   { title: "Husbandry", items: [
-    { icon: "scale", label: "Weight recording", href: "/events/weight" },
-    { icon: "arrow-left-right", label: "Movement", href: "/events/movement" },
-    { icon: "content-cut", label: "Dehorning", href: "/events/dehorning" },
-    { icon: "tools", label: "Hoof trimming", href: "/events/hoof" },
-    { icon: "water-off", label: "Drying off", href: "/events/dryoff" },
+    { icon: "scale", label: "Weight recording", href: "/(tabs)/record/events/weight" },
+    { icon: "arrow-left-right", label: "Movement", href: "/(tabs)/record/events/movement" },
+    { icon: "content-cut", label: "Dehorning", href: "/(tabs)/record/events/dehorning" },
+    { icon: "tools", label: "Hoof trimming", href: "/(tabs)/record/events/hoof" },
+    { icon: "water-off", label: "Drying off", href: "/(tabs)/record/events/dryoff" },
   ]},
   { title: "End of life", items: [
-    { icon: "cash", label: "Sell animal", href: "/sales/new" },
-    { icon: "delete-outline", label: "Cull / death", href: "/culls/new" },
+    { icon: "cash", label: "Sell animal", href: "/(tabs)/record/sales/new" },
+    { icon: "delete-outline", label: "Cull / death", href: "/(tabs)/record/culls/new" },
   ]},
 ];
 
