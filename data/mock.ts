@@ -124,8 +124,8 @@ export const drawerStruct: DrawerGroup[] = [
   { grp: "Records", its: [
     { id: "animals", ic: "format-list-bulleted", l: "Animals", href: "/(tabs)/animals" },
     { id: "herds", ic: "fence", l: "Herds", href: "/(tabs)/animals/herds" },
-    { id: "diagnoses", ic: "magnify", l: "Diagnoses", href: "/diagnoses" },
-    { id: "cases", ic: "stethoscope", l: "Health cases", href: "/cases", b: 3 },
+    { id: "diagnoses", ic: "magnify", l: "Diagnoses", href: "/(tabs)/alerts/diagnoses" },
+    { id: "cases", ic: "stethoscope", l: "Health cases", href: "/(tabs)/alerts/cases", b: 3 },
     { id: "sales", ic: "cash", l: "Sales", href: "/sales" },
     { id: "culls", ic: "delete-outline", l: "Culls / deaths", href: "/culls" },
   ]},
