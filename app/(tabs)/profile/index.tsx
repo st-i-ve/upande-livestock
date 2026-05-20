@@ -11,7 +11,7 @@ export default function Profile() {
   const handleLogout = () => {
     Alert.alert("Log out", "Sign out of this device?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Log out", style: "destructive", onPress: () => {} },
+      { text: "Log out", style: "destructive", onPress: () => router.replace("/(auth)/login") },
     ]);
   };
 

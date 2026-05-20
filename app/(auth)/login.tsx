@@ -1,0 +1,146 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React, { useState } from "react";
+import {
+  Image,
+  ImageBackground,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { Button } from "@/components/Button";
+import { COLORS, FONT_FAMILY } from "@/constants/theme";
+
+export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [obscure, setObscure] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = () => {
+    setLoading(true);
+    // Demo app: no real auth. Brief loading state, then enter the app.
+    setTimeout(() => {
+      setLoading(false);
+      router.replace("/(tabs)");
+    }, 300);
+  };
+
+  return (
+    <ImageBackground
+      source={require("../../assets/images/home_bg.png")}
+      style={s.background}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom", "left", "right"]}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={s.container}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+          >
+            <ScrollView
+              contentContainerStyle={s.scroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={s.content}>
+                <View style={s.header}>
+                  <Image
+                    source={require("../../assets/images/upande_logo_no_bg.png")}
+                    style={s.logo}
+                    resizeMode="contain"
+                  />
+                  <Text style={s.title}>Upande Livestock</Text>
+                </View>
+
+                <View style={s.field}>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Enter email"
+                    placeholderTextColor={COLORS.textSubtle}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    returnKeyType="next"
+                    style={s.input}
+                  />
+                </View>
+
+                <View style={s.field}>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Enter password"
+                    placeholderTextColor={COLORS.textSubtle}
+                    secureTextEntry={obscure}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                    style={[s.input, { paddingRight: 44 }]}
+                  />
+                  <Pressable onPress={() => setObscure((v) => !v)} hitSlop={10} style={s.eye}>
+                    <MaterialCommunityIcons
+                      name={obscure ? "eye" : "eye-off"}
+                      size={20}
+                      color={COLORS.textMuted}
+                    />
+                  </Pressable>
+                </View>
+
+                <Button label="Login" onPress={handleLogin} loading={loading} />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </SafeAreaView>
+    </ImageBackground>
+  );
+}
+
+const s = StyleSheet.create({
+  background: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1 },
+  scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
+  content: { width: "100%", maxWidth: 400, alignSelf: "center" },
+  header: { alignItems: "center", marginBottom: 40 },
+  logo: { width: 180, height: 180 },
+  title: {
+    color: COLORS.text,
+    letterSpacing: 1,
+    fontFamily: FONT_FAMILY.regular,
+    fontSize: 36,
+    lineHeight: 44,
+    marginTop: 6,
+  },
+  field: { marginBottom: 14, position: "relative" },
+  input: {
+    backgroundColor: COLORS.bg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.border,
+    borderRadius: 50,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    fontSize: 14,
+    color: COLORS.text,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  eye: {
+    position: "absolute",
+    right: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+});
