@@ -2,5 +2,13 @@ import { Stack } from "expo-router";
 import React from "react";
 
 export default function AnimalsStackLayout() {
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#FFFFFF" } }} />;
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "#FFFFFF" },
+        animation: "slide_from_right",
+      }}
+    />
+  );
 }
