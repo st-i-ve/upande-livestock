@@ -13,11 +13,6 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#FFFFFF" } }}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="sales/index" />
-          <Stack.Screen name="culls/index" />
-          <Stack.Screen name="reports/[type]" />
-          <Stack.Screen name="inventory/[type]" />
-          <Stack.Screen name="settings" />
         </Stack>
         <StatusBar style="dark" />
       </SafeAreaProvider>
