@@ -112,7 +112,6 @@ export const drawerStruct: DrawerGroup[] = [
     { id: "inv_semen", ic: "test-tube", l: "Semen straws", href: "/(tabs)/profile/inventory/semen" },
     { id: "inv_feed", ic: "grain", l: "Feed", href: "/(tabs)/profile/inventory/feed" },
   ]},
-  { grp: "Settings", its: [{ id: "set_settings", ic: "cog", l: "Livestock settings", href: "/(tabs)/profile/settings" }]},
 ];
 
 // Backwards-compatible aliases — older screens import these.
