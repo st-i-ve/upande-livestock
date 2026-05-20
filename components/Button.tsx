@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { COLORS } from "@/constants/theme";
 
 type Variant = "primary" | "outline" | "danger" | "link";
 
@@ -55,8 +55,8 @@ export function Button({
 
 const s = StyleSheet.create({
   btn: {
-    paddingVertical: 11, paddingHorizontal: 16,
-    borderRadius: RADIUS.md, alignItems: "center", justifyContent: "center",
+    paddingVertical: 11, paddingHorizontal: 20,
+    borderRadius: 999, alignItems: "center", justifyContent: "center",
     marginTop: 6,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
