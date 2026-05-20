@@ -54,7 +54,7 @@ export default function Animals() {
         <Empty text="No animals match" />
       ) : (
         list.map((a) => (
-          <AnimalRow key={a.id} a={a} onPress={() => router.push(`/animal/${encodeURIComponent(a.id)}`)} />
+          <AnimalRow key={a.id} a={a} onPress={() => router.push(`/(tabs)/animals/${encodeURIComponent(a.id)}`)} />
         ))
       )}
     </Screen>
