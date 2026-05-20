@@ -10,8 +10,8 @@ import { COLORS } from "@/constants/theme";
 const ICON_INACTIVE = 22;
 const ICON_ACTIVE = 26;
 const BAR_CONTENT_HEIGHT = 64;
-const CIRCLE_DIAMETER = 58;
-const CIRCLE_LIFT = 22;
+const CIRCLE_DIAMETER = 46;
+const CIRCLE_LIFT = 14;
 
 const labelStyle = {
   fontSize: 10,
@@ -33,7 +33,7 @@ function RecordTabButton(props: BottomTabBarButtonProps) {
       style={s.recordCell}
     >
       <View style={[s.recordCircle, selected && s.recordCircleSelected]}>
-        <MaterialCommunityIcons name="plus" size={28} color={COLORS.bg} />
+        <MaterialCommunityIcons name="plus" size={22} color={COLORS.bg} />
       </View>
       <Text style={[s.recordLabel, selected && s.recordLabelSelected]}>Record</Text>
     </Pressable>

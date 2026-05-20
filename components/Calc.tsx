@@ -16,8 +16,6 @@ const s = StyleSheet.create({
   box: {
     backgroundColor: COLORS.bgMuted,
     borderRadius: RADIUS.md,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.text,
     paddingHorizontal: 13,
     paddingVertical: 11,
     marginBottom: 13,
