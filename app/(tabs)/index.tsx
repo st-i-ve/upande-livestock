@@ -1,34 +1,14 @@
 import { router } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar, type AvatarTone } from "@/components/Avatar";
 import { Banner } from "@/components/Banner";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { Tile, TileGrid } from "@/components/Tile";
 import { APP, COLORS, RADIUS } from "@/constants/theme";
 import { safetyAlerts, todaysMilk, todaysMilkRecorded } from "@/data/mock";
-
-const QUICK_ACTIONS: { icon: any; label: string; href: string }[] = [
-  { icon: "water",                label: "Milk recording",   href: "/events/milk" },
-  { icon: "baby-bottle-outline",  label: "Calf feeding",     href: "/events/calf-feed" },
-  { icon: "grain",                label: "Animal feeding",   href: "/events/animal-feed" },
-  { icon: "magnify",              label: "Diagnosis",        href: "/events/diagnosis" },
-  { icon: "needle",               label: "Vaccination",      href: "/events/vaccination" },
-  { icon: "bug",                  label: "Deworming",        href: "/events/deworming" },
-  { icon: "fire",                 label: "Heat detection",   href: "/events/heat" },
-  { icon: "heart",                label: "Service / AI",     href: "/events/service" },
-  { icon: "clipboard-check",      label: "Pregnancy diag.",  href: "/events/pd" },
-  { icon: "baby-bottle-outline",  label: "Calving",          href: "/events/calving" },
-  { icon: "baby-carriage",        label: "Birth",            href: "/events/birth" },
-  { icon: "scale",                label: "Weight",           href: "/events/weight" },
-  { icon: "arrow-left-right",     label: "Movement",         href: "/events/movement" },
-  { icon: "content-cut",          label: "Dehorning",        href: "/events/dehorning" },
-  { icon: "tools",                label: "Hoof trimming",    href: "/events/hoof" },
-  { icon: "water-off",            label: "Drying off",       href: "/events/dryoff" },
-];
 
 export default function Home() {
   return (
@@ -53,7 +33,11 @@ export default function Home() {
 
       <SectionTitle>Today's milk by herd</SectionTitle>
       {todaysMilk.map((r) => (
-        <View key={r.herd} style={s.herdRow}>
+        <Pressable
+          key={r.herd}
+          onPress={() => router.push(`/(tabs)/animals/herds/${encodeURIComponent(r.herd)}`)}
+          style={({ pressed }) => [s.herdRow, pressed && { backgroundColor: COLORS.bgMuted }]}
+        >
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.herdName} numberOfLines={1}>{r.herd}</Text>
             <Text style={s.herdMeta}>{r.cnt} cows · expected ~{r.expected} kg/day</Text>
@@ -70,7 +54,7 @@ export default function Home() {
               {r.pm !== null ? `${r.pm} kg` : "pending"}
             </Text>
           </View>
-        </View>
+        </Pressable>
       ))}
 
       <SectionTitle>Action queue · milk safety</SectionTitle>
@@ -85,12 +69,6 @@ export default function Home() {
         />
       ))}
 
-      <SectionTitle>Quick actions</SectionTitle>
-      <TileGrid>
-        {QUICK_ACTIONS.map((q) => (
-          <Tile key={q.href} icon={q.icon} title={q.label} onPress={() => router.push(q.href as any)} />
-        ))}
-      </TileGrid>
     </Screen>
   );
 }

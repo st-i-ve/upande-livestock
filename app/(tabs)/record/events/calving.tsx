@@ -28,7 +28,7 @@ export default function Calving() {
           title="Select dam (pregnant only)"
           placeholder="Search pregnant cow..."
           include={(a) => a.pregnant === 1}
-          emptyAction={{ label: "Add pregnancy", onPress: () => router.push("/events/pd") }}
+          emptyAction={{ label: "Add pregnancy", onPress: () => router.push("/(tabs)/record/events/pd") }}
         />
       </Field>
 
@@ -56,7 +56,7 @@ export default function Calving() {
       </FieldRow>
       <Field label="Number of calves"><Input keyboardType="numeric" defaultValue="1" /></Field>
 
-      <Button label="Submit calving" onPress={() => router.replace("/event-success?name=Calving")} />
+      <Button label="Submit calving" onPress={() => router.replace("/(tabs)/record/success?name=Calving")} />
     </Screen>
   );
 }

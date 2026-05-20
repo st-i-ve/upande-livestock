@@ -77,7 +77,7 @@ export default function CalfFeed() {
       <Field label="Quantity fed (kg)"><Input value={qty} onChangeText={setQty} keyboardType="numeric" /></Field>
       <Field label="Remarks (optional)"><Textarea placeholder="Optional notes" /></Field>
 
-      <Button label="Submit" onPress={() => router.replace("/event-success?name=Calf feeding")} />
+      <Button label="Submit" onPress={() => router.replace("/(tabs)/record/success?name=Calf feeding")} />
     </Screen>
   );
 }
