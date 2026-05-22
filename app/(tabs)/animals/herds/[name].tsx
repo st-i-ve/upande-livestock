@@ -14,30 +14,28 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { COLORS, RADIUS } from "@/constants/theme";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimals } from "@/src/hooks/useAnimals";
-import { useHerds } from "@/src/hooks/useHerds";
+import { useHerd } from "@/src/hooks/useHerd";
 
 export default function HerdDetail() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
-  const herdsQ = useHerds();
+  // useHerd fetches the single doc with its ration_items child table inline.
+  const herdQ = useHerd(herdName);
   const animalsQ = useAnimals();
 
-  const h = useMemo(
-    () => herdsQ.data?.find((x) => x.n === herdName) ?? null,
-    [herdsQ.data, herdName],
-  );
+  const h = herdQ.data ?? null;
 
   const inHerd = useMemo(
     () => (animalsQ.data ?? []).filter((a) => a.herd === herdName),
     [animalsQ.data, herdName],
   );
 
-  const isLoading = herdsQ.isLoading || animalsQ.isLoading;
-  const error = herdsQ.error || animalsQ.error;
-  const isRefetching = herdsQ.isRefetching || animalsQ.isRefetching;
+  const isLoading = herdQ.isLoading || animalsQ.isLoading;
+  const error = herdQ.error || animalsQ.error;
+  const isRefetching = herdQ.isRefetching || animalsQ.isRefetching;
   const refetch = () => {
-    herdsQ.refetch();
+    herdQ.refetch();
     animalsQ.refetch();
   };
 
@@ -78,13 +76,28 @@ export default function HerdDetail() {
         ]}
       />
 
-      {h.bom ? (
+      {h.bom || h.ration.length > 0 ? (
         <>
           <SectionTitle>Feeding plan (TMR / BOM)</SectionTitle>
           <View style={s.bom}>
-            <Text style={s.bomTitle}>{h.bom}</Text>
-            <Text style={s.bomSub}>Linked BOM determines cost-per-kg DMI for this herd</Text>
-            <Button label="View ration items" variant="outline" />
+            {h.bom ? <Text style={s.bomTitle}>{h.bom}</Text> : null}
+            <Text style={s.bomSub}>
+              {h.ration.length
+                ? `${h.ration.length} ration item${h.ration.length === 1 ? "" : "s"}`
+                : "Linked BOM determines cost-per-kg DMI for this herd"}
+            </Text>
+            {h.ration.length > 0 ? (
+              <View style={s.rationList}>
+                {h.ration.map((r, i) => (
+                  <View key={`${r.name}-${i}`} style={s.rationRow}>
+                    <Text style={s.rationName} numberOfLines={1}>{r.name || "—"}</Text>
+                    {r.pct > 0 ? (
+                      <Text style={s.rationPct}>{r.pct}%</Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         </>
       ) : null}
@@ -121,4 +134,15 @@ const s = StyleSheet.create({
   },
   bomTitle: { fontSize: 13, fontWeight: "600", color: COLORS.text },
   bomSub: { fontSize: 11, color: COLORS.textMuted, marginTop: 3 },
+  rationList: { marginTop: 10, gap: 6 },
+  rationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.borderSubtle,
+  },
+  rationName: { flex: 1, fontSize: 12, color: COLORS.text },
+  rationPct: { fontSize: 12, color: COLORS.textMuted, fontVariant: ["tabular-nums"] },
 });
