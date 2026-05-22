@@ -6,9 +6,12 @@ import { StyleSheet, TextInput, View } from "react-native";
 import { AnimalRow } from "@/components/AnimalRow";
 import { Chip, Chips } from "@/components/Chips";
 import { Empty } from "@/components/Empty";
+import { ErrorState } from "@/components/ErrorState";
+import { Loader } from "@/components/Loader";
 import { Screen } from "@/components/Screen";
 import { COLORS, RADIUS } from "@/constants/theme";
-import { animals } from "@/data/mock";
+import { extractFrappeError } from "@/src/services/api";
+import { useAnimals } from "@/src/hooks/useAnimals";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -21,6 +24,7 @@ const FILTERS = [
 export default function Animals() {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const { data: animals = [], isLoading, isRefetching, error, refetch } = useAnimals();
 
   const list = useMemo(() => {
     let l = animals;
@@ -30,10 +34,17 @@ export default function Animals() {
       l = l.filter((a) => a.id.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
     }
     return l;
-  }, [filter, query]);
+  }, [animals, filter, query]);
+
+  const subtitle = animals.length ? `${animals.length} animals` : "";
 
   return (
-    <Screen title="Animals" subtitle="462 across 12 herds">
+    <Screen
+      title="Animals"
+      subtitle={subtitle}
+      onRefresh={() => refetch()}
+      refreshing={isRefetching}
+    >
       <View style={s.search}>
         <MaterialCommunityIcons name="magnify" size={16} color={COLORS.textSubtle} />
         <TextInput
@@ -50,7 +61,11 @@ export default function Animals() {
         ))}
       </Chips>
 
-      {list.length === 0 ? (
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={() => refetch()} />
+      ) : list.length === 0 ? (
         <Empty text="No animals match" />
       ) : (
         list.map((a) => (

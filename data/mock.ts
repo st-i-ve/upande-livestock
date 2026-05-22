@@ -1,4 +1,8 @@
-import type { Alert, Animal, DailyMilkRow, DrawerGroup, Herd } from "@/types";
+// NOTE: Most data here has been replaced by live Frappe reads in sub-project #1.
+// What remains is fixture data used by screens that have not yet been migrated:
+// the record/* event screens, the profile configurations drawer, and the animal
+// picker sheet. Sub-project #2 (online writes) will replace these.
+import type { Animal, DrawerGroup, Herd } from "@/types";
 
 export const animals: Animal[] = [
   { id: "BELLA-129290", name: "BELLA", sex: "F", dob: "2019-09-28", herd: "Lactating group 1", repro: "Lactating", dim: 127, parity: 3, lastWt: 485, milkSafe: null, inTreatment: 0, pregnant: 0 },
@@ -70,30 +74,6 @@ export const feedStockItems = [
 
 export const warehouses = ["Stores - WDL", "Finished Goods - WDL", "Silage Pit 1", "Silage Pit 2"];
 
-// Today's milk by lactating herd. AM logged for two; PM and one full herd
-// still pending — the dashboard surfaces these as safety alerts.
-export const todaysMilk: DailyMilkRow[] = [
-  { herd: "Lactating group 1", cnt: 46, am: 245, pm: null, expected: 480 },
-  { herd: "LACTATION GROUP 2", cnt: 38, am: 145, pm: null, expected: 320 },
-  { herd: "Super high yielders", cnt: 8, am: null, pm: null, expected: 167 },
-];
-
-export const todaysMilkRecorded = todaysMilk.reduce(
-  (sum, r) => sum + (r.am ?? 0) + (r.pm ?? 0),
-  0,
-);
-
-// Action queue is explicitly milk-safety focused: withdrawal milk, colostrum
-// in the bulk tank, missed milkings, missed feedings.
-export const safetyAlerts: Alert[] = [
-  { sev: "danger", ic: "alert-octagon-outline", t: "TEST IVY in withdrawal", s: "Discard milk until 12 May · 22 kg/day" },
-  { sev: "danger", ic: "water", t: "Colostrum present in fresh cow", s: "TEST IVY · do not bulk-tank" },
-  { sev: "default", ic: "clock-alert-outline", t: "AM milking not recorded", s: "Super high yielders · 8 cows" },
-  { sev: "default", ic: "clock-alert-outline", t: "PM milking pending all herds", s: "3 herds · expected ~420 kg" },
-  { sev: "default", ic: "food-off", t: "STEAMERS not fed today", s: "18 cows · skipping AM ration" },
-  { sev: "default", ic: "food-off", t: "BULLS not fed today", s: "14 head · skipping AM ration" },
-];
-
 // Drawer mirrors the bottom-tab structure; events live under the Record tab now.
 export const drawerStruct: DrawerGroup[] = [
   { grp: "Archives", its: [
@@ -114,6 +94,3 @@ export const drawerStruct: DrawerGroup[] = [
   ]},
 ];
 
-// Backwards-compatible aliases — older screens import these.
-export const homeAlerts = safetyAlerts.slice(0, 3);
-export const allAlerts = safetyAlerts;
