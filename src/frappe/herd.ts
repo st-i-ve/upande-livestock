@@ -39,6 +39,8 @@ export const mapHerd = (row: HerdRow): Herd => ({
   // daily ration size comes from the linked BOM (see `bom`), which we don't
   // resolve in this sub-project. UI shows "—" when this is 0.
   kgPerHeadPerDay: 0,
+  isMilking: !!row.custom_is_milking,
+  isDry: !!row.custom_is_dry,
 });
 
 export const getHerds = async (): Promise<Herd[]> => {
