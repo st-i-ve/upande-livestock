@@ -212,16 +212,28 @@ mapAnimal(row): Animal = {
 
 ### Herd (`src/frappe/herd.ts`)
 
+Verified against the live `Herds` DocType on `upande-kaitet2.c.frappe.cloud`. Fields used:
+
 ```ts
-HERD_LIST_FIELDS = ['name', 'category', 'head_count', 'cost_center', 'bom']
+HERD_LIST_FIELDS = [
+  'name', 'herd_name', 'custom_herd_category', 'number_of_animals',
+  'cost_center', 'custom_cost_center', 'bom',
+  'custom_is_milking', 'custom_is_dry', 'custom_is_calf_rearing',
+]
 mapHerd(row): Herd = {
-  n: row.name, cat: row.category, cnt: row.head_count,
-  cc: row.cost_center, bom: row.bom,
-  ration: [], kgPerHeadPerDay: 0,
+  n:   row.name,
+  cat: row.custom_herd_category ?? '',   // Milking | Dry | Youngstock > 12m | Youngstock < 12m
+  cnt: Number(row.number_of_animals ?? 0),
+  cc:  row.cost_center ?? row.custom_cost_center ?? '',
+  bom: row.bom ?? '',
+  ration: row.ration_items?.map(mapRationItem) ?? [],
+  kgPerHeadPerDay: 0,
 }
 ```
 
-**Known gap:** `ration` and `kgPerHeadPerDay` are not on the `Herds` DocType per the server-scripts doc. The mapper returns empty/zero; UI tolerates these (renders "—" or hides the ration section). When these fields are added in Frappe, the mapper is updated in place.
+A single herd is fetched via `/api/resource/Herds/<name>` (hook `useHerd(name)`), which returns the `ration_items` child table inline. The herd detail screen surfaces ration items when present.
+
+**Known gap:** `kgPerHeadPerDay` is not a field on `Herds`. The per-head daily ration size is BOM-derived (`bom` field links to the relevant BOM). Resolving the BOM is out of scope for sub-project #1 — UI renders "—" when this is 0.
 
 ### Milk Recording (`src/frappe/milkRecording.ts`)
 
@@ -350,9 +362,9 @@ To be run on `upande-kaitet2.c.frappe.cloud` with a real account before merging:
 
 Surfaced for follow-up:
 
-- `Herds.ration` (child table or text) — not in schema; mapper returns `[]`.
-- `Herds.kg_per_head_per_day` — not in schema; mapper returns `0`.
-- No `Open Cases` count source — the home "Open cases" tile currently hard-codes `3`. For this sub-project we leave it hard-coded; a follow-up will wire it once we know the source (probably an Animal Event / health-case DocType filter).
+- `Herds.kg_per_head_per_day` — not a Herds field. Per-head ration size is BOM-derived (the herd's linked BOM has the per-unit quantities). Resolving BOMs is a follow-up; for now the home screen renders "—" for expected daily yield and ration totals.
+- No `Open Cases` count source — the home "Open cases" tile previously hard-coded `3`. It now renders "—" (with "coming soon" caption). A follow-up will wire it once we know the source (probably an Animal Event / health-case DocType filter).
+- ~~`Herds.ration` not in schema.~~ **Resolved during implementation:** rations live on the `Herds.ration_items` child table (Feeding Ration Item). The herd detail screen surfaces these.
 
 These are flagged here so they aren't silently lost.
 
