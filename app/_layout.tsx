@@ -5,7 +5,8 @@ import {
   Poppins_700Bold,
   useFonts,
 } from "@expo-google-fonts/poppins";
-import { Stack } from "expo-router";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
@@ -14,6 +15,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
+import { queryClient } from "@/src/services/queryClient";
 
 // Map fontWeight values to the loaded Poppins faces. React Native does NOT
 // synthesise bold from a regular file, so a Text style with weight 600 must
@@ -56,7 +59,34 @@ if (OriginalRender && !(Text as any).__poppinsPatched) {
   (Text as any).__poppinsPatched = true;
 }
 
+// Always start in the (auth) group so we never flash protected content
+// before checkAuth resolves. The AuthGate redirects to (tabs) if a session
+// already exists.
 export const unstable_settings = { anchor: "(auth)" };
+
+function AuthGate() {
+  const router = useRouter();
+  const segments = useSegments();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const checkAuth = useAuthStore((s) => s.checkAuth);
+
+  React.useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  React.useEffect(() => {
+    if (isLoading) return;
+    const inAuthGroup = segments[0] === "(auth)";
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace("/(auth)/login");
+    } else if (isAuthenticated && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [isAuthenticated, isLoading, segments, router]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -75,20 +105,23 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: COLORS.bg },
-            animation: "slide_from_right",
-          }}
-        >
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-        <StatusBar style="dark" />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <AuthGate />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: COLORS.bg },
+              animation: "slide_from_right",
+            }}
+          >
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+          <StatusBar style="dark" />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }

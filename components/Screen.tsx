@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS, FONT } from "@/constants/theme";
@@ -13,6 +13,8 @@ export function Screen({
   scroll = true,
   children,
   footer,
+  onRefresh,
+  refreshing = false,
 }: {
   title: string;
   subtitle?: string;
@@ -20,6 +22,8 @@ export function Screen({
   scroll?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const nav = useNavigation();
@@ -43,6 +47,11 @@ export function Screen({
         <ScrollView
           contentContainerStyle={[s.body, { paddingBottom: 24 + insets.bottom }]}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.text} />
+            ) : undefined
+          }
         >
           {children}
         </ScrollView>
