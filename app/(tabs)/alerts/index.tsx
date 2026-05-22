@@ -2,10 +2,14 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
+import { ErrorState } from "@/components/ErrorState";
+import { Loader } from "@/components/Loader";
 import { Screen } from "@/components/Screen";
 import { COLORS, FONT_FAMILY } from "@/constants/theme";
-import { allAlerts } from "@/data/mock";
+import { extractFrappeError } from "@/src/services/api";
+import { useSafetyAlerts } from "@/src/hooks/useSafetyAlerts";
 
 type Sev = "danger" | "default";
 
@@ -23,47 +27,58 @@ const SEV: Record<Sev, { bg: string; fg: string; border: string }> = {
 };
 
 export default function Alerts() {
+  const { data: allAlerts, isLoading, error, refetch } = useSafetyAlerts();
   const dangerCount = allAlerts.filter((a) => a.sev === "danger").length;
+
   return (
     <Screen
       title="Action queue"
       subtitle={`${allAlerts.length} items · ${dangerCount} urgent`}
+      onRefresh={refetch}
     >
-      <View style={s.list}>
-        {allAlerts.map((a, i) => {
-          const sev = (a.sev as Sev) || "default";
-          const tone = SEV[sev];
-          const last = i === allAlerts.length - 1;
-          return (
-            <View key={i}>
-              <View style={s.row}>
-                <View
-                  style={[
-                    s.iconWrap,
-                    { backgroundColor: tone.bg, borderColor: tone.border },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={a.ic as any}
-                    size={20}
-                    color={tone.fg}
-                  />
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      ) : allAlerts.length === 0 ? (
+        <Banner tone="info">Nothing to action right now.</Banner>
+      ) : (
+        <View style={s.list}>
+          {allAlerts.map((a, i) => {
+            const sev = (a.sev as Sev) || "default";
+            const tone = SEV[sev];
+            const last = i === allAlerts.length - 1;
+            return (
+              <View key={i}>
+                <View style={s.row}>
+                  <View
+                    style={[
+                      s.iconWrap,
+                      { backgroundColor: tone.bg, borderColor: tone.border },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={a.ic as any}
+                      size={20}
+                      color={tone.fg}
+                    />
+                  </View>
+                  <View style={s.body}>
+                    <Text style={s.title} numberOfLines={2}>
+                      {a.t}
+                    </Text>
+                    <Text style={s.meta} numberOfLines={2}>
+                      {a.s}
+                    </Text>
+                  </View>
+                  <Button label="Resolve" variant="link" />
                 </View>
-                <View style={s.body}>
-                  <Text style={s.title} numberOfLines={2}>
-                    {a.t}
-                  </Text>
-                  <Text style={s.meta} numberOfLines={2}>
-                    {a.s}
-                  </Text>
-                </View>
-                <Button label="Resolve" variant="link" />
+                {last ? null : <View style={s.divider} />}
               </View>
-              {last ? null : <View style={s.divider} />}
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      )}
     </Screen>
   );
 }

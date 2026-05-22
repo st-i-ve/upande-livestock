@@ -1,20 +1,60 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AnimalRow } from "@/components/AnimalRow";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Empty } from "@/components/Empty";
+import { ErrorState } from "@/components/ErrorState";
+import { Loader } from "@/components/Loader";
 import { MetricGrid } from "@/components/MetricGrid";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { COLORS, RADIUS } from "@/constants/theme";
-import { animals, herds } from "@/data/mock";
+import { extractFrappeError } from "@/src/services/api";
+import { useAnimals } from "@/src/hooks/useAnimals";
+import { useHerds } from "@/src/hooks/useHerds";
 
 export default function HerdDetail() {
   const { name } = useLocalSearchParams<{ name: string }>();
-  const h = herds.find((x) => x.n === decodeURIComponent(name || ""));
+  const herdName = decodeURIComponent(name || "");
+
+  const herdsQ = useHerds();
+  const animalsQ = useAnimals();
+
+  const h = useMemo(
+    () => herdsQ.data?.find((x) => x.n === herdName) ?? null,
+    [herdsQ.data, herdName],
+  );
+
+  const inHerd = useMemo(
+    () => (animalsQ.data ?? []).filter((a) => a.herd === herdName),
+    [animalsQ.data, herdName],
+  );
+
+  const isLoading = herdsQ.isLoading || animalsQ.isLoading;
+  const error = herdsQ.error || animalsQ.error;
+  const isRefetching = herdsQ.isRefetching || animalsQ.isRefetching;
+  const refetch = () => {
+    herdsQ.refetch();
+    animalsQ.refetch();
+  };
+
+  if (isLoading) {
+    return (
+      <Screen title="Herd" back>
+        <Loader />
+      </Screen>
+    );
+  }
+  if (error) {
+    return (
+      <Screen title="Herd" back>
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      </Screen>
+    );
+  }
   if (!h) {
     return (
       <Screen title="Not found" back>
@@ -22,23 +62,32 @@ export default function HerdDetail() {
       </Screen>
     );
   }
-  const inHerd = animals.filter((a) => a.herd === h.n);
 
   return (
-    <Screen title={h.n} subtitle={h.cat} back>
+    <Screen
+      title={h.n}
+      subtitle={h.cat || undefined}
+      back
+      onRefresh={refetch}
+      refreshing={isRefetching}
+    >
       <MetricGrid
         items={[
           { label: "Animals", value: h.cnt },
-          { label: "Cost centre", value: h.cc, small: true },
+          { label: "Cost centre", value: h.cc || "—", small: true },
         ]}
       />
 
-      <SectionTitle>Feeding plan (TMR / BOM)</SectionTitle>
-      <View style={s.bom}>
-        <Text style={s.bomTitle}>{h.bom}</Text>
-        <Text style={s.bomSub}>Linked BOM determines cost-per-kg DMI for this herd</Text>
-        <Button label="View ration items" variant="outline" />
-      </View>
+      {h.bom ? (
+        <>
+          <SectionTitle>Feeding plan (TMR / BOM)</SectionTitle>
+          <View style={s.bom}>
+            <Text style={s.bomTitle}>{h.bom}</Text>
+            <Text style={s.bomSub}>Linked BOM determines cost-per-kg DMI for this herd</Text>
+            <Button label="View ration items" variant="outline" />
+          </View>
+        </>
+      ) : null}
 
       <SectionTitle>
         Animals in herd {inHerd.length ? `(${inHerd.length} of ${h.cnt} shown)` : ""}
@@ -53,7 +102,7 @@ export default function HerdDetail() {
           />
         ))
       ) : (
-        <Empty text="Not all herd members loaded in demo" />
+        <Empty text="No animals in this herd" />
       )}
 
       <SectionTitle>Quick actions</SectionTitle>

@@ -1,0 +1,223 @@
+import axios, { AxiosError, AxiosInstance } from "axios";
+
+import { DEFAULT_INSTANCE_URL, STORAGE_KEYS, storage } from "./storage";
+
+const normalizeBaseUrl = (url: string) => url.trim().replace(/\/+$/, "");
+
+const previewPayload = (value: unknown, max = 2000): string => {
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  try {
+    const s = typeof value === "string" ? value : JSON.stringify(value);
+    return s.length > max ? `${s.slice(0, max)}…[+${s.length - max} chars]` : s;
+  } catch {
+    return "[unserializable]";
+  }
+};
+
+const resolveUrl = (config: any): string => {
+  const base = String(config?.baseURL ?? "").replace(/\/+$/, "");
+  const path = String(config?.url ?? "");
+  return /^https?:\/\//i.test(path) ? path : `${base}${path}`;
+};
+
+const attachLogging = (instance: AxiosInstance | typeof axios) => {
+  instance.interceptors.request.use((config) => {
+    const method = String(config.method ?? "get").toUpperCase();
+    const parts = [`[API] → ${method} ${resolveUrl(config)}`];
+    if (config.params) parts.push(`params=${previewPayload(config.params)}`);
+    if (config.data !== undefined) parts.push(`body=${previewPayload(config.data)}`);
+    console.log(parts.join(" "));
+    return config;
+  });
+  instance.interceptors.response.use(
+    (response) => {
+      const method = String(response.config?.method ?? "get").toUpperCase();
+      console.log(
+        `[API] ← ${response.status} ${method} ${resolveUrl(response.config)} ${previewPayload(response.data)}`,
+      );
+      return response;
+    },
+    (error) => {
+      const config = error.config ?? {};
+      const method = String(config.method ?? "get").toUpperCase();
+      const status = error.response?.status ?? "ERR";
+      const detail =
+        error.response?.data !== undefined
+          ? previewPayload(error.response.data)
+          : (error.message ?? "(no response)");
+      console.warn(`[API] ✗ ${status} ${method} ${resolveUrl(config)} ${detail}`);
+      return Promise.reject(error);
+    },
+  );
+};
+
+attachLogging(axios);
+
+// Hook registered by authStore so the response interceptor can route to login
+// on session expiry without a circular import.
+let onUnauthorized: (() => void) | null = null;
+export const setUnauthorizedHandler = (fn: (() => void) | null) => {
+  onUnauthorized = fn;
+};
+
+const isUnauthorized = (err: AxiosError): boolean => {
+  const status = err.response?.status;
+  if (status === 401 || status === 403) return true;
+  const data = err.response?.data as any;
+  const exc = String(data?.exc ?? data?.exception ?? "");
+  return /CSRFTokenError|AuthenticationError|SessionExpired/i.test(exc);
+};
+
+/**
+ * Returns a single user-readable string from a Frappe error response.
+ * Frappe wraps validation messages inside `_server_messages` as a JSON string
+ * of JSON strings, so we double-decode and pick the first message.
+ */
+export const extractFrappeError = (err: unknown): string => {
+  const e = err as AxiosError;
+  const data = e?.response?.data as any;
+  if (data?._server_messages) {
+    try {
+      const outer = JSON.parse(data._server_messages);
+      const arr = Array.isArray(outer) ? outer : [outer];
+      for (const item of arr) {
+        try {
+          const inner = typeof item === "string" ? JSON.parse(item) : item;
+          if (inner?.message) return String(inner.message);
+        } catch {
+          if (typeof item === "string") return item;
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+  if (data?.exception) return String(data.exception);
+  if (data?.message) return String(data.message);
+  if (e?.message) return e.message;
+  return "Something went wrong.";
+};
+
+export const getWorkingUrl = async (inputUrl: string): Promise<string | null> => {
+  const normalized = normalizeBaseUrl(inputUrl);
+  if (!normalized) return null;
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  const httpsUrl = `https://${normalized}`;
+  try {
+    await axios.head(httpsUrl, { timeout: 5000 });
+    return httpsUrl;
+  } catch {
+    return `http://${normalized}`;
+  }
+};
+
+export const getClient = async (): Promise<AxiosInstance> => {
+  const baseUrl =
+    (await storage.getItem(STORAGE_KEYS.INSTANCE_URL)) || DEFAULT_INSTANCE_URL;
+  const cookie = await storage.getItem(STORAGE_KEYS.COOKIE);
+  const sid = await storage.getItem(STORAGE_KEYS.SID);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (cookie) headers["Cookie"] = cookie;
+  if (sid) headers["sid"] = sid;
+  if (cookie) {
+    const m = cookie.match(/csrf_token=([^;]+)/i);
+    if (m && m[1]) headers["X-Frappe-CSRF-Token"] = m[1];
+  }
+
+  const client = axios.create({
+    baseURL: baseUrl,
+    headers,
+    timeout: 15_000,
+  });
+  attachLogging(client);
+
+  client.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (isUnauthorized(error as AxiosError) && onUnauthorized) {
+        try {
+          onUnauthorized();
+        } catch (e) {
+          console.warn("[api] onUnauthorized handler threw", e);
+        }
+      }
+      return Promise.reject(error);
+    },
+  );
+
+  return client;
+};
+
+const parseSetCookie = (raw: string[] | string | undefined): string => {
+  if (!raw) return "";
+  const list = Array.isArray(raw) ? raw : [raw];
+  return list
+    .map((h) => {
+      const parts = h.split(";");
+      return parts[0] ? parts[0].trim() : "";
+    })
+    .filter(Boolean)
+    .join("; ");
+};
+
+export const api = {
+  /**
+   * Logs in to a Frappe site and persists the cookie + sid.
+   * Returns the parsed login response so callers can grab `full_name`.
+   */
+  login: async (
+    email: string,
+    password: string,
+    url: string,
+  ): Promise<{ full_name?: string; message?: string }> => {
+    const fullUrl = await getWorkingUrl(url);
+    if (!fullUrl) throw new Error("Could not connect to server");
+
+    await storage.setItem(STORAGE_KEYS.INSTANCE_URL, fullUrl);
+    await storage.setItem(STORAGE_KEYS.INSTANCE_URL_BACKUP, fullUrl);
+
+    const params = new URLSearchParams();
+    params.append("usr", email);
+    params.append("pwd", password);
+
+    const response = await axios.post(`${fullUrl}/api/method/login`, params, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 15_000,
+    });
+
+    const setCookie =
+      (response.headers as any)["set-cookie"] ||
+      (response.headers as any)["Set-Cookie"];
+    const cookieStr = parseSetCookie(setCookie);
+
+    if (cookieStr) {
+      await storage.setItem(STORAGE_KEYS.COOKIE, cookieStr);
+      const sidMatch = cookieStr.match(/sid=([^;]+)/);
+      if (sidMatch?.[1]) await storage.setItem(STORAGE_KEYS.SID, sidMatch[1]);
+    }
+
+    await storage.setItem(STORAGE_KEYS.EMAIL, email);
+    const data = response.data as { full_name?: string; message?: string };
+    if (data?.full_name) await storage.setItem(STORAGE_KEYS.FULLNAME, data.full_name);
+
+    return data;
+  },
+
+  logout: async (): Promise<void> => {
+    try {
+      const client = await getClient();
+      await client.post("/api/method/logout");
+    } catch {
+      // ignore — we're clearing local state anyway
+    }
+    await storage.multiRemove([
+      STORAGE_KEYS.COOKIE,
+      STORAGE_KEYS.SID,
+      STORAGE_KEYS.FULLNAME,
+    ]);
+  },
+};

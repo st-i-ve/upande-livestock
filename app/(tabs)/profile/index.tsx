@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { APP, COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -40,13 +41,23 @@ function Subheader({ children }: { children: React.ReactNode }) {
 }
 
 export default function Profile() {
+  const fullname = useAuthStore((s) => s.fullname);
+  const email = useAuthStore((s) => s.email);
+  const logout = useAuthStore((s) => s.logout);
+
+  const displayName = fullname || APP.user;
+  const subtitle = email || APP.farm;
+
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Logout",
         style: "destructive",
-        onPress: () => router.replace("/(auth)/login"),
+        onPress: async () => {
+          await logout();
+          router.replace("/(auth)/login");
+        },
       },
     ]);
   };
@@ -60,12 +71,12 @@ export default function Profile() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.userSection}>
           <View style={s.avatar}>
-            <Text style={s.avatarText}>{APP.user.charAt(0).toUpperCase()}</Text>
+            <Text style={s.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={{ marginLeft: 20, flex: 1, justifyContent: "center" }}>
-            <Text style={s.name} numberOfLines={1}>{APP.user}</Text>
+            <Text style={s.name} numberOfLines={1}>{displayName}</Text>
+            <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
             <Text style={s.caption} numberOfLines={1}>{APP.farm}</Text>
-            <Text style={s.caption} numberOfLines={1}>Employee · {APP.emp}</Text>
           </View>
         </View>
 
