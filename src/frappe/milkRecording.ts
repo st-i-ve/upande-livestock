@@ -81,12 +81,11 @@ export const mapTodaysMilkByHerd = (
     slot[bucket] = (slot[bucket] ?? 0) + r.netYieldKg;
   }
 
-  // Only include lactating herds (heuristic: any herd that has cows_milked
-  // entries today OR whose name suggests a milking group).
-  const lactatingPattern = /lact|milk|fresh|yield/i;
+  // Include any herd flagged as `custom_is_milking` on Frappe, plus any herd
+  // that already has a recording today (covers herds without the flag set).
   const candidates = new Set<string>([
     ...Object.keys(sums),
-    ...herds.filter((h) => lactatingPattern.test(h.n) || lactatingPattern.test(h.cat)).map((h) => h.n),
+    ...herds.filter((h) => h.isMilking).map((h) => h.n),
   ]);
 
   const result: DailyMilkRow[] = [];

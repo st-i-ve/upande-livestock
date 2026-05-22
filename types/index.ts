@@ -23,6 +23,8 @@ export type Herd = {
   bom: string;
   ration: RationItem[];
   kgPerHeadPerDay: number;
+  isMilking?: boolean;
+  isDry?: boolean;
 };
 
 export type DrawerItem = {
