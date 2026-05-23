@@ -16,6 +16,7 @@ import "react-native-reanimated";
 
 import { COLORS, FONT_FAMILY } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
+import { startAutoDrain } from "@/src/offline/autoDrain";
 import { queryClient } from "@/src/services/queryClient";
 
 // Map fontWeight values to the loaded Poppins faces. React Native does NOT
@@ -73,6 +74,9 @@ function AuthGate() {
 
   React.useEffect(() => {
     checkAuth();
+    // Start the offline-queue drainer once, at app startup.
+    const stop = startAutoDrain();
+    return stop;
   }, [checkAuth]);
 
   React.useEffect(() => {

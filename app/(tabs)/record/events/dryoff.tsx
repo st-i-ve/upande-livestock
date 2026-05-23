@@ -43,9 +43,10 @@ export default function Dryoff() {
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     let succeeded = 0;
+    let queued = 0;
     for (const a of selected) {
       try {
-        await mutation.mutateAsync({
+        const r = await mutation.mutateAsync({
           eventType: "Drying Off",
           animal: a.id,
           currentHerd: a.herd,
@@ -53,7 +54,8 @@ export default function Dryoff() {
           eventDate: todayISO(),
           toHerd,
         });
-        succeeded += 1;
+        if (r.queued) queued += 1;
+        else succeeded += 1;
       } catch (err) {
         setError(
           `${succeeded} of ${selected.length} dried off. Stopped at ${a.name}: ${extractFrappeError(err)}`,
@@ -61,7 +63,10 @@ export default function Dryoff() {
         return;
       }
     }
-    Alert.alert("Drying off recorded", `${succeeded} cow${succeeded === 1 ? "" : "s"} moved to ${toHerd}.`);
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert("Drying off recorded", parts.join(" · "));
     router.replace("/(tabs)/record/success?name=Drying off");
   };
 

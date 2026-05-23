@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { APP, COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
+import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
+import { usePendingCount } from "@/src/hooks/useQueueStatus";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -44,6 +46,8 @@ export default function Profile() {
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
+  const pending = usePendingCount();
+  const online = useNetworkStatus();
 
   const displayName = fullname || APP.user;
   const subtitle = email || APP.farm;
@@ -91,6 +95,18 @@ export default function Profile() {
             icon="cog"
             label="Livestock settings"
             onPress={() => router.push("/(tabs)/profile/settings")}
+          />
+          <Row
+            icon="cloud-upload-outline"
+            label={online === false ? "Offline · pending submissions" : "Pending submissions"}
+            onPress={() => router.push("/(tabs)/profile/pending" as any)}
+            right={
+              pending > 0 ? (
+                <View style={s.badge}>
+                  <Text style={s.badgeText}>{pending}</Text>
+                </View>
+              ) : undefined
+            }
           />
 
           <View style={s.divider} />
@@ -198,5 +214,20 @@ const s = StyleSheet.create({
     color: COLORS.textSubtle,
     fontSize: 12,
     fontFamily: FONT_FAMILY.regular,
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    backgroundColor: COLORS.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 6,
+  },
+  badgeText: {
+    color: COLORS.bg,
+    fontSize: 11,
+    fontFamily: FONT_FAMILY.semibold,
   },
 });

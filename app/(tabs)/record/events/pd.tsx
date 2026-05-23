@@ -35,7 +35,7 @@ export default function PD() {
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         eventType: "Pregnancy Diagnosis",
         animal: animal.id,
         currentHerd: animal.herd,
@@ -45,10 +45,12 @@ export default function PD() {
         remarks: remarks || undefined,
       });
       Alert.alert(
-        "PD recorded",
-        result === "Confirmed"
-          ? `${animal.name} confirmed pregnant. Expected calving in 280 days.`
-          : `${animal.name} marked ${result}.`,
+        r.queued ? "Queued offline" : "PD recorded",
+        r.queued
+          ? `${animal.name} saved locally. Will sync when online.`
+          : result === "Confirmed"
+            ? `${animal.name} confirmed pregnant. Expected calving in 280 days.`
+            : `${animal.name} marked ${result}.`,
       );
       router.replace("/(tabs)/record/success?name=Pregnancy diagnosis");
     } catch (err) {

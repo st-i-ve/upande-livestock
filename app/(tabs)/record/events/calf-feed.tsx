@@ -86,7 +86,7 @@ export default function CalfFeed() {
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         calf: calf.id,
         feedingDate: todayISO(),
         feedingSession: session,
@@ -98,7 +98,12 @@ export default function CalfFeed() {
         operator,
         remarks: remarks || undefined,
       });
-      Alert.alert("Calf feeding recorded", `${qty} kg ${feedType} fed to ${calf.name}.`);
+      Alert.alert(
+        r.queued ? "Queued offline" : "Calf feeding recorded",
+        r.queued
+          ? `Saved locally. Will sync when online.`
+          : `${qty} kg ${feedType} fed to ${calf.name}.`,
+      );
       router.replace("/(tabs)/record/success?name=Calf feeding");
     } catch (err) {
       setError(extractFrappeError(err));

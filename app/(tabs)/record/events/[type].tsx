@@ -102,9 +102,10 @@ export default function GenericEvent() {
         remarks: finalRemarks,
       } as const;
 
+      let r: { queued: boolean; data: any };
       switch (spec.eventType) {
         case "Weight Recording":
-          await mutation.mutateAsync({
+          r = await mutation.mutateAsync({
             ...common,
             eventType: "Weight Recording",
             weightKg: Number(weight),
@@ -115,7 +116,7 @@ export default function GenericEvent() {
         case "Deworming":
         case "Dehorning":
         case "Hoof Trimming":
-          await mutation.mutateAsync({
+          r = await mutation.mutateAsync({
             ...common,
             eventType: spec.eventType,
             drugIssues: drugIssues.length ? drugIssues : undefined,
@@ -123,10 +124,17 @@ export default function GenericEvent() {
           });
           break;
         case "Heat Detection":
-          await mutation.mutateAsync({ ...common, eventType: "Heat Detection" });
+          r = await mutation.mutateAsync({ ...common, eventType: "Heat Detection" });
           break;
+        default:
+          throw new Error(`Unhandled event type ${spec.eventType}`);
       }
-      Alert.alert(`${spec.title} recorded`, `${animal.name} updated.`);
+      Alert.alert(
+        r.queued ? "Queued offline" : `${spec.title} recorded`,
+        r.queued
+          ? `${animal.name} saved locally. Will sync when online.`
+          : `${animal.name} updated.`,
+      );
       router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
     } catch (err) {
       setError(extractFrappeError(err));

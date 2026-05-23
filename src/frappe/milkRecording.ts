@@ -102,6 +102,35 @@ export const getMilkRecordingsForDate = async (
   return rows.map(mapRow);
 };
 
+/**
+ * Submitted Milk Recordings over a date range. Used by the milk-yield report
+ * for 30-day rollups; also useful for any per-herd / per-day chart.
+ */
+export const getMilkRecordingsBetween = async (
+  startISO: string,
+  endISO: string,
+): Promise<(MilkRecordingRow & { milkRevenue: number; discardedKg: number })[]> => {
+  const client = await getClient();
+  const res = await client.get("/api/resource/Milk Recording", {
+    params: {
+      fields: JSON.stringify([...MILK_LIST_FIELDS, "milk_revenue", "discarded_kg"]),
+      filters: JSON.stringify([
+        ["recording_date", ">=", startISO],
+        ["recording_date", "<=", endISO],
+        ["docstatus", "=", 1],
+      ]),
+      limit_page_length: 2000,
+      order_by: "recording_date desc",
+    },
+  });
+  const rows = (res.data?.data ?? []) as any[];
+  return rows.map((r) => ({
+    ...mapRow(r),
+    milkRevenue: Number(r.milk_revenue ?? 0),
+    discardedKg: Number(r.discarded_kg ?? 0),
+  }));
+};
+
 const sessionBucket = (session: string): "am" | "pm" | "other" => {
   const s = session.toLowerCase();
   if (s.includes("am") || s.includes("morning")) return "am";

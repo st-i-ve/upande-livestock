@@ -355,7 +355,7 @@ export default function Diagnosis() {
             .join(" · ");
 
           try {
-            await mutation.mutateAsync({
+            const r = await mutation.mutateAsync({
               animal: animal.id,
               operator,
               company,
@@ -371,10 +371,12 @@ export default function Diagnosis() {
               confirmedByVet: vetConfirmed,
             });
             Alert.alert(
-              "Diagnosis submitted",
-              action === "Escalated to Case"
-                ? `${animal.name} flagged. A draft Animal Health Case has been created.`
-                : `${animal.name} examined and logged.`,
+              r.queued ? "Queued offline" : "Diagnosis submitted",
+              r.queued
+                ? `${animal.name} saved locally. Will sync when online.`
+                : action === "Escalated to Case"
+                  ? `${animal.name} flagged. A draft Animal Health Case has been created.`
+                  : `${animal.name} examined and logged.`,
             );
             router.replace(
               action === "Escalated to Case"

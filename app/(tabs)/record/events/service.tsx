@@ -36,7 +36,7 @@ export default function Service() {
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         eventType: "Service",
         animal: animal.id,
         currentHerd: animal.herd,
@@ -47,7 +47,12 @@ export default function Service() {
         sire: sireCatalog || undefined,
         remarks: remarks || undefined,
       });
-      Alert.alert("Service recorded", `${animal.name} marked as served.`);
+      Alert.alert(
+        r.queued ? "Queued offline" : "Service recorded",
+        r.queued
+          ? `${animal.name} saved locally. Will sync when the device is back online.`
+          : `${animal.name} marked as served.`,
+      );
       router.replace("/(tabs)/record/success?name=Service");
     } catch (err) {
       setError(extractFrappeError(err));

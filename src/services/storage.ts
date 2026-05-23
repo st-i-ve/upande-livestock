@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   INSTANCE_URL_BACKUP: "instanceurl_backup",
   EMAIL: "email",
   FULLNAME: "fullname",
+  PENDING_QUEUE: "pending_queue",
 } as const;
 
 export const DEFAULT_INSTANCE_URL = "https://upande-kaitet2.c.frappe.cloud";

@@ -1,4 +1,5 @@
 import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
+import { listDocuments } from "./generic";
 
 // Event types the Frappe `Animal Event` DocType accepts. Verified against
 // the live DocType options on upande-kaitet2.c.frappe.cloud.
@@ -92,6 +93,60 @@ const mapDrugIssue = (d: AnimalDrugIssueInput) => ({
  * auto-populate downstream fields like Stock Entries, JEs, derived dates,
  * and (for Calving live births) a new Animal record.
  */
+export type EventListRow = {
+  name: string;
+  animal: string;
+  eventType: AnimalEventType;
+  eventDate: string;
+  currentHerd: string | null;
+  newHerd: string | null;
+  diagnosisResult: string | null;
+  activityCost: number;
+};
+
+const EVENT_LIST_FIELDS = [
+  "name",
+  "animal",
+  "custom_animal_ref",
+  "event_type",
+  "event_date",
+  "current_herd",
+  "new_herd",
+  "custom_to_herd",
+  "diagnosis_result",
+  "custom_activity_cost",
+  "docstatus",
+];
+
+const mapEvent = (row: any): EventListRow => ({
+  name: row.name,
+  animal: row.custom_animal_ref || row.animal,
+  eventType: row.event_type,
+  eventDate: row.event_date,
+  currentHerd: row.current_herd ?? null,
+  newHerd: row.new_herd || row.custom_to_herd || null,
+  diagnosisResult: row.diagnosis_result ?? null,
+  activityCost: Number(row.custom_activity_cost ?? 0),
+});
+
+export const getRecentEvents = async (params?: {
+  eventType?: AnimalEventType;
+  since?: string;
+  limit?: number;
+}): Promise<EventListRow[]> => {
+  const filters: [string, string, any][] = [["docstatus", "=", 1]];
+  if (params?.eventType) filters.push(["event_type", "=", params.eventType]);
+  if (params?.since) filters.push(["event_date", ">=", params.since]);
+  const rows = await listDocuments({
+    doctype: "Animal Event",
+    fields: EVENT_LIST_FIELDS,
+    filters,
+    orderBy: "event_date desc",
+    limit: params?.limit ?? 200,
+  });
+  return rows.map(mapEvent);
+};
+
 export const createAnimalEvent = async (
   input: AnimalEventInput,
 ): Promise<any> => {
