@@ -31,9 +31,9 @@ export default function AnimalFeed() {
 
   return (
     <Screen title="Animal feeding" subtitle="Per herd · TMR / BOM" back>
-      <Banner tone="info">
-        Records the daily feed delivered to a herd. The ration breakdown comes from the herd's BOM —
-        each herd has its own ratio.
+      <Banner tone="warning">
+        Not yet posted to Frappe — there is no Animal Feeding DocType for per-herd TMR delivery
+        (only Calf Feeding for milk-fed calves). Submitting here records nothing on the server.
       </Banner>
       <Field label="Herd"><Picker value={herdName} onChange={setHerdName} options={herds.map((x) => x.n)} /></Field>
       <View style={s.bom}>

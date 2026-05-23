@@ -1,5 +1,5 @@
 import type { Animal } from "@/types";
-import { getClient } from "@/src/services/api";
+import { frappeCreateAndSubmit, getClient } from "@/src/services/api";
 
 export const ANIMAL_LIST_FIELDS = [
   "name",
@@ -99,6 +99,56 @@ export const getAnimals = async (): Promise<Animal[]> => {
   });
   const rows = (res.data?.data ?? []) as any[];
   return safeMap(rows, mapAnimal);
+};
+
+export type CreateAnimalInput = {
+  tagNumber: string;
+  burnName: string;
+  sex: "Female" | "Male";
+  currentHerd: string;
+  company: string;
+  dateOfBirth?: string;
+  origin?: "Born on Farm" | "Purchased" | "Transferred In";
+  acquisitionDate?: string;
+  birthWeightKg?: number;
+  dam?: string;
+  sireName?: string;
+  coatColour?: string;
+  isCapitalised?: boolean;
+  purchaseValue?: number;
+  insuredValue?: number;
+  reproStatus?: string;
+  remarks?: string;
+};
+
+/**
+ * Create + submit a new Animal record. If `isCapitalised` + `purchaseValue`
+ * are set, the After Submit server script creates the capitalisation JE
+ * (see livestock_server_scripts §6).
+ */
+export const createAnimal = async (input: CreateAnimalInput): Promise<any> => {
+  const body: Record<string, any> = {
+    tag_number: input.tagNumber,
+    burn_name: input.burnName,
+    sex: input.sex,
+    current_herd: input.currentHerd,
+    company: input.company,
+    status: "Active",
+  };
+  if (input.dateOfBirth) body.date_of_birth = input.dateOfBirth;
+  if (input.origin) body.origin = input.origin;
+  if (input.acquisitionDate) body.acquisition_date = input.acquisitionDate;
+  if (input.birthWeightKg != null) body.birth_weight_kg = input.birthWeightKg;
+  if (input.dam) body.dam = input.dam;
+  if (input.sireName) body.sire_name = input.sireName;
+  if (input.coatColour) body.coat_colour = input.coatColour;
+  if (input.isCapitalised) body.is_capitalised = 1;
+  if (input.purchaseValue != null) body.purchase_value = input.purchaseValue;
+  if (input.insuredValue != null) body.insured_value = input.insuredValue;
+  if (input.reproStatus) body.repro_status = input.reproStatus;
+  if (input.remarks) body.remarks = input.remarks;
+
+  return frappeCreateAndSubmit("Animal", body);
 };
 
 export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
