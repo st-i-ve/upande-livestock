@@ -7,12 +7,12 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
+import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { extractFrappeError, todayISO } from "@/src/services/api";
-import { semenItems } from "@/data/mock";
 import type { Animal } from "@/types";
 
 export default function Service() {
@@ -22,8 +22,8 @@ export default function Service() {
   const [operator, setOperator] = useState<string | null>(defaultOperator);
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
-  const [straw, setStraw] = useState(semenItems[0]);
-  const [sire, setSire] = useState("(none)");
+  const [straw, setStraw] = useState<string>("");
+  const [sireCatalog, setSireCatalog] = useState<string>("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -35,10 +35,6 @@ export default function Service() {
     if (!animal) return setError("Pick the cow to service.");
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
-    // Strip the trailing item-code marker if present (e.g. "Semen Delta Stormer-F (4040030377)").
-    // The Frappe Item link expects the raw item code if you have it; otherwise pass null.
-    const code = /\(([^()]+)\)\s*$/.exec(straw)?.[1] ?? null;
-
     try {
       await mutation.mutateAsync({
         eventType: "Service",
@@ -47,8 +43,8 @@ export default function Service() {
         operator,
         eventDate: todayISO(),
         serviceType: type,
-        semenItem: code ?? undefined,
-        sire: sire === "(none)" ? undefined : sire,
+        semenItem: straw || undefined,
+        sire: sireCatalog || undefined,
         remarks: remarks || undefined,
       });
       Alert.alert("Service recorded", `${animal.name} marked as served.`);
@@ -80,11 +76,27 @@ export default function Service() {
           <Picker value={type} onChange={(v) => setType(v as "A.I." | "Natural")} options={["A.I.", "Natural"]} />
         </Field>
       </FieldRow>
-      <Field label="Semen straw (Item)" help="Link to Item master · 1 straw issued from Stores on submit.">
-        <Picker value={straw} onChange={setStraw} options={semenItems} />
+      <Field label="Semen straw (Item)" help="Search Frappe Items. 1 straw issued from Stores on submit.">
+        <FrappeSearchPicker
+          doctype="Item"
+          value={straw || null}
+          onChange={(name) => setStraw(name)}
+          fields={["name", "item_name", "item_code"]}
+          displayField="item_name"
+          metaField="item_code"
+          searchField="item_name"
+          filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
+          icon="test-tube"
+        />
       </Field>
       <Field label="Sire (catalog · optional)">
-        <Picker value={sire} onChange={setSire} options={["(none)", "Delta Stormer (Holstein)", "Delta Keen (Holstein)"]} />
+        <FrappeSearchPicker
+          doctype="Sire Catalog"
+          value={sireCatalog || null}
+          onChange={(name) => setSireCatalog(name)}
+          fields={["name"]}
+          icon="cow"
+        />
       </Field>
       <Field label="Remarks">
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Heat signs, technician notes..." />

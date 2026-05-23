@@ -8,6 +8,7 @@ import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
+import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Screen } from "@/components/Screen";
 import { COLORS, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
@@ -248,24 +249,29 @@ function DrugRows({
       ) : null}
       {rows.map((r) => (
         <View key={r.id} style={s.drugBox}>
-          <FieldRow>
-            <Field label="Item code" style={{ flex: 2 }}>
-              <Input
-                value={r.itemCode}
-                onChangeText={(t) => update(r.id, { itemCode: t })}
-                placeholder="e.g. 4040020167"
-                autoCapitalize="none"
-              />
-            </Field>
-            <Field label="Qty" style={{ flex: 1 }}>
-              <Input
-                value={r.qty}
-                onChangeText={(t) => update(r.id, { qty: t })}
-                keyboardType="numeric"
-                placeholder="1"
-              />
-            </Field>
-          </FieldRow>
+          <Field label="Item">
+            <FrappeSearchPicker
+              doctype="Item"
+              value={r.itemCode || null}
+              onChange={(name, row) =>
+                update(r.id, { itemCode: name, uom: r.uom || row?.stock_uom || "" })
+              }
+              fields={["name", "item_name", "item_code", "stock_uom"]}
+              displayField="item_name"
+              metaField="item_code"
+              searchField="item_name"
+              filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
+              icon="pill"
+            />
+          </Field>
+          <Field label="Qty">
+            <Input
+              value={r.qty}
+              onChangeText={(t) => update(r.id, { qty: t })}
+              keyboardType="numeric"
+              placeholder="1"
+            />
+          </Field>
           <FieldRow>
             <Field label="UOM" style={{ flex: 1 }}>
               <Input value={r.uom} onChangeText={(t) => update(r.id, { uom: t })} placeholder="ECH" />
