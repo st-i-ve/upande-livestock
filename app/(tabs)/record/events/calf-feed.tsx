@@ -10,11 +10,10 @@ import { Calc } from "@/components/Calc";
 import { Chip, Chips } from "@/components/Chips";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
+import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
-import { SearchPicker } from "@/components/SearchPicker";
 import { Screen } from "@/components/Screen";
 import { COLORS } from "@/constants/theme";
-import { feedStockItems, warehouses } from "@/data/mock";
 import { ageDays, initials } from "@/services/utils";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
@@ -59,8 +58,8 @@ export default function CalfFeed() {
   const [calf, setCalf] = useState<Animal | null>(null);
   const [session, setSession] = useState<CalfFeedingSession>("AM");
   const [feedType, setFeedType] = useState<CalfFeedType>("Whole Milk");
-  const [item, setItem] = useState<string>(feedStockItems[0]);
-  const [wh, setWh] = useState<string>(warehouses[0]);
+  const [item, setItem] = useState<string>("");
+  const [wh, setWh] = useState<string>("");
   const [qty, setQty] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -148,19 +147,32 @@ export default function CalfFeed() {
       </Field>
       <Field
         label="Feed item (stock)"
-        help="Must match a Frappe Item code. Stock issued from source warehouse on submit."
+        help="Search live Frappe Items. Stock issued from source warehouse on submit."
       >
-        <SearchPicker
-          value={item}
-          onChange={setItem}
-          options={feedStockItems}
-          title="Search stock items"
-          searchPlaceholder="Type to filter feed items"
+        <FrappeSearchPicker
+          doctype="Item"
+          value={item || null}
+          onChange={(name) => setItem(name)}
+          fields={["name", "item_name", "item_code", "stock_uom"]}
+          displayField="item_name"
+          metaField="item_code"
+          searchField="item_name"
+          filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
+          icon="package-variant"
         />
       </Field>
       <FieldRow>
         <Field label="Source warehouse" style={{ flex: 1 }}>
-          <SearchPicker value={wh} onChange={setWh} options={warehouses} title="Source warehouse" />
+          <FrappeSearchPicker
+            doctype="Warehouse"
+            value={wh || null}
+            onChange={(name) => setWh(name)}
+            fields={["name", "warehouse_name"]}
+            displayField="warehouse_name"
+            searchField="warehouse_name"
+            filters={[["disabled", "=", 0]]}
+            icon="warehouse"
+          />
         </Field>
         <Field label="Session" style={{ flex: 1 }}>
           <Chips>

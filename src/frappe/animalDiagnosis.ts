@@ -1,4 +1,5 @@
 import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
+import { listDocuments } from "./generic";
 
 export type DiagnosisAction =
   | "Logged — monitor"
@@ -38,6 +39,49 @@ export type CreateAnimalDiagnosisInput = {
  * Create + submit an Animal Diagnosis. When `actionTaken` is "Escalated to
  * Case", the server auto-creates a draft Animal Health Case linked back.
  */
+export type DiagnosisListRow = {
+  name: string;
+  animal: string;
+  animalName: string;
+  diagnosisDate: string;
+  actionTaken: DiagnosisAction;
+  suggestedDiagnosis: string | null;
+  followUpDate: string | null;
+  relatedCase: string | null;
+};
+
+const DIAGNOSIS_LIST_FIELDS = [
+  "name",
+  "animal",
+  "animal_name",
+  "diagnosis_date",
+  "action_taken",
+  "suggested_diagnosis",
+  "follow_up_date",
+  "related_case",
+];
+
+const mapDiagnosis = (row: any): DiagnosisListRow => ({
+  name: row.name,
+  animal: row.animal,
+  animalName: row.animal_name || row.animal,
+  diagnosisDate: row.diagnosis_date,
+  actionTaken: row.action_taken,
+  suggestedDiagnosis: row.suggested_diagnosis ?? null,
+  followUpDate: row.follow_up_date ?? null,
+  relatedCase: row.related_case ?? null,
+});
+
+export const getDiagnoses = async (limit = 100): Promise<DiagnosisListRow[]> => {
+  const rows = await listDocuments({
+    doctype: "Animal Diagnosis",
+    fields: DIAGNOSIS_LIST_FIELDS,
+    orderBy: "diagnosis_date desc",
+    limit,
+  });
+  return rows.map(mapDiagnosis);
+};
+
 export const createAnimalDiagnosis = async (
   input: CreateAnimalDiagnosisInput,
 ): Promise<any> => {

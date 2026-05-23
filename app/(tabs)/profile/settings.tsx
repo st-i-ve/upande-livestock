@@ -1,10 +1,21 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { Banner } from "@/components/Banner";
+import { Button } from "@/components/Button";
 import { Divider } from "@/components/Divider";
+import { ErrorState } from "@/components/ErrorState";
+import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
+import { Loader } from "@/components/Loader";
 import { Screen } from "@/components/Screen";
 import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { LivestockSettingsDoc } from "@/src/frappe/livestockSettings";
+import {
+  useLivestockSettings,
+  useUpdateLivestockSettings,
+} from "@/src/hooks/useLivestockSettings";
+import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -21,12 +32,14 @@ function LabeledInput({
   onChangeText,
   keyboardType,
   hint,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   keyboardType?: "default" | "numeric";
   hint?: string;
+  placeholder?: string;
 }) {
   return (
     <View style={s.field}>
@@ -35,6 +48,7 @@ function LabeledInput({
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}
+        placeholder={placeholder}
         placeholderTextColor={COLORS.textSubtle}
         style={s.input}
       />
@@ -43,164 +57,335 @@ function LabeledInput({
   );
 }
 
-function Stepper({
+function LinkField({
   label,
+  hint,
+  doctype,
   value,
   onChange,
-  min = 0,
-  max = 999,
-  step = 1,
-  suffix,
+  fields,
+  displayField,
+  searchField,
+  icon,
 }: {
   label: string;
-  value: number;
-  onChange: (n: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  suffix?: string;
-}) {
-  const dec = () => onChange(Math.max(min, value - step));
-  const inc = () => onChange(Math.min(max, value + step));
-  return (
-    <View style={s.field}>
-      <Text style={s.fieldLabel}>{label}</Text>
-      <View style={s.stepper}>
-        <Pressable onPress={dec} hitSlop={6} style={({ pressed }) => [s.stepBtn, pressed && { backgroundColor: COLORS.border }]}>
-          <MaterialCommunityIcons name="minus" size={18} color={COLORS.text} />
-        </Pressable>
-        <View style={s.stepValueWrap}>
-          <Text style={s.stepValue}>{value}</Text>
-          {suffix ? <Text style={s.stepSuffix}>{suffix}</Text> : null}
-        </View>
-        <Pressable onPress={inc} hitSlop={6} style={({ pressed }) => [s.stepBtn, pressed && { backgroundColor: COLORS.border }]}>
-          <MaterialCommunityIcons name="plus" size={18} color={COLORS.text} />
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function RangeStepper({
-  label,
-  start,
-  end,
-  onChangeStart,
-  onChangeEnd,
-  suffix,
-}: {
-  label: string;
-  start: number;
-  end: number;
-  onChangeStart: (n: number) => void;
-  onChangeEnd: (n: number) => void;
-  suffix?: string;
+  hint?: string;
+  doctype: string;
+  value: string;
+  onChange: (name: string) => void;
+  fields?: string[];
+  displayField?: string;
+  searchField?: string;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
 }) {
   return (
     <View style={s.field}>
       <Text style={s.fieldLabel}>{label}</Text>
-      <View style={s.rangeRow}>
-        <View style={[s.stepper, { flex: 1 }]}>
-          <Pressable onPress={() => onChangeStart(Math.max(1, start - 1))} hitSlop={6} style={s.stepBtn}>
-            <MaterialCommunityIcons name="minus" size={18} color={COLORS.text} />
-          </Pressable>
-          <View style={s.stepValueWrap}>
-            <Text style={s.stepValue}>{start}</Text>
-          </View>
-          <Pressable onPress={() => onChangeStart(Math.min(end - 1, start + 1))} hitSlop={6} style={s.stepBtn}>
-            <MaterialCommunityIcons name="plus" size={18} color={COLORS.text} />
-          </Pressable>
-        </View>
-        <Text style={s.rangeSep}>→</Text>
-        <View style={[s.stepper, { flex: 1 }]}>
-          <Pressable onPress={() => onChangeEnd(Math.max(start + 1, end - 1))} hitSlop={6} style={s.stepBtn}>
-            <MaterialCommunityIcons name="minus" size={18} color={COLORS.text} />
-          </Pressable>
-          <View style={s.stepValueWrap}>
-            <Text style={s.stepValue}>{end}</Text>
-          </View>
-          <Pressable onPress={() => onChangeEnd(Math.min(180, end + 1))} hitSlop={6} style={s.stepBtn}>
-            <MaterialCommunityIcons name="plus" size={18} color={COLORS.text} />
-          </Pressable>
-        </View>
-      </View>
-      {suffix ? <Text style={s.fieldHint}>{suffix}</Text> : null}
+      <FrappeSearchPicker
+        doctype={doctype}
+        value={value || null}
+        onChange={(name) => onChange(name)}
+        fields={fields}
+        displayField={displayField}
+        searchField={searchField}
+        icon={icon}
+      />
+      {hint ? <Text style={s.fieldHint}>{hint}</Text> : null}
     </View>
   );
 }
 
 export default function Settings() {
-  const [calfHerd, setCalfHerd] = useState("0-2");
-  const [bullHerd, setBullHerd] = useState("BULLS");
-  const [dryHerd, setDryHerd] = useState("STEAMERS");
+  const { data: settings, isLoading, error, refetch } = useLivestockSettings();
+  const mutation = useUpdateLivestockSettings();
 
-  const [colostrumPct, setColostrumPct] = useState("10");
-  const [transitionalPct, setTransitionalPct] = useState("5");
-  const [milkPct, setMilkPct] = useState("10");
-  const [weanStart, setWeanStart] = useState(60);
-  const [weanEnd, setWeanEnd] = useState(90);
+  // Local form state — initialised from live settings, allows edits, then we
+  // diff against the original on save so we only patch changed fields.
+  const [form, setForm] = useState<Partial<LivestockSettingsDoc>>({});
+  const [original, setOriginal] = useState<Partial<LivestockSettingsDoc>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [minServiceAge, setMinServiceAge] = useState(15);
-  const [minCalvingAge, setMinCalvingAge] = useState(24);
+  useEffect(() => {
+    if (settings && Object.keys(original).length === 0) {
+      setForm(settings);
+      setOriginal(settings);
+    }
+  }, [settings, original]);
 
-  const [milkSales, setMilkSales] = useState("404001");
-  const [vetExpense, setVetExpense] = useState("50101906");
-  const [feedExpense, setFeedExpense] = useState("50101905");
-  const [milkPrice, setMilkPrice] = useState("60");
+  const set = <K extends keyof LivestockSettingsDoc>(
+    key: K,
+    value: LivestockSettingsDoc[K] | string,
+  ) => setForm((prev) => ({ ...prev, [key]: value as any }));
+
+  const diff = (): Partial<LivestockSettingsDoc> => {
+    const out: Partial<LivestockSettingsDoc> = {};
+    (Object.keys(form) as (keyof LivestockSettingsDoc)[]).forEach((k) => {
+      if (form[k] !== original[k]) (out as any)[k] = form[k];
+    });
+    return out;
+  };
+
+  const handleSave = async () => {
+    setSaveError(null);
+    const patch = diff();
+    if (Object.keys(patch).length === 0) {
+      Alert.alert("No changes", "Nothing to save.");
+      return;
+    }
+    // Coerce numeric fields.
+    if (patch.custom_milk_price_per_kg !== undefined) {
+      patch.custom_milk_price_per_kg = Number(patch.custom_milk_price_per_kg);
+    }
+    if (patch.custom_default_payout_percent !== undefined) {
+      patch.custom_default_payout_percent = Number(patch.custom_default_payout_percent);
+    }
+    try {
+      await mutation.mutateAsync(patch);
+      setOriginal({ ...original, ...patch });
+      Alert.alert("Saved", `${Object.keys(patch).length} field${Object.keys(patch).length === 1 ? "" : "s"} updated.`);
+    } catch (err) {
+      setSaveError(extractFrappeError(err));
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Screen title="Livestock settings" back>
+        <Loader />
+      </Screen>
+    );
+  }
+  if (error) {
+    return (
+      <Screen title="Livestock settings" back>
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      </Screen>
+    );
+  }
+
+  const dirty = Object.keys(diff()).length > 0;
 
   return (
-    <Screen title="Livestock settings" subtitle="Tap any field to edit" back>
+    <Screen
+      title="Livestock settings"
+      subtitle="Edits go to the Frappe single doctype on save"
+      back
+    >
+      <SectionHeader title="Company & farm" />
+      <LinkField
+        label="Default company"
+        doctype="Company"
+        value={form.custom_default_company || ""}
+        onChange={(v) => set("custom_default_company", v)}
+        icon="domain"
+      />
+      <LabeledInput
+        label="Farm"
+        value={form.custom_farm || ""}
+        onChangeText={(v) => set("custom_farm", v)}
+        hint="Posted on Sales Invoice (custom_farm)"
+      />
+      <LabeledInput
+        label="Milk business unit"
+        value={form.custom_milk_business_unit || ""}
+        onChangeText={(v) => set("custom_milk_business_unit", v)}
+      />
+
+      <Divider />
+
       <SectionHeader title="Default herds" subtitle="Where new animals land by default" />
-      <LabeledInput label="Calf herd" value={calfHerd} onChangeText={setCalfHerd} />
-      <LabeledInput label="Bull herd" value={bullHerd} onChangeText={setBullHerd} />
-      <LabeledInput label="Dry herd" value={dryHerd} onChangeText={setDryHerd} />
-
-      <Divider />
-
-      <SectionHeader title="Calf feeding plan" subtitle="Percentages of body weight per day" />
-      <LabeledInput
-        label="Day 1 colostrum"
-        value={colostrumPct}
-        onChangeText={setColostrumPct}
-        keyboardType="numeric"
-        hint="% of birth weight"
+      <LinkField
+        label="Default heifer herd"
+        doctype="Herds"
+        value={form.custom_default_heifer_herd || ""}
+        onChange={(v) => set("custom_default_heifer_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
       />
-      <LabeledInput
-        label="Days 2–5 transitional"
-        value={transitionalPct}
-        onChangeText={setTransitionalPct}
-        keyboardType="numeric"
-        hint="% body weight / day"
+      <LinkField
+        label="Default bull herd"
+        doctype="Herds"
+        value={form.custom_default_bull_herd || ""}
+        onChange={(v) => set("custom_default_bull_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
       />
-      <LabeledInput
-        label="Day 6+ whole milk"
-        value={milkPct}
-        onChangeText={setMilkPct}
-        keyboardType="numeric"
-        hint="% body weight / day"
-      />
-      <RangeStepper
-        label="Weaning window"
-        start={weanStart}
-        end={weanEnd}
-        onChangeStart={setWeanStart}
-        onChangeEnd={setWeanEnd}
-        suffix="days from birth"
+      <LinkField
+        label="Default dry herd"
+        doctype="Herds"
+        value={form.custom_default_dry_herd || ""}
+        onChange={(v) => set("custom_default_dry_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
       />
 
       <Divider />
 
-      <SectionHeader title="Reproduction" subtitle="Earliest acceptable ages" />
-      <Stepper label="Minimum service age" value={minServiceAge} onChange={setMinServiceAge} min={6} max={36} suffix="months" />
-      <Stepper label="Minimum calving age" value={minCalvingAge} onChange={setMinCalvingAge} min={18} max={48} suffix="months" />
+      <SectionHeader title="Milking" />
+      <LinkField
+        label="Milk item"
+        doctype="Item"
+        value={form.custom_milk_item || ""}
+        onChange={(v) => set("custom_milk_item", v)}
+        fields={["name", "item_name", "item_code"]}
+        displayField="item_name"
+        searchField="item_name"
+        icon="package-variant"
+      />
+      <LinkField
+        label="Milk target warehouse"
+        doctype="Warehouse"
+        value={form.custom_milk_target_warehouse || ""}
+        onChange={(v) => set("custom_milk_target_warehouse", v)}
+        fields={["name", "warehouse_name"]}
+        displayField="warehouse_name"
+        searchField="warehouse_name"
+        icon="warehouse"
+      />
+      <LinkField
+        label="Milk discard warehouse"
+        doctype="Warehouse"
+        value={form.custom_milk_discard_warehouse || ""}
+        onChange={(v) => set("custom_milk_discard_warehouse", v)}
+        fields={["name", "warehouse_name"]}
+        displayField="warehouse_name"
+        searchField="warehouse_name"
+        icon="warehouse"
+      />
+      <LabeledInput
+        label="Milking stock entry type"
+        value={form.custom_milking_stock_entry_type || ""}
+        onChangeText={(v) => set("custom_milking_stock_entry_type", v)}
+        hint="e.g. Milking"
+      />
+      <LabeledInput
+        label="Milk price (KES / kg)"
+        value={String(form.custom_milk_price_per_kg ?? "")}
+        onChangeText={(v) => set("custom_milk_price_per_kg", v)}
+        keyboardType="numeric"
+      />
 
       <Divider />
 
-      <SectionHeader title="Accounting" subtitle="ERPNext account numbers and pricing" />
-      <LabeledInput label="Milk sales account" value={milkSales} onChangeText={setMilkSales} keyboardType="numeric" />
-      <LabeledInput label="Vet expense account" value={vetExpense} onChangeText={setVetExpense} keyboardType="numeric" />
-      <LabeledInput label="Feed expense account" value={feedExpense} onChangeText={setFeedExpense} keyboardType="numeric" />
-      <LabeledInput label="Milk price" value={milkPrice} onChangeText={setMilkPrice} keyboardType="numeric" hint="KES per kilogram" />
+      <SectionHeader title="Stock — drugs & semen" />
+      <LinkField
+        label="Drug warehouse"
+        doctype="Warehouse"
+        value={form.custom_drug_warehouse || ""}
+        onChange={(v) => set("custom_drug_warehouse", v)}
+        fields={["name", "warehouse_name"]}
+        displayField="warehouse_name"
+        icon="warehouse"
+      />
+      <LinkField
+        label="Semen warehouse"
+        doctype="Warehouse"
+        value={form.custom_semen_warehouse || ""}
+        onChange={(v) => set("custom_semen_warehouse", v)}
+        fields={["name", "warehouse_name"]}
+        displayField="warehouse_name"
+        icon="warehouse"
+      />
+      <LinkField
+        label="Livestock sale item"
+        doctype="Item"
+        value={form.custom_animal_sale_item || ""}
+        onChange={(v) => set("custom_animal_sale_item", v)}
+        fields={["name", "item_name", "item_code"]}
+        displayField="item_name"
+        icon="package-variant"
+      />
+
+      <Divider />
+
+      <SectionHeader title="Accounting" subtitle="Frappe accounts used by server scripts" />
+      <LinkField
+        label="Animal asset account"
+        doctype="Account"
+        value={form.custom_animal_asset_account || ""}
+        onChange={(v) => set("custom_animal_asset_account", v)}
+        icon="bank"
+      />
+      <LinkField
+        label="Default credit / cash account"
+        doctype="Account"
+        value={form.custom_default_credit_account || ""}
+        onChange={(v) => set("custom_default_credit_account", v)}
+        icon="cash"
+      />
+      <LinkField
+        label="Disposal write-off account"
+        doctype="Account"
+        value={form.custom_disposal_account || ""}
+        onChange={(v) => set("custom_disposal_account", v)}
+        icon="cash-remove"
+      />
+      <LinkField
+        label="Animal sale income account"
+        doctype="Account"
+        value={form.custom_animal_sale_income_account || ""}
+        onChange={(v) => set("custom_animal_sale_income_account", v)}
+        icon="cash-plus"
+      />
+      <LinkField
+        label="Milk income account"
+        doctype="Account"
+        value={form.custom_milk_income_account || ""}
+        onChange={(v) => set("custom_milk_income_account", v)}
+        icon="water"
+      />
+      <LinkField
+        label="Vet expense account"
+        doctype="Account"
+        value={form.custom_vet_expense_account || ""}
+        onChange={(v) => set("custom_vet_expense_account", v)}
+        icon="medical-bag"
+      />
+      <LinkField
+        label="Feed expense account"
+        doctype="Account"
+        value={form.custom_feed_expense_account || ""}
+        onChange={(v) => set("custom_feed_expense_account", v)}
+        icon="grain"
+      />
+      <LinkField
+        label="Insurance receivable account"
+        doctype="Account"
+        value={form.custom_insurance_receivable_account || ""}
+        onChange={(v) => set("custom_insurance_receivable_account", v)}
+        icon="shield-check"
+      />
+      <LinkField
+        label="Insurance income account"
+        doctype="Account"
+        value={form.custom_insurance_income_account || ""}
+        onChange={(v) => set("custom_insurance_income_account", v)}
+        icon="shield-check"
+      />
+
+      <Divider />
+
+      <SectionHeader title="Insurance defaults" />
+      <LabeledInput
+        label="Default payout percent"
+        value={String(form.custom_default_payout_percent ?? "")}
+        onChangeText={(v) => set("custom_default_payout_percent", v)}
+        keyboardType="numeric"
+        hint="Used on culls/deaths when policy doesn't override"
+      />
+
+      {saveError ? <Banner tone="danger">{saveError}</Banner> : null}
+
+      <View style={{ height: 8 }} />
+      <Button
+        label={mutation.isPending ? "Saving…" : dirty ? "Save changes" : "No changes"}
+        disabled={!dirty || mutation.isPending}
+        loading={mutation.isPending}
+        onPress={handleSave}
+      />
     </Screen>
   );
 }
@@ -223,7 +408,7 @@ const s = StyleSheet.create({
     marginTop: 3,
   },
   field: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   fieldLabel: {
     fontSize: 12,
@@ -242,54 +427,12 @@ const s = StyleSheet.create({
     width: "100%",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.border,
-    borderRadius: 50,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 14,
     color: COLORS.text,
-    fontFamily: FONT_FAMILY.medium,
-    backgroundColor: COLORS.bg,
-  },
-  stepper: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    borderRadius: 50,
-    backgroundColor: COLORS.bg,
-  },
-  stepBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepValueWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "center",
-    gap: 4,
-  },
-  stepValue: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-    fontVariant: ["tabular-nums"],
-  },
-  stepSuffix: {
-    fontSize: 11,
-    color: COLORS.textMuted,
     fontFamily: FONT_FAMILY.regular,
-  },
-  rangeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  rangeSep: {
-    fontSize: 16,
-    color: COLORS.textSubtle,
+    backgroundColor: COLORS.bg,
   },
 });

@@ -1,14 +1,19 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/Avatar";
+import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Divider } from "@/components/Divider";
+import { ErrorState } from "@/components/ErrorState";
+import { Loader } from "@/components/Loader";
 import { MetricGrid } from "@/components/MetricGrid";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { useSales } from "@/src/hooks/useDisposals";
+import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -20,13 +25,35 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 }
 
 export default function SalesList() {
+  const { data: sales = [], isLoading, isRefetching, error, refetch } = useSales();
+
+  const { ytdRevenue, ytdProfit, count } = useMemo(() => {
+    const year = new Date().getFullYear().toString();
+    const ytd = sales.filter((s) => (s.disposalDate || "").startsWith(year));
+    return {
+      ytdRevenue: ytd.reduce((acc, s) => acc + s.salePrice, 0),
+      ytdProfit: ytd.reduce((acc, s) => acc + s.gainLoss, 0),
+      count: ytd.length,
+    };
+  }, [sales]);
+
   return (
-    <Screen title="Sales" subtitle="Animals sold to buyers" back>
+    <Screen
+      title="Sales"
+      subtitle="Animals sold to buyers"
+      back
+      onRefresh={refetch}
+      refreshing={isRefetching}
+    >
       <SectionHeader title="Year-to-date" subtitle="Revenue and profit summary" />
       <MetricGrid
         items={[
-          { label: "YTD revenue", value: "285,000", sub: "3 sales · KES" },
-          { label: "YTD net P&L", value: "+55,000", sub: "vs book value" },
+          { label: "YTD revenue", value: ytdRevenue.toLocaleString(), sub: `${count} sale${count === 1 ? "" : "s"} · KES` },
+          {
+            label: "YTD net P&L",
+            value: `${ytdProfit >= 0 ? "+" : ""}${ytdProfit.toLocaleString()}`,
+            sub: "vs book value",
+          },
         ]}
       />
 
@@ -37,10 +64,23 @@ export default function SalesList() {
 
       <Divider />
 
-      <SectionHeader title="Recent sales" subtitle="Last three transactions" />
-      <Row left={<Avatar icon="cash" tone="calf" />} title="TESTDAM-001/22 → Mwangi Butchery" meta="9 May · 95,000 KES · loss 25,000" />
-      <Row left={<Avatar icon="cash" tone="calf" />} title="ANAIAH-129273 → Eldoret Co-op" meta="3 Apr · 95,000 KES · gain 15,000" />
-      <Row left={<Avatar icon="cash" tone="calf" />} title="ARSHAVIN-129279 → Direct buyer" meta="22 Mar · 95,000 KES · gain 65,000" />
+      <SectionHeader title="Recent sales" subtitle="Most recent disposals where type = Sold" />
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      ) : sales.length === 0 ? (
+        <Banner tone="info">No sales recorded yet.</Banner>
+      ) : (
+        sales.slice(0, 20).map((sale) => (
+          <Row
+            key={sale.name}
+            left={<Avatar icon="cash" />}
+            title={`${sale.animalName}${sale.buyerName ? ` → ${sale.buyerName}` : ""}`}
+            meta={`${sale.disposalDate} · ${sale.salePrice.toLocaleString()} KES · ${sale.gainLoss >= 0 ? "gain" : "loss"} ${Math.abs(sale.gainLoss).toLocaleString()}`}
+          />
+        ))
+      )}
     </Screen>
   );
 }
