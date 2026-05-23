@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { getEmployeeForUser } from "@/src/frappe/employee";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
 import {
@@ -14,6 +15,11 @@ interface AuthState {
   instanceUrl: string;
   email: string | null;
   fullname: string | null;
+  /** Employee record name linked to the logged-in user, if any. Default
+   *  operator for Animal Event submissions; can be overridden per form. */
+  employeeName: string | null;
+  /** Manual override — used when no Employee is linked to the user. */
+  setEmployeeName: (name: string | null) => Promise<void>;
 
   checkAuth: () => Promise<void>;
   login: (email: string, password: string, url?: string) => Promise<void>;
@@ -22,27 +28,38 @@ interface AuthState {
   handleUnauthorized: () => void;
 }
 
+const STORAGE_KEY_EMPLOYEE = "operator_employee";
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true,
   instanceUrl: DEFAULT_INSTANCE_URL,
   email: null,
   fullname: null,
+  employeeName: null,
+
+  setEmployeeName: async (name) => {
+    if (name) await storage.setItem(STORAGE_KEY_EMPLOYEE, name);
+    else await storage.removeItem(STORAGE_KEY_EMPLOYEE);
+    set({ employeeName: name });
+  },
 
   checkAuth: async () => {
     set({ isLoading: true });
     try {
-      const [cookie, url, email, fullname] = await Promise.all([
+      const [cookie, url, email, fullname, employee] = await Promise.all([
         storage.getItem(STORAGE_KEYS.COOKIE),
         storage.getItem(STORAGE_KEYS.INSTANCE_URL),
         storage.getItem(STORAGE_KEYS.EMAIL),
         storage.getItem(STORAGE_KEYS.FULLNAME),
+        storage.getItem(STORAGE_KEY_EMPLOYEE),
       ]);
       set({
         isAuthenticated: !!cookie,
         instanceUrl: url || DEFAULT_INSTANCE_URL,
         email,
         fullname,
+        employeeName: employee,
       });
     } catch (e) {
       console.error("[auth] checkAuth failed", e);
@@ -55,21 +72,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email, password, url) => {
     const target = url || get().instanceUrl || DEFAULT_INSTANCE_URL;
     const data = await api.login(email, password, target);
+
+    // Best-effort: resolve the Employee linked to this user. If none, the
+    // forms will surface an Employee picker. Either way, login still succeeds.
+    let employeeName: string | null = null;
+    try {
+      const emp = await getEmployeeForUser(email);
+      if (emp) {
+        employeeName = emp.name;
+        await storage.setItem(STORAGE_KEY_EMPLOYEE, emp.name);
+      }
+    } catch (e) {
+      console.warn("[auth] Employee lookup failed", e);
+    }
+
     set({
       isAuthenticated: true,
       instanceUrl: target,
       email,
       fullname: data?.full_name ?? null,
+      employeeName,
     });
   },
 
   logout: async () => {
     await api.logout();
     queryClient.clear();
+    await storage.removeItem(STORAGE_KEY_EMPLOYEE);
     set({
       isAuthenticated: false,
       email: null,
       fullname: null,
+      employeeName: null,
     });
   },
 

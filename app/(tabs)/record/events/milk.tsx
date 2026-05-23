@@ -1,27 +1,44 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Calc } from "@/components/Calc";
+import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { APP, COLORS, RADIUS } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
+import { useCreateMilkRecording } from "@/src/hooks/mutations";
+import { useHerds } from "@/src/hooks/useHerds";
+import { extractFrappeError, todayISO } from "@/src/services/api";
+import type { MilkSession } from "@/src/frappe/milkRecording";
 
-const HERDS = ["Lactating group 1", "LACTATION GROUP 2", "Super high yielders"];
-const SESSIONS = ["Morning", "Evening"];
+const SESSIONS: MilkSession[] = ["AM — Morning", "PM — Afternoon", "Evening"];
 
 export default function Milk() {
-  const [herd, setHerd] = useState(HERDS[0]);
-  const [session, setSession] = useState(SESSIONS[0]);
-  // Empty by default — operator enters the day's collection per herd. Only
-  // computed values appear once they've typed something in.
+  const defaultOperator = useAuthStore((s) => s.employeeName);
+  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
+  const { data: herds = [] } = useHerds();
+  const milkingHerds = herds.filter((h) => h.isMilking);
+
+  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const [herd, setHerd] = useState<string>("");
+  const [session, setSession] = useState<MilkSession>(SESSIONS[0]);
   const [total, setTotal] = useState("");
   const [discard, setDiscard] = useState("");
   const [colostrum, setColostrum] = useState("");
   const [allCol, setAllCol] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!herd) {
+      const first = milkingHerds[0] ?? herds[0];
+      if (first) setHerd(first.n);
+    }
+  }, [herds, milkingHerds, herd]);
 
   const t = Number(total) || 0;
   const d = Number(discard) || 0;
@@ -30,15 +47,58 @@ export default function Milk() {
   const rev = Math.round(m * APP.milkPriceKES);
   const hasInput = total !== "" || discard !== "" || colostrum !== "" || allCol;
 
+  const mutation = useCreateMilkRecording();
+
+  const selectedHerd = herds.find((h) => h.n === herd);
+  const cowsMilked = selectedHerd?.cnt ?? undefined;
+
+  const handleSubmit = async () => {
+    setError(null);
+    if (!operator) return setError("Pick the operator before submitting.");
+    if (!herd) return setError("Pick a herd.");
+    if (t <= 0) return setError("Enter the total yield (kg).");
+    if (operator !== defaultOperator) await setStoredOperator(operator);
+
+    try {
+      await mutation.mutateAsync({
+        herd,
+        session,
+        recordingDate: todayISO(),
+        totalYieldKg: t,
+        discardedKg: d || undefined,
+        colostrumYieldKg: !allCol && ck > 0 ? ck : undefined,
+        isColostrum: allCol,
+        pricePerKg: APP.milkPriceKES,
+        cowsMilked,
+        operator,
+      });
+      Alert.alert(
+        "Milk recording submitted",
+        allCol
+          ? `${(t - d).toFixed(1)} kg → Colostrum bank.`
+          : `${m.toFixed(1)} kg sellable · ${rev.toLocaleString()} KES revenue.`,
+      );
+      router.replace("/(tabs)/record/success?name=Milk recording");
+    } catch (err) {
+      setError(extractFrappeError(err));
+    }
+  };
+
   return (
-    <Screen title="Milk recording" subtitle={`${herd} · ${session}`} back>
-      <Banner tone="warning">
-        <Text style={{ fontWeight: "700" }}>1 cow in withdrawal</Text> · TEST IVY · plan to discard her share
-      </Banner>
-      <Field label="Herd"><Picker value={herd} onChange={setHerd} options={HERDS} /></Field>
+    <Screen title="Milk recording" subtitle={`${herd || "—"} · ${session}`} back>
+      <Field label="Operator">
+        <EmployeePickerButton value={operator} onChange={setOperator} />
+      </Field>
+      <Field label="Herd">
+        <Picker value={herd} onChange={setHerd} options={(milkingHerds.length ? milkingHerds : herds).map((h) => h.n)} />
+      </Field>
       <FieldRow>
-        <Field label="Session" style={{ flex: 1 }}><Picker value={session} onChange={setSession} options={SESSIONS} /></Field>
-        <Field label="Date" style={{ flex: 1 }}><Input value={APP.today} /></Field>
+        <Field label="Session" style={{ flex: 1 }}>
+          <Picker value={session} onChange={(v) => setSession(v as MilkSession)} options={SESSIONS} />
+        </Field>
+        <Field label="Date" style={{ flex: 1 }}>
+          <Input value={todayISO()} editable={false} />
+        </Field>
       </FieldRow>
       <FieldRow>
         <Field label="Total yield (kg)" style={{ flex: 1 }}>
@@ -75,8 +135,6 @@ export default function Milk() {
         />
       </Field>
 
-      {/* Calc only fills in once the operator has put numbers; otherwise the
-          collection is the input default of 0 across all fields. */}
       {hasInput ? (
         allCol ? (
           <Calc
@@ -86,20 +144,27 @@ export default function Milk() {
           />
         ) : (
           <Calc
-            label={`Net sellable milk · ${herd} · ${session}`}
+            label={`Net sellable milk · ${herd || "—"} · ${session}`}
             value={`${m.toFixed(1)} kg → ${rev.toLocaleString()} KES`}
             footer={`${t} − ${d} discard${ck ? ` − ${ck} colostrum` : ""}`}
           />
         )
       ) : (
         <Calc
-          label={`Net sellable milk · ${herd} · ${session}`}
+          label={`Net sellable milk · ${herd || "—"} · ${session}`}
           value="0 kg → 0 KES"
           footer="Enter the day's collection above"
         />
       )}
 
-      <Button label="Submit recording" onPress={() => router.replace("/(tabs)/record/success?name=Milk recording")} />
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+
+      <Button
+        label={mutation.isPending ? "Submitting…" : "Submit recording"}
+        disabled={mutation.isPending}
+        loading={mutation.isPending}
+        onPress={handleSubmit}
+      />
     </Screen>
   );
 }

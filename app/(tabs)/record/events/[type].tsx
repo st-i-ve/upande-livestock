@@ -1,30 +1,65 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
-import { APP, COLORS, RADIUS } from "@/constants/theme";
+import { COLORS, RADIUS } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
+import {
+  AnimalDrugIssueInput,
+  AnimalEventType,
+} from "@/src/frappe/animalEvent";
+import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { extractFrappeError, todayISO } from "@/src/services/api";
+import type { Animal } from "@/types";
 
-type FieldType = "picker" | "picker_single" | "birth_dam" | "weight_bcs" | "drugs" | "method" | "activity_cost" | "feet" | "reason" | "heat_signs" | "plan" | "calf";
+type Spec = {
+  title: string;
+  eventType: AnimalEventType;
+  // Which fields this screen should show beyond the universal ones.
+  needsWeight?: boolean;
+  needsDrugs?: boolean;
+  needsActivityCost?: boolean;
+  needsMethod?: boolean;
+  needsFeet?: boolean;
+  needsHeatSigns?: boolean;
+  multi?: boolean;
+};
 
-const SPECS: Record<string, { title: string; fields: FieldType[] }> = {
-  birth: { title: "Birth", fields: ["birth_dam", "calf", "activity_cost"] },
-  weight: { title: "Weight recording", fields: ["picker", "weight_bcs"] },
-  vaccination: { title: "Vaccination", fields: ["picker", "drugs"] },
-  deworming: { title: "Deworming", fields: ["picker", "drugs"] },
-  dehorning: { title: "Dehorning", fields: ["picker", "method", "activity_cost"] },
-  hoof: { title: "Hoof trimming", fields: ["picker", "feet", "reason", "activity_cost"] },
-  heat: { title: "Heat detection", fields: ["picker_single", "heat_signs", "plan"] },
+const SPECS: Record<string, Spec> = {
+  weight:      { title: "Weight recording",  eventType: "Weight Recording",  needsWeight: true },
+  vaccination: { title: "Vaccination",       eventType: "Vaccination",       needsDrugs: true, needsActivityCost: true },
+  deworming:   { title: "Deworming",         eventType: "Deworming",         needsDrugs: true, needsActivityCost: true },
+  dehorning:   { title: "Dehorning",         eventType: "Dehorning",         needsMethod: true, needsActivityCost: true },
+  hoof:        { title: "Hoof trimming",     eventType: "Hoof Trimming",     needsFeet: true, needsActivityCost: true },
+  heat:        { title: "Heat detection",    eventType: "Heat Detection",    needsHeatSigns: true },
 };
 
 export default function GenericEvent() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const spec = SPECS[type || ""];
+  const defaultOperator = useAuthStore((s) => s.employeeName);
+  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
+
+  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [weight, setWeight] = useState("");
+  const [bcs, setBcs] = useState("");
+  const [activityCost, setActivityCost] = useState("");
+  const [method, setMethod] = useState("Hot iron");
+  const [feet, setFeet] = useState("All four");
+  const [heatSigns, setHeatSigns] = useState("");
+  const [drugs, setDrugs] = useState<DrugRow[]>([]);
+  const [remarks, setRemarks] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useCreateAnimalEvent();
 
   if (!spec) {
     return (
@@ -34,66 +69,91 @@ export default function GenericEvent() {
     );
   }
 
+  const handleSubmit = async () => {
+    setError(null);
+    if (!operator) return setError("Pick the operator before submitting.");
+    if (!animal) return setError("Pick an animal.");
+    if (spec.needsWeight && !weight) return setError("Enter the weight (kg).");
+    if (operator !== defaultOperator) await setStoredOperator(operator);
+
+    const drugIssues: AnimalDrugIssueInput[] = drugs
+      .filter((d) => d.itemCode.trim() && Number(d.qty) > 0)
+      .map((d) => ({
+        itemCode: d.itemCode.trim(),
+        qty: Number(d.qty),
+        uom: d.uom || undefined,
+        withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
+      }));
+
+    const remarksBits: string[] = [];
+    if (spec.needsMethod) remarksBits.push(`Method: ${method}`);
+    if (spec.needsFeet) remarksBits.push(`Feet: ${feet}`);
+    if (spec.needsHeatSigns && heatSigns) remarksBits.push(`Heat signs: ${heatSigns}`);
+    if (remarks) remarksBits.push(remarks);
+    const finalRemarks = remarksBits.join(" · ") || undefined;
+
+    try {
+      const common = {
+        animal: animal.id,
+        currentHerd: animal.herd,
+        operator,
+        eventDate: todayISO(),
+        remarks: finalRemarks,
+      } as const;
+
+      switch (spec.eventType) {
+        case "Weight Recording":
+          await mutation.mutateAsync({
+            ...common,
+            eventType: "Weight Recording",
+            weightKg: Number(weight),
+            bcs: bcs ? Number(bcs) : undefined,
+          });
+          break;
+        case "Vaccination":
+        case "Deworming":
+        case "Dehorning":
+        case "Hoof Trimming":
+          await mutation.mutateAsync({
+            ...common,
+            eventType: spec.eventType,
+            drugIssues: drugIssues.length ? drugIssues : undefined,
+            activityCost: activityCost ? Number(activityCost) : undefined,
+          });
+          break;
+        case "Heat Detection":
+          await mutation.mutateAsync({ ...common, eventType: "Heat Detection" });
+          break;
+      }
+      Alert.alert(`${spec.title} recorded`, `${animal.name} updated.`);
+      router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
+    } catch (err) {
+      setError(extractFrappeError(err));
+    }
+  };
+
   return (
     <Screen title={spec.title} subtitle="New event" back>
-      <Field label="Date"><Input value={APP.today} /></Field>
-      {spec.fields.map((f) => <FieldBlock key={f} kind={f} />)}
-      <Field label="Remarks"><Textarea placeholder="Optional notes" /></Field>
-      <Button
-        label={`Submit ${spec.title.toLowerCase()}`}
-        onPress={() => router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`)}
-      />
-    </Screen>
-  );
-}
+      <Field label="Operator">
+        <EmployeePickerButton value={operator} onChange={setOperator} />
+      </Field>
+      <Field label="Animal">
+        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
+      </Field>
+      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
 
-function FieldBlock({ kind }: { kind: FieldType }) {
-  const [feet, setFeet] = useState("All four");
-  const [reason, setReason] = useState("Routine");
-  const [method, setMethod] = useState("Hot iron");
-  const [plan, setPlan] = useState("Next 12-18h");
-  const [sex, setSex] = useState<"Female" | "Male">("Female");
-
-  switch (kind) {
-    case "picker":
-      return <Field label="Animal(s)"><AnimalPickerButton mode="multi" placeholder="Single animal or many..." /></Field>;
-    case "picker_single":
-      return <Field label="Animal"><AnimalPickerButton mode="single" /></Field>;
-    case "birth_dam":
-      return (
-        <Field label="Dam (mother)">
-          <AnimalPickerButton title="Select dam" include={(a) => a.sex === "F" && a.parity > 0} placeholder="Search dam..." />
-        </Field>
-      );
-    case "weight_bcs":
-      return (
+      {spec.needsWeight ? (
         <FieldRow>
-          <Field label="Weight (kg)" style={{ flex: 1 }}><Input keyboardType="numeric" placeholder="480" /></Field>
-          <Field label="BCS (1-5)" style={{ flex: 1 }}><Input keyboardType="numeric" placeholder="3.5" /></Field>
+          <Field label="Weight (kg)" style={{ flex: 1 }}>
+            <Input value={weight} onChangeText={setWeight} keyboardType="numeric" placeholder="480" />
+          </Field>
+          <Field label="BCS (1-5)" style={{ flex: 1 }}>
+            <Input value={bcs} onChangeText={setBcs} keyboardType="numeric" placeholder="3.5" />
+          </Field>
         </FieldRow>
-      );
-    case "drugs":
-      return (
-        <Field label="Drugs administered (Items)">
-          <View style={s.drugBox}>
-            <View style={s.drugTop}>
-              <Text style={s.drugName}>FMD Vaccine (Quadrivalent)</Text>
-              <Text style={s.drugPrice}>320 KES</Text>
-            </View>
-            <Text style={s.drugMeta}>2 ml SC · Batch FMD-26-B201 · 0d wd</Text>
-          </View>
-          <View style={s.drugBox}>
-            <View style={s.drugTop}>
-              <Text style={s.drugName}>LSD Vaccine</Text>
-              <Text style={s.drugPrice}>280 KES</Text>
-            </View>
-            <Text style={s.drugMeta}>3 ml SC · Batch LSD-26-A012 · 0d wd</Text>
-          </View>
-          <Button label="Add drug" icon="plus" variant="link" />
-        </Field>
-      );
-    case "method":
-      return (
+      ) : null}
+
+      {spec.needsMethod ? (
         <Field label="Method">
           <Chips>
             {["Hot iron", "Caustic paste", "Surgical"].map((m) => (
@@ -101,11 +161,9 @@ function FieldBlock({ kind }: { kind: FieldType }) {
             ))}
           </Chips>
         </Field>
-      );
-    case "activity_cost":
-      return <Field label="Activity cost (KES)"><Input keyboardType="numeric" placeholder="0" /></Field>;
-    case "feet":
-      return (
+      ) : null}
+
+      {spec.needsFeet ? (
         <Field label="Feet">
           <Chips>
             {["Front-L", "Front-R", "Hind-L", "Hind-R", "All four"].map((f) => (
@@ -113,46 +171,120 @@ function FieldBlock({ kind }: { kind: FieldType }) {
             ))}
           </Chips>
         </Field>
-      );
-    case "reason":
-      return (
-        <Field label="Reason">
-          <Chips>
-            {["Routine", "Lameness", "Overgrowth"].map((r) => (
-              <Chip key={r} label={r} active={reason === r} onPress={() => setReason(r)} />
-            ))}
-          </Chips>
+      ) : null}
+
+      {spec.needsHeatSigns ? (
+        <Field label="Heat signs">
+          <Textarea
+            value={heatSigns}
+            onChangeText={setHeatSigns}
+            placeholder="Mounting, mucus, restless, vulva swelling..."
+          />
         </Field>
-      );
-    case "heat_signs":
-      return <Field label="Heat signs"><Textarea placeholder="Mounting, mucus, restless, vulva swelling..." /></Field>;
-    case "plan":
-      return (
-        <Field label="Plan">
-          <Chips>
-            {["Now", "Next 12-18h", "Skip cycle"].map((p) => (
-              <Chip key={p} label={p} active={plan === p} onPress={() => setPlan(p)} />
-            ))}
-          </Chips>
+      ) : null}
+
+      {spec.needsDrugs ? <DrugRows rows={drugs} onChange={setDrugs} /> : null}
+
+      {spec.needsActivityCost ? (
+        <Field label="Activity cost (KES)">
+          <Input
+            value={activityCost}
+            onChangeText={setActivityCost}
+            keyboardType="numeric"
+            placeholder="0"
+          />
         </Field>
-      );
-    case "calf":
-      return (
-        <>
-          <Field label="Calf book number"><Input placeholder="e.g. A001/26" /></Field>
+      ) : null}
+
+      <Field label="Remarks">
+        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Optional notes" />
+      </Field>
+
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+
+      <Button
+        label={mutation.isPending ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
+        disabled={mutation.isPending || !animal}
+        loading={mutation.isPending}
+        onPress={handleSubmit}
+      />
+    </Screen>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+type DrugRow = {
+  id: number;
+  itemCode: string;
+  qty: string;
+  uom: string;
+  withdrawalDays: string;
+};
+
+function DrugRows({
+  rows,
+  onChange,
+}: {
+  rows: DrugRow[];
+  onChange: (rows: DrugRow[]) => void;
+}) {
+  const add = () =>
+    onChange([
+      ...rows,
+      { id: Date.now() + rows.length, itemCode: "", qty: "1", uom: "", withdrawalDays: "" },
+    ]);
+  const update = (id: number, patch: Partial<DrugRow>) =>
+    onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const remove = (id: number) => onChange(rows.filter((r) => r.id !== id));
+
+  return (
+    <Field
+      label="Drugs / vaccines (optional)"
+      help="Each row issues stock from Stores and posts a vet expense JE on submit. Use the exact Frappe Item code."
+    >
+      {rows.length === 0 ? (
+        <Text style={s.drugEmpty}>No drug rows. Tap “Add drug” if any drug was used.</Text>
+      ) : null}
+      {rows.map((r) => (
+        <View key={r.id} style={s.drugBox}>
           <FieldRow>
-            <Field label="Calf burn name" style={{ flex: 1 }}><Input placeholder="e.g. BLOSSOM" /></Field>
-            <Field label="Sex" style={{ flex: 1 }}>
-              <Chips>
-                <Chip label="Female" active={sex === "Female"} onPress={() => setSex("Female")} />
-                <Chip label="Male" active={sex === "Male"} onPress={() => setSex("Male")} />
-              </Chips>
+            <Field label="Item code" style={{ flex: 2 }}>
+              <Input
+                value={r.itemCode}
+                onChangeText={(t) => update(r.id, { itemCode: t })}
+                placeholder="e.g. 4040020167"
+                autoCapitalize="none"
+              />
+            </Field>
+            <Field label="Qty" style={{ flex: 1 }}>
+              <Input
+                value={r.qty}
+                onChangeText={(t) => update(r.id, { qty: t })}
+                keyboardType="numeric"
+                placeholder="1"
+              />
             </Field>
           </FieldRow>
-          <Field label="Birth weight (kg)"><Input keyboardType="numeric" placeholder="36" /></Field>
-        </>
-      );
-  }
+          <FieldRow>
+            <Field label="UOM" style={{ flex: 1 }}>
+              <Input value={r.uom} onChangeText={(t) => update(r.id, { uom: t })} placeholder="ECH" />
+            </Field>
+            <Field label="Withdrawal days" style={{ flex: 1 }}>
+              <Input
+                value={r.withdrawalDays}
+                onChangeText={(t) => update(r.id, { withdrawalDays: t })}
+                keyboardType="numeric"
+                placeholder="0"
+              />
+            </Field>
+          </FieldRow>
+          <Button label="Remove row" variant="link" onPress={() => remove(r.id)} />
+        </View>
+      ))}
+      <Button label="Add drug" icon="plus" variant="outline" onPress={add} />
+    </Field>
+  );
 }
 
 const s = StyleSheet.create({
@@ -162,8 +294,9 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.md,
     marginBottom: 7,
   },
-  drugTop: { flexDirection: "row", justifyContent: "space-between" },
-  drugName: { fontSize: 12, fontWeight: "600", color: COLORS.text },
-  drugPrice: { fontSize: 12, fontWeight: "600", color: COLORS.text },
-  drugMeta: { fontSize: 10, color: COLORS.textMuted, marginTop: 4 },
+  drugEmpty: {
+    color: COLORS.textSubtle,
+    fontSize: 12,
+    paddingVertical: 4,
+  },
 });

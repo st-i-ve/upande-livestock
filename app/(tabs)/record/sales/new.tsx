@@ -1,52 +1,96 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
-import { APP, COLORS, RADIUS } from "@/constants/theme";
+import { COLORS, RADIUS } from "@/constants/theme";
+import { useCreateAnimalDisposal } from "@/src/hooks/mutations";
+import { extractFrappeError, todayISO } from "@/src/services/api";
+import type { Animal } from "@/types";
 
 export default function SaleNew() {
-  const [price, setPrice] = useState("95000");
-  const book = 120000;
+  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [price, setPrice] = useState("");
+  const [buyer, setBuyer] = useState("");
+  const [phone, setPhone] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useCreateAnimalDisposal();
+
+  // Book value comes from the Animal record server-side; we surface the
+  // sale price impact for the operator's confidence. The script computes
+  // the actual gain_loss after pulling current_book_value.
   const p = Number(price) || 0;
-  const gl = p - book;
+
+  const handleSubmit = async () => {
+    setError(null);
+    if (!animal) return setError("Pick an animal to sell.");
+    if (!buyer.trim()) return setError("Enter a buyer name.");
+    if (p <= 0) return setError("Enter a sale price.");
+
+    try {
+      await mutation.mutateAsync({
+        animal: animal.id,
+        animalName: animal.name,
+        disposalType: "Sold",
+        disposalDate: todayISO(),
+        salePrice: p,
+        buyerName: buyer.trim(),
+        buyerContact: phone.trim() || undefined,
+        reasonDetails: reason.trim() || undefined,
+      });
+      Alert.alert(
+        "Sale recorded",
+        `${animal.name} sold to ${buyer.trim()} for ${p.toLocaleString()} KES.\n\nFrappe will post the Sales Invoice, Payment Entry, and write-off JE.`,
+      );
+      router.replace("/(tabs)/record/success?name=Sale");
+    } catch (err) {
+      setError(extractFrappeError(err));
+    }
+  };
 
   return (
     <Screen title="Record sale" subtitle="Posts gain/loss to GL" back>
       <Field label="Animal to sell">
-        <AnimalPickerButton />
+        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
       </Field>
       <FieldRow>
         <Field label="Date" style={{ flex: 1 }}>
-          <Input value={APP.today} />
+          <Input value={todayISO()} editable={false} />
         </Field>
         <Field label="Sale price (KES)" style={{ flex: 1 }}>
-          <Input value={price} onChangeText={setPrice} keyboardType="numeric" />
+          <Input value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="0" />
         </Field>
       </FieldRow>
       <Field label="Buyer name">
-        <Input placeholder="Buyer / butchery / co-op" />
+        <Input value={buyer} onChangeText={setBuyer} placeholder="Buyer / butchery / co-op" />
       </Field>
       <Field label="Buyer phone">
-        <Input placeholder="+254..." keyboardType="phone-pad" />
+        <Input value={phone} onChangeText={setPhone} placeholder="+254..." keyboardType="phone-pad" />
       </Field>
       <Field label="Reason / notes">
-        <Textarea placeholder="End of productive life, surplus, etc." />
+        <Textarea value={reason} onChangeText={setReason} placeholder="End of productive life, surplus, etc." />
       </Field>
       <View style={s.box}>
-        <KV k="Book value" v="120,000 KES" />
         <KV k="Sale price" v={`${p.toLocaleString()} KES`} />
-        <KV
-          k="Gain / loss"
-          v={`${gl >= 0 ? "+" : ""}${gl.toLocaleString()} KES`}
-          vColor={gl < 0 ? COLORS.danger : undefined}
-        />
+        <KV k="Book value" v="(pulled from Animal record on submit)" />
+        <KV k="Gain / loss" v="(computed by Frappe)" />
       </View>
-      <Button label="Submit sale" onPress={() => router.replace("/(tabs)/record/success?name=Sale")} />
+
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+
+      <Button
+        label={mutation.isPending ? "Submitting…" : "Submit sale"}
+        disabled={mutation.isPending || !animal}
+        loading={mutation.isPending}
+        onPress={handleSubmit}
+      />
     </Screen>
   );
 }
