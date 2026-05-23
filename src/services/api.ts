@@ -172,6 +172,16 @@ export const todayISO = (): string => {
   return `${y}-${m}-${day}`;
 };
 
+/** ISO date `days` ago. Useful for rolling-window reports. */
+export const isoDaysAgo = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 /**
  * Pulls the first user-readable message Frappe attaches to a *successful*
  * response (via frappe.msgprint on the server). Returns null if there's

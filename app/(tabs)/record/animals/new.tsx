@@ -55,7 +55,7 @@ export default function NewAnimal() {
     if (!company) return setError("Default company not loaded yet. Try again.");
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         tagNumber: tagNumber.trim(),
         burnName: burnName.trim(),
         sex,
@@ -74,12 +74,14 @@ export default function NewAnimal() {
         remarks: remarks || undefined,
       });
       Alert.alert(
-        "Animal created",
-        `${burnName.trim()} (${tagNumber.trim()}) added to ${currentHerd}.${
-          origin === "Purchased" && isCapitalised && purchaseValue
-            ? "\nCapitalisation JE posted on submit."
-            : ""
-        }`,
+        r.queued ? "Queued offline" : "Animal created",
+        r.queued
+          ? `Saved locally. Will sync when online.`
+          : `${burnName.trim()} (${tagNumber.trim()}) added to ${currentHerd}.${
+              origin === "Purchased" && isCapitalised && purchaseValue
+                ? "\nCapitalisation JE posted on submit."
+                : ""
+            }`,
       );
       router.replace(`/(tabs)/record/success?name=New animal`);
     } catch (err) {

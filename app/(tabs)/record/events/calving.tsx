@@ -57,7 +57,7 @@ export default function Calving() {
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         eventType: "Calving",
         animal: dam.id,
         currentHerd: dam.herd,
@@ -72,10 +72,12 @@ export default function Calving() {
         coatColour: coatColour || undefined,
       });
       Alert.alert(
-        "Calving recorded",
-        outcome === "Live Birth"
-          ? `${dam.name} calved. Calf ${calfName} (${calfBook}) created.`
-          : `${dam.name} marked as calved (${outcome}).`,
+        r.queued ? "Queued offline" : "Calving recorded",
+        r.queued
+          ? `${dam.name} saved locally. Will sync when online.`
+          : outcome === "Live Birth"
+            ? `${dam.name} calved. Calf ${calfName} (${calfBook}) created.`
+            : `${dam.name} marked as calved (${outcome}).`,
       );
       router.replace("/(tabs)/record/success?name=Calving");
     } catch (err) {

@@ -45,7 +45,7 @@ export default function CaseNew() {
     const presentingSymptoms = [condition.trim(), notes.trim()].filter(Boolean).join(" — ");
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         animal: animal.id,
         company,
         openedBy: operator,
@@ -54,7 +54,12 @@ export default function CaseNew() {
         presentingSymptoms,
         severity,
       });
-      Alert.alert("Health case opened", `New case opened for ${animal.name}.`);
+      Alert.alert(
+        r.queued ? "Queued offline" : "Health case opened",
+        r.queued
+          ? `Case saved locally. Will sync when online.`
+          : `New case opened for ${animal.name}.`,
+      );
       router.replace("/(tabs)/record/success?name=Health case");
     } catch (err) {
       setError(extractFrappeError(err));
