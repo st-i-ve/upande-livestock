@@ -36,6 +36,9 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     { icon: "cash", label: "Sell animal", href: "/(tabs)/record/sales/new" },
     { icon: "delete-outline", label: "Cull / death", href: "/(tabs)/record/culls/new" },
   ]},
+  { title: "Animals", items: [
+    { icon: "cow", label: "Add purchased animal", href: "/(tabs)/record/animals/new" },
+  ]},
 ];
 
 export default function Record() {

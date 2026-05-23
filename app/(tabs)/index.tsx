@@ -12,6 +12,7 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { APP, COLORS, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { extractFrappeError } from "@/src/services/api";
+import { useOpenHealthCaseCount } from "@/src/hooks/useHealthCases";
 import { useSafetyAlerts } from "@/src/hooks/useSafetyAlerts";
 import { useTodaysMilk } from "@/src/hooks/useTodaysMilk";
 
@@ -19,6 +20,7 @@ export default function Home() {
   const fullname = useAuthStore((s) => s.fullname) || APP.user;
   const milk = useTodaysMilk();
   const alerts = useSafetyAlerts();
+  const openCases = useOpenHealthCaseCount();
 
   const totalRecorded = (milk.data ?? []).reduce(
     (sum, r) => sum + (r.am ?? 0) + (r.pm ?? 0),
@@ -56,11 +58,16 @@ export default function Home() {
               <Text style={s.topValue}>{Math.round(totalRecorded)} kg</Text>
               <Text style={s.topSub}>recorded so far</Text>
             </View>
-            <View style={s.topCell}>
+            <Pressable
+              style={s.topCell}
+              onPress={() => router.push("/(tabs)/alerts/cases")}
+            >
               <Text style={s.topLabel}>Open cases</Text>
-              <Text style={s.topValue}>—</Text>
-              <Text style={s.topSub}>(coming soon)</Text>
-            </View>
+              <Text style={s.topValue}>
+                {openCases.isLoading ? "…" : (openCases.data ?? 0)}
+              </Text>
+              <Text style={s.topSub}>open + under treatment</Text>
+            </Pressable>
           </View>
 
           <SectionTitle>Today's milk by herd</SectionTitle>

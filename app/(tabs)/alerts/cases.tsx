@@ -1,43 +1,84 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 
 import { Avatar } from "@/components/Avatar";
+import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
+import { Empty } from "@/components/Empty";
+import { ErrorState } from "@/components/ErrorState";
+import { Loader } from "@/components/Loader";
 import { Pill } from "@/components/Pill";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
+import { useHealthCases } from "@/src/hooks/useHealthCases";
+import { extractFrappeError } from "@/src/services/api";
+
+const isOpen = (status: string) =>
+  status === "Open" || status === "Under Treatment";
 
 export default function Cases() {
+  const { data: cases = [], isLoading, isRefetching, error, refetch } = useHealthCases();
+
+  const { open, closed } = useMemo(() => {
+    const o = cases.filter((c) => isOpen(c.caseStatus));
+    const c = cases.filter((x) => !isOpen(x.caseStatus));
+    return { open: o, closed: c.slice(0, 20) };
+  }, [cases]);
+
+  const subtitle = cases.length
+    ? `${open.length} open · ${closed.length} closed`
+    : "";
+
   return (
-    <Screen title="Health cases" subtitle="3 open · 5 closed this month" back>
+    <Screen
+      title="Health cases"
+      subtitle={subtitle}
+      back
+      onRefresh={refetch}
+      refreshing={isRefetching}
+    >
       <Button label="New case" icon="plus" onPress={() => router.push("/(tabs)/record/cases/new")} />
-      <SectionTitle>Open</SectionTitle>
-      <Row
-        left={<Avatar icon="stethoscope" tone="danger" />}
-        title="TEST IVY · Mastitis (Clinical)"
-        meta="HC-2026-160120 · 870 KES · since 8 May"
-        right={<Pill label="Open" tone="danger" />}
-      />
-      <Row
-        left={<Avatar icon="stethoscope" tone="danger" />}
-        title="ADAM · Udder Oedema"
-        meta="HC-2026-160094 · since 10 Mar"
-        right={<Pill label="Open" tone="danger" />}
-      />
-      <Row
-        left={<Avatar icon="stethoscope" tone="danger" />}
-        title="EDEN · Mastitis (Clinical)"
-        meta="HC-2026-160093 · since 12 Mar"
-        right={<Pill label="Open" tone="danger" />}
-      />
-      <SectionTitle>Recently closed</SectionTitle>
-      <Row
-        left={<Avatar icon="stethoscope" />}
-        title="MC CAIN · Joint Injury"
-        meta="HC-2026-160095 · 500 KES · 3 days"
-        right={<Pill label="Recovered" />}
-      />
+
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      ) : cases.length === 0 ? (
+        <Banner tone="info">No health cases recorded yet.</Banner>
+      ) : (
+        <>
+          <SectionTitle>Open</SectionTitle>
+          {open.length === 0 ? (
+            <Empty text="No open cases" />
+          ) : (
+            open.map((c) => (
+              <Row
+                key={c.name}
+                left={<Avatar icon="stethoscope" tone="danger" />}
+                title={`${c.animalName} · ${c.presentingSymptoms || "—"}`}
+                meta={`${c.name} · ${c.openedDate}${c.totalTreatmentCost ? ` · ${Math.round(c.totalTreatmentCost).toLocaleString()} KES` : ""}`}
+                right={<Pill label={c.caseStatus} tone="danger" />}
+              />
+            ))
+          )}
+
+          {closed.length > 0 ? (
+            <>
+              <SectionTitle>Recently closed</SectionTitle>
+              {closed.map((c) => (
+                <Row
+                  key={c.name}
+                  left={<Avatar icon="stethoscope" />}
+                  title={`${c.animalName} · ${c.presentingSymptoms || "—"}`}
+                  meta={`${c.name} · ${c.openedDate}${c.duration != null ? ` · ${c.duration}d` : ""}`}
+                  right={<Pill label={c.caseStatus} />}
+                />
+              ))}
+            </>
+          ) : null}
+        </>
+      )}
     </Screen>
   );
 }

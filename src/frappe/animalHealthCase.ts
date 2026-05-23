@@ -1,4 +1,5 @@
 import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
+import { countDocuments, listDocuments } from "./generic";
 
 export type CaseStatus =
   | "Open"
@@ -24,6 +25,61 @@ export type CreateAnimalHealthCaseInput = {
   vetName?: string;
   vetVisitDate?: string;
 };
+
+export type HealthCaseListRow = {
+  name: string;
+  animal: string;
+  animalName: string;
+  caseStatus: CaseStatus;
+  severity: CaseSeverity | null;
+  openedDate: string;
+  presentingSymptoms: string;
+  totalTreatmentCost: number;
+  duration: number | null;
+};
+
+const mapCase = (row: any): HealthCaseListRow => ({
+  name: row.name,
+  animal: row.animal,
+  animalName: row.animal_name || row.animal,
+  caseStatus: row.case_status,
+  severity: row.severity ?? null,
+  openedDate: row.opened_date,
+  presentingSymptoms: row.presenting_symptoms ?? "",
+  totalTreatmentCost: Number(row.total_treatment_cost ?? 0),
+  duration: row.duration_days ?? null,
+});
+
+const HEALTH_CASE_LIST_FIELDS = [
+  "name",
+  "animal",
+  "animal_name",
+  "case_status",
+  "severity",
+  "opened_date",
+  "presenting_symptoms",
+  "total_treatment_cost",
+  "duration_days",
+];
+
+export const getHealthCases = async (
+  filters: ["case_status" | "any", string][] = [],
+): Promise<HealthCaseListRow[]> => {
+  const f: [string, string, any][] = filters
+    .filter(([k]) => k !== "any")
+    .map(([k, v]) => [k, "=", v] as [string, string, any]);
+  const rows = await listDocuments({
+    doctype: "Animal Health Case",
+    fields: HEALTH_CASE_LIST_FIELDS,
+    filters: f,
+    orderBy: "opened_date desc",
+    limit: 200,
+  });
+  return rows.map(mapCase);
+};
+
+export const countOpenHealthCases = (): Promise<number> =>
+  countDocuments("Animal Health Case", [["case_status", "in", ["Open", "Under Treatment"]]]);
 
 export const createAnimalHealthCase = async (
   input: CreateAnimalHealthCaseInput,

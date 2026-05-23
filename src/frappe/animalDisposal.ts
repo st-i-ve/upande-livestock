@@ -1,4 +1,5 @@
 import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
+import { listDocuments } from "./generic";
 
 // Exact strings the Frappe DocType expects. The cull/death types use em-dashes
 // (—) — must be sent verbatim. Verified against the live DocType.
@@ -32,6 +33,63 @@ export type CreateAnimalDisposalInput = {
  * the three paths (sold / culled with insurance / culled without insurance)
  * per livestock_server_scripts §5.
  */
+export type DisposalListRow = {
+  name: string;
+  animal: string;
+  animalName: string;
+  disposalDate: string;
+  disposalType: DisposalType;
+  bookValue: number;
+  salePrice: number;
+  gainLoss: number;
+  buyerName: string | null;
+  insuranceClaimAmount: number;
+};
+
+const DISPOSAL_LIST_FIELDS = [
+  "name",
+  "animal",
+  "animal_name",
+  "disposal_date",
+  "disposal_type",
+  "book_value",
+  "sale_price",
+  "gain_loss",
+  "buyer_name",
+  "insurance_claim_amount",
+];
+
+const mapDisposal = (row: any): DisposalListRow => ({
+  name: row.name,
+  animal: row.animal,
+  animalName: row.animal_name || row.animal,
+  disposalDate: row.disposal_date,
+  disposalType: row.disposal_type,
+  bookValue: Number(row.book_value ?? 0),
+  salePrice: Number(row.sale_price ?? 0),
+  gainLoss: Number(row.gain_loss ?? 0),
+  buyerName: row.buyer_name ?? null,
+  insuranceClaimAmount: Number(row.insurance_claim_amount ?? 0),
+});
+
+export const getDisposals = async (params?: {
+  soldOnly?: boolean;
+  cullsOnly?: boolean;
+  limit?: number;
+}): Promise<DisposalListRow[]> => {
+  const filters: [string, string, any][] = [];
+  if (params?.soldOnly) filters.push(["disposal_type", "=", "Sold"]);
+  if (params?.cullsOnly) filters.push(["disposal_type", "!=", "Sold"]);
+  const rows = await listDocuments({
+    doctype: "Animal Disposal",
+    fields: DISPOSAL_LIST_FIELDS,
+    filters,
+    orderBy: "disposal_date desc",
+    limit: params?.limit ?? 200,
+  });
+  return rows.map(mapDisposal);
+};
+
 export const createAnimalDisposal = async (
   input: CreateAnimalDisposalInput,
 ): Promise<any> => {
