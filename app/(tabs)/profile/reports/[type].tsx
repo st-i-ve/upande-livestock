@@ -1,16 +1,26 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/Avatar";
+import { Banner } from "@/components/Banner";
 import { Divider } from "@/components/Divider";
+import { ErrorState } from "@/components/ErrorState";
 import { KV } from "@/components/KV";
+import { Loader } from "@/components/Loader";
 import { MetricGrid } from "@/components/MetricGrid";
 import { Pill } from "@/components/Pill";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { useAnimals } from "@/src/hooks/useAnimals";
+import {
+  useAllHealthCases,
+  useEventsLast365d,
+  useMilkLast30d,
+} from "@/src/hooks/useReports";
+import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -21,107 +31,340 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
+// ---------------------------------------------------------------------------
+// Milk yield — last 30 days
+// ---------------------------------------------------------------------------
+
 function MilkYield() {
+  const { data: rows = [], isLoading, isRefetching, error, refetch } = useMilkLast30d();
+
+  const { totalKg, revenue, discarded, byHerd } = useMemo(() => {
+    let totalKg = 0;
+    let revenue = 0;
+    let discarded = 0;
+    const byHerd: Record<string, number> = {};
+    for (const r of rows) {
+      totalKg += r.netYieldKg;
+      revenue += r.milkRevenue;
+      discarded += r.discardedKg;
+      byHerd[r.herd] = (byHerd[r.herd] ?? 0) + r.netYieldKg;
+    }
+    return { totalKg, revenue, discarded, byHerd };
+  }, [rows]);
+
+  // Days with at least one recording, used to compute per-cow heuristic.
+  const distinctDays = useMemo(
+    () => new Set(rows.map((r) => r.recordingDate)).size || 1,
+    [rows],
+  );
+  const discardPct = totalKg + discarded > 0 ? (discarded / (totalKg + discarded)) * 100 : 0;
+
   return (
-    <Screen title="Milk yield" subtitle="Last 30 days" back>
-      <SectionHeader title="Overview" subtitle="Production, revenue and discard summary" />
-      <MetricGrid items={[
-        { label: "30d total", value: "28,460", sub: "kg, +4.2%" },
-        { label: "Per cow", value: "22.6", sub: "kg/day" },
-        { label: "Revenue", value: "1.69M", sub: "KES" },
-        { label: "Discarded", value: "312", sub: "kg, 1.1%" },
-      ]} />
+    <Screen title="Milk yield" subtitle="Last 30 days" back onRefresh={refetch} refreshing={isRefetching}>
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      ) : (
+        <>
+          <SectionHeader title="Overview" subtitle="Production, revenue and discard summary" />
+          <MetricGrid
+            items={[
+              { label: "30d net yield", value: Math.round(totalKg).toLocaleString(), sub: "kg" },
+              { label: "Days recorded", value: String(distinctDays), sub: rows.length === 1 ? "session" : `${rows.length} sessions` },
+              { label: "Revenue", value: Math.round(revenue).toLocaleString(), sub: "KES" },
+              { label: "Discarded", value: Math.round(discarded).toLocaleString(), sub: `kg, ${discardPct.toFixed(1)}%` },
+            ]}
+          />
 
-      <Divider />
+          <Divider />
 
-      <SectionHeader title="By herd" subtitle="Total kg over the last 30 days" />
-      <KV k="Lactating group 1" v="14,920 kg" />
-      <KV k="Lactating group 2" v="8,540 kg" />
-      <KV k="Super high yielders" v="5,000 kg" />
+          <SectionHeader title="By herd" subtitle="Total kg over the last 30 days" />
+          {Object.keys(byHerd).length === 0 ? (
+            <Banner tone="info">No milk recordings in the last 30 days.</Banner>
+          ) : (
+            Object.entries(byHerd)
+              .sort(([, a], [, b]) => b - a)
+              .map(([herd, kg]) => (
+                <KV key={herd} k={herd} v={`${Math.round(kg).toLocaleString()} kg`} />
+              ))
+          )}
+        </>
+      )}
     </Screen>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Reproduction — last 12 months
+// ---------------------------------------------------------------------------
 
 function Reproduction() {
+  const events = useEventsLast365d();
+  const animals = useAnimals();
+
+  const isLoading = events.isLoading || animals.isLoading;
+  const error = events.error || animals.error;
+  const refetch = () => {
+    events.refetch();
+    animals.refetch();
+  };
+
+  const stats = useMemo(() => {
+    const all = events.data ?? [];
+    const services = all.filter((e) => e.eventType === "Service");
+    const pds = all.filter((e) => e.eventType === "Pregnancy Diagnosis");
+    const calvings = all.filter((e) => e.eventType === "Calving" || e.eventType === "Birth");
+    const confirmedPDs = pds.filter((e) => e.diagnosisResult === "Confirmed").length;
+    const conception = pds.length > 0 ? (confirmedPDs / pds.length) * 100 : 0;
+    return { services, pds, calvings, conception };
+  }, [events.data]);
+
+  // Cows served > 50 days ago without a subsequent PD or Calving event.
+  const overdue = useMemo(() => {
+    const all = events.data ?? [];
+    const fiftyDaysAgo = Date.now() - 50 * 86_400_000;
+    const out: { animal: string; service: string; daysAgo: number }[] = [];
+    const byAnimal: Record<string, typeof all> = {};
+    for (const e of all) (byAnimal[e.animal] ||= []).push(e);
+    for (const [animal, rows] of Object.entries(byAnimal)) {
+      const sorted = rows.slice().sort((a, b) => (a.eventDate < b.eventDate ? 1 : -1));
+      const lastService = sorted.find((e) => e.eventType === "Service");
+      if (!lastService) continue;
+      const serviceTime = Date.parse(lastService.eventDate);
+      if (Number.isNaN(serviceTime) || serviceTime > fiftyDaysAgo) continue;
+      const laterPD = sorted.find(
+        (e) =>
+          (e.eventType === "Pregnancy Diagnosis" || e.eventType === "Calving" || e.eventType === "Birth") &&
+          e.eventDate > lastService.eventDate,
+      );
+      if (!laterPD) {
+        out.push({
+          animal,
+          service: lastService.eventDate,
+          daysAgo: Math.floor((Date.now() - serviceTime) / 86_400_000),
+        });
+      }
+    }
+    return out.sort((a, b) => b.daysAgo - a.daysAgo).slice(0, 20);
+  }, [events.data]);
+
   return (
-    <Screen title="Reproduction" subtitle="Last 12 months" back>
-      <SectionHeader title="Performance" subtitle="Targets vs. actual on key fertility KPIs" />
-      <MetricGrid items={[
-        { label: "Conception", value: "62%", sub: "target 60%" },
-        { label: "Days open", value: "112", sub: "target 100" },
-        { label: "Calving int.", value: "395", sub: "days" },
-        { label: "Straws/preg", value: "2.1", sub: "target 2.0" },
-      ]} />
+    <Screen title="Reproduction" subtitle="Last 12 months" back onRefresh={refetch}>
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      ) : (
+        <>
+          <SectionHeader title="Performance" subtitle="Counts from Animal Event timeline" />
+          <MetricGrid
+            items={[
+              { label: "Services", value: String(stats.services.length), sub: "12m" },
+              { label: "PDs done", value: String(stats.pds.length), sub: "12m" },
+              { label: "Calvings", value: String(stats.calvings.length), sub: "12m" },
+              { label: "Conception", value: `${stats.conception.toFixed(0)}%`, sub: "of PDs" },
+            ]}
+          />
 
-      <Divider />
+          <Divider />
 
-      <SectionHeader title="Open events" subtitle="Cows past their expected PD or service window" />
-      <Row left={<Avatar icon="clock-outline" tone="warning" />} title="AMALIA-129272" meta="Served 55 days ago · PD overdue" right={<Pill label="Overdue" tone="warning" />} />
-      <Row left={<Avatar icon="clock-outline" tone="calf" />} title="BROOKE-129297" meta="Served 38 days ago" right={<Pill label="Awaiting" tone="preg" />} />
+          <SectionHeader title="Open events" subtitle="Served > 50 days ago, no PD on record" />
+          {overdue.length === 0 ? (
+            <Banner tone="info">All served cows have follow-up events.</Banner>
+          ) : (
+            overdue.map((o) => (
+              <Row
+                key={o.animal}
+                left={<Avatar icon="clock-outline" tone="warning" />}
+                title={o.animal}
+                meta={`Served ${o.service} · ${o.daysAgo}d ago`}
+                right={<Pill label="PD overdue" tone="warning" />}
+              />
+            ))
+          )}
+        </>
+      )}
     </Screen>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Health & costs
+// ---------------------------------------------------------------------------
 
 function HealthCosts() {
+  const cases = useAllHealthCases();
+  const events = useEventsLast365d();
+
+  const isLoading = cases.isLoading || events.isLoading;
+  const error = cases.error || events.error;
+  const refetch = () => {
+    cases.refetch();
+    events.refetch();
+  };
+
+  const stats = useMemo(() => {
+    const allCases = cases.data ?? [];
+    const allEvents = events.data ?? [];
+    const treatmentEventSpend = allEvents
+      .filter((e) =>
+        ["Vaccination", "Deworming", "Dehorning", "Hoof Trimming"].includes(e.eventType),
+      )
+      .reduce((a, e) => a + e.activityCost, 0);
+    const caseSpend = allCases.reduce((a, c) => a + c.totalTreatmentCost, 0);
+    const totalSpend = treatmentEventSpend + caseSpend;
+    const avgPerCase = allCases.length ? caseSpend / allCases.length : 0;
+    return { allCases, totalSpend, caseSpend, treatmentEventSpend, avgPerCase };
+  }, [cases.data, events.data]);
+
+  // Cost grouped by presenting symptom (best proxy for "by condition" until
+  // confirmed_diagnosis is populated consistently).
+  const byCondition = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const c of cases.data ?? []) {
+      const key = (c.presentingSymptoms || "Other").slice(0, 32);
+      map[key] = (map[key] ?? 0) + c.totalTreatmentCost;
+    }
+    return Object.entries(map).sort(([, a], [, b]) => b - a).slice(0, 8);
+  }, [cases.data]);
+
+  // Top-spending animals across cases.
+  const topSpenders = useMemo(() => {
+    const map: Record<string, { animalName: string; total: number; count: number }> = {};
+    for (const c of cases.data ?? []) {
+      const m = map[c.animal] || { animalName: c.animalName, total: 0, count: 0 };
+      m.total += c.totalTreatmentCost;
+      m.count += 1;
+      map[c.animal] = m;
+    }
+    return Object.entries(map)
+      .map(([animal, v]) => ({ animal, ...v }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [cases.data]);
+
   return (
-    <Screen title="Health & costs" subtitle="Last 12 months" back>
-      <SectionHeader title="Spending overview" subtitle="Year-to-date totals at a glance" />
-      <MetricGrid items={[
-        { label: "Vet spend", value: "285,400", sub: "KES YTD" },
-        { label: "Cases", value: "38", sub: "14 mastitis" },
-        { label: "Avg / case", value: "7,510", sub: "KES" },
-        { label: "Discard loss", value: "189k", sub: "KES, 3,150 kg" },
-      ]} />
+    <Screen title="Health & costs" subtitle="Last 12 months" back onRefresh={refetch}>
+      {isLoading ? (
+        <Loader />
+      ) : error ? (
+        <ErrorState text={extractFrappeError(error)} onRetry={refetch} />
+      ) : (
+        <>
+          <SectionHeader title="Spending overview" subtitle="Aggregated from cases + events" />
+          <MetricGrid
+            items={[
+              { label: "Total spend", value: Math.round(stats.totalSpend).toLocaleString(), sub: "KES" },
+              { label: "Cases", value: String(stats.allCases.length), sub: "12m" },
+              { label: "Avg / case", value: Math.round(stats.avgPerCase).toLocaleString(), sub: "KES" },
+              { label: "Event cost", value: Math.round(stats.treatmentEventSpend).toLocaleString(), sub: "vacc + deworm + ..." },
+            ]}
+          />
 
-      <Divider />
+          <Divider />
 
-      <SectionHeader title="By condition" subtitle="Where the money is going" />
-      <KV k="Mastitis (clinical)" v="142,300 KES" />
-      <KV k="Lameness" v="68,920 KES" />
-      <KV k="Metritis" v="34,180 KES" />
-      <KV k="Other / minor" v="40,000 KES" />
+          <SectionHeader title="By condition" subtitle="Where the case spend is going" />
+          {byCondition.length === 0 ? (
+            <Banner tone="info">No health cases recorded.</Banner>
+          ) : (
+            byCondition.map(([cond, kes]) => (
+              <KV key={cond} k={cond} v={`${Math.round(kes).toLocaleString()} KES`} />
+            ))
+          )}
 
-      <Divider />
+          <Divider />
 
-      <SectionHeader title="Top spenders" subtitle="Animals with the highest treatment cost" />
-      <Row left={<Avatar icon="stethoscope" tone="danger" />} title="EDEN-129339" meta="3 cases · 35,200 KES total" right={<Pill label="High" tone="danger" />} />
-      <Row left={<Avatar icon="stethoscope" tone="warning" />} title="TEST IVY" meta="1 case · 6,570 KES" right={<Pill label="Open" tone="warning" />} />
-
-      <Divider />
-
-      <SectionHeader title="Recent treatments" subtitle="Last 30 days of clinical activity" />
-      <Row left={<Avatar icon="needle" tone="calf" />} title="EDEN · Intramammary course" meta="6 May · 8,400 KES · ongoing" />
-      <Row left={<Avatar icon="needle" tone="calf" />} title="TEST IVY · Tilmicosin" meta="3 May · 6,570 KES · monitoring" />
-      <Row left={<Avatar icon="needle" tone="calf" />} title="ADAM · Udder oedema gel" meta="11 Mar · 1,200 KES · resolved" />
+          <SectionHeader title="Top spenders" subtitle="Highest treatment cost across cases" />
+          {topSpenders.length === 0 ? (
+            <Banner tone="info">No data yet.</Banner>
+          ) : (
+            topSpenders.map((sp) => (
+              <Row
+                key={sp.animal}
+                left={<Avatar icon="stethoscope" tone="danger" />}
+                title={sp.animalName}
+                meta={`${sp.count} case${sp.count === 1 ? "" : "s"} · ${Math.round(sp.total).toLocaleString()} KES`}
+              />
+            ))
+          )}
+        </>
+      )}
     </Screen>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Calf growth
+// ---------------------------------------------------------------------------
 
 function CalfGrowth() {
+  const animals = useAnimals();
+
+  // Use the existing animals list (already has lastWt + dob). For a richer
+  // ADG calc we'd fetch each animal's weight_history; this report uses the
+  // simple (last_weight - birth_weight) / days_since_birth proxy from the
+  // list-level data. Anything more accurate is a per-animal query.
+  const stats = useMemo(() => {
+    const list = animals.data ?? [];
+    const youngstock = list.filter((a) => a.repro === "Calf" || a.repro === "Heifer");
+    return { youngstock };
+  }, [animals.data]);
+
   return (
-    <Screen title="Calf growth" subtitle="Youngstock 0-12 months" back>
-      <SectionHeader title="Performance" subtitle="Average daily gain and target adherence" />
-      <MetricGrid items={[
-        { label: "Avg ADG", value: "780", sub: "g/day, target 850" },
-        { label: "On target", value: "62%", sub: "22 of 36 calves" },
-        { label: "Mortality", value: "2.8%", sub: "target <5%" },
-        { label: "Wean wt", value: "82", sub: "kg @ d90" },
-      ]} />
+    <Screen title="Calf growth" subtitle="Youngstock 0–12 months" back onRefresh={animals.refetch}>
+      {animals.isLoading ? (
+        <Loader />
+      ) : animals.error ? (
+        <ErrorState text={extractFrappeError(animals.error)} onRetry={animals.refetch} />
+      ) : stats.youngstock.length === 0 ? (
+        <Banner tone="info">No youngstock on record.</Banner>
+      ) : (
+        <>
+          <SectionHeader title="Population" subtitle="Calves + heifers in the system" />
+          <MetricGrid
+            items={[
+              { label: "Total", value: String(stats.youngstock.length), sub: "head" },
+              {
+                label: "Median weight",
+                value: medianWeight(stats.youngstock.map((a) => a.lastWt).filter(Boolean) as number[]).toLocaleString(),
+                sub: "kg",
+              },
+            ]}
+          />
 
-      <Divider />
+          <Divider />
 
-      <SectionHeader title="Need attention" subtitle="Below growth curve and worth a check" />
-      <Row left={<Avatar icon="trending-down" tone="warning" />} title="TEST BLOSSOM · 24 d · 42 kg" meta="ADG 250 g/d · below target" right={<Pill label="Watch" tone="warning" />} />
+          <SectionHeader title="Roster" subtitle="Youngstock with current weight" />
+          {stats.youngstock.slice(0, 30).map((a) => (
+            <Row
+              key={a.id}
+              left={<Avatar icon="cow" />}
+              title={`${a.name} · ${a.id}`}
+              meta={`${a.herd}${a.lastWt ? ` · ${a.lastWt} kg` : ""}`}
+            />
+          ))}
+        </>
+      )}
     </Screen>
   );
 }
+
+const medianWeight = (xs: number[]): number => {
+  if (xs.length === 0) return 0;
+  const sorted = xs.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+};
+
+// ---------------------------------------------------------------------------
 
 function UnknownReport() {
   return (
     <Screen title="Report" back>
       <View style={s.empty}>
         <MaterialCommunityIcons name="file-question-outline" size={48} color={COLORS.textSubtle} />
-        <Text style={s.emptyText}>This report does not exist in the demo dataset.</Text>
+        <Text style={s.emptyText}>Unknown report.</Text>
       </View>
     </Screen>
   );

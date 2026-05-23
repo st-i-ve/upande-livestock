@@ -41,7 +41,7 @@ export default function CullNew() {
     if (!animal) return setError("Pick an animal.");
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         animal: animal.id,
         animalName: animal.name,
         disposalType: type,
@@ -51,8 +51,10 @@ export default function CullNew() {
         witness: witness.trim() || undefined,
       });
       Alert.alert(
-        "Disposal recorded",
-        `${animal.name} marked ${type}.\n\nFrappe will post the write-off JE and (if insured) the insurance receivable JE.`,
+        r.queued ? "Queued offline" : "Disposal recorded",
+        r.queued
+          ? `Saved locally. Will sync (and post the write-off / insurance JEs) when online.`
+          : `${animal.name} marked ${type}.\n\nFrappe will post the write-off JE and (if insured) the insurance receivable JE.`,
       );
       router.replace("/(tabs)/record/success?name=Cull / death");
     } catch (err) {

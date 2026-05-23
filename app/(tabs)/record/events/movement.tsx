@@ -69,9 +69,10 @@ export default function Movement() {
     // current_herd. We sequence rather than parallelize so a partial failure
     // gives the user a clear "X of Y moved" message.
     let succeeded = 0;
+    let queued = 0;
     for (const a of selected) {
       try {
-        await mutation.mutateAsync({
+        const r = await mutation.mutateAsync({
           eventType: "Movement",
           animal: a.id,
           currentHerd: a.herd,
@@ -80,7 +81,8 @@ export default function Movement() {
           eventDate: todayISO(),
           remarks,
         });
-        succeeded += 1;
+        if (r.queued) queued += 1;
+        else succeeded += 1;
       } catch (err) {
         setError(
           `${succeeded} of ${selected.length} moved. Stopped at ${a.name}: ${extractFrappeError(err)}`,
@@ -88,10 +90,10 @@ export default function Movement() {
         return;
       }
     }
-    Alert.alert(
-      "Movement recorded",
-      `${succeeded} animal${succeeded === 1 ? "" : "s"} moved to ${toHerd}.`,
-    );
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert("Movement recorded", parts.join(" · "));
     router.replace(`/(tabs)/record/success?name=Movement`);
   };
 

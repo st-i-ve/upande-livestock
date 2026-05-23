@@ -35,7 +35,7 @@ export default function SaleNew() {
     if (p <= 0) return setError("Enter a sale price.");
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         animal: animal.id,
         animalName: animal.name,
         disposalType: "Sold",
@@ -46,8 +46,10 @@ export default function SaleNew() {
         reasonDetails: reason.trim() || undefined,
       });
       Alert.alert(
-        "Sale recorded",
-        `${animal.name} sold to ${buyer.trim()} for ${p.toLocaleString()} KES.\n\nFrappe will post the Sales Invoice, Payment Entry, and write-off JE.`,
+        r.queued ? "Queued offline" : "Sale recorded",
+        r.queued
+          ? `Sale saved locally. Will sync when online — Sales Invoice, Payment Entry and write-off JE will post then.`
+          : `${animal.name} sold to ${buyer.trim()} for ${p.toLocaleString()} KES.\n\nFrappe will post the Sales Invoice, Payment Entry, and write-off JE.`,
       );
       router.replace("/(tabs)/record/success?name=Sale");
     } catch (err) {

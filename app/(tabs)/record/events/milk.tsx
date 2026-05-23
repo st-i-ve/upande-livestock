@@ -60,7 +60,7 @@ export default function Milk() {
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         herd,
         session,
         recordingDate: todayISO(),
@@ -73,10 +73,12 @@ export default function Milk() {
         operator,
       });
       Alert.alert(
-        "Milk recording submitted",
-        allCol
-          ? `${(t - d).toFixed(1)} kg → Colostrum bank.`
-          : `${m.toFixed(1)} kg sellable · ${rev.toLocaleString()} KES revenue.`,
+        r.queued ? "Queued offline" : "Milk recording submitted",
+        r.queued
+          ? `${t} kg saved locally. Will sync when online.`
+          : allCol
+            ? `${(t - d).toFixed(1)} kg → Colostrum bank.`
+            : `${m.toFixed(1)} kg sellable · ${rev.toLocaleString()} KES revenue.`,
       );
       router.replace("/(tabs)/record/success?name=Milk recording");
     } catch (err) {
