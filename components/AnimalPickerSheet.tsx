@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { COLORS, RADIUS } from "@/constants/theme";
-import { animals as ALL } from "@/data/mock";
+import { useAnimals } from "@/src/hooks/useAnimals";
 import { avatarToneFor, initials, pillFor } from "@/services/utils";
 import type { Animal } from "@/types";
 
@@ -41,6 +41,7 @@ export function AnimalPickerSheet({
   const [view, setView] = useState<"all" | "herd">("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { data: ALL = [], isLoading } = useAnimals();
 
   const list = useMemo(() => {
     let l = include ? ALL.filter(include) : ALL;
@@ -49,7 +50,7 @@ export function AnimalPickerSheet({
       l = l.filter((a) => a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
     }
     return l;
-  }, [include, query]);
+  }, [ALL, include, query]);
 
   // Group rows for the herd view: header → child animal rows.
   const herdRows = useMemo<GroupRow[]>(() => {
@@ -169,7 +170,12 @@ export function AnimalPickerSheet({
             />
           </View>
 
-          {list.length === 0 ? (
+          {isLoading && list.length === 0 ? (
+            <View style={s.empty}>
+              <ActivityIndicator color={COLORS.text} />
+              <Text style={s.emptyText}>Loading animals…</Text>
+            </View>
+          ) : list.length === 0 ? (
             <View style={s.empty}>
               <MaterialCommunityIcons name="magnify-close" size={32} color={COLORS.textSubtle} />
               <Text style={s.emptyText}>No animals match</Text>

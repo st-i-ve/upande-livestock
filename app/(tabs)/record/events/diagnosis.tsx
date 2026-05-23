@@ -1,18 +1,25 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { ScoreRow } from "@/components/ScoreRow";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { APP, COLORS, RADIUS } from "@/constants/theme";
+import type { DiagnosisAction } from "@/src/frappe/animalDiagnosis";
+import { useAuthStore } from "@/src/auth/authStore";
+import { useCreateAnimalDiagnosis } from "@/src/hooks/mutations";
+import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
+import { extractFrappeError, todayISO } from "@/src/services/api";
+import type { Animal } from "@/types";
 
 const APPETITE = ["Normal", "Reduced", "Not eating"] as const;
 const BEHAVIOR = ["Active", "Dull", "Aggressive", "Isolated"] as const;
@@ -33,6 +40,28 @@ const CONDITIONS = [
 type CustomField = { id: number; label: string; value: string };
 
 export default function Diagnosis() {
+  const defaultOperator = useAuthStore((s) => s.employeeName);
+  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
+  const { data: company } = useDefaultCompany();
+
+  // Live picked animal + operator (replacing the stub picker that never lifted).
+  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const mutation = useCreateAnimalDiagnosis();
+
+  // Free-text fields that map directly into Animal Diagnosis.
+  const [examiner, setExaminer] = useState<string>(APP.user);
+  const [weight, setWeight] = useState("");
+  const [temp, setTemp] = useState("");
+  const [hr, setHr] = useState("");
+  const [resp, setResp] = useState("");
+  const [bcs, setBcs] = useState("");
+  const [followUp, setFollowUp] = useState("");
+  const [vetName, setVetName] = useState("");
+  const [vetConfirmed, setVetConfirmed] = useState(false);
+  const [freeRemarks, setFreeRemarks] = useState("");
+
   // Single-select chip groups
   const [appetite, setAppetite] = useState<string>("Normal");
   const [behavior, setBehavior] = useState<string>("Active");
@@ -80,10 +109,19 @@ export default function Diagnosis() {
 
       {/* 1. BASIC INFORMATION */}
       <SectionTitle>1 · Basic information</SectionTitle>
-      <Field label="Animal"><AnimalPickerButton /></Field>
+      <Field label="Operator">
+        <EmployeePickerButton value={operator} onChange={setOperator} />
+      </Field>
+      <Field label="Animal">
+        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
+      </Field>
       <FieldRow>
-        <Field label="Date of examination" style={{ flex: 1 }}><Input value={APP.today} /></Field>
-        <Field label="Examiner name" style={{ flex: 1 }}><Input defaultValue={APP.user} /></Field>
+        <Field label="Date of examination" style={{ flex: 1 }}>
+          <Input value={todayISO()} editable={false} />
+        </Field>
+        <Field label="Examiner name" style={{ flex: 1 }}>
+          <Input value={examiner} onChangeText={setExaminer} />
+        </Field>
       </FieldRow>
 
       {/* 2. GENERAL CONDITION */}
@@ -99,7 +137,9 @@ export default function Diagnosis() {
           { label: "5", tone: "danger" },
         ]}
       />
-      <Field label="Weight (kg)"><Input keyboardType="numeric" placeholder="e.g. 480" /></Field>
+      <Field label="Weight (kg)">
+        <Input value={weight} onChangeText={setWeight} keyboardType="numeric" placeholder="e.g. 480" />
+      </Field>
       <Field label="Appetite">
         <Chips>
           {APPETITE.map((o) => (
@@ -118,14 +158,14 @@ export default function Diagnosis() {
       {/* 3. VITAL SIGNS */}
       <SectionTitle>3 · Vital signs</SectionTitle>
       <Field label="Temperature (°C)" help="Cattle 38.0–39.3 · Goat / sheep 38.5–40.0">
-        <Input keyboardType="numeric" placeholder="38.7" />
+        <Input value={temp} onChangeText={setTemp} keyboardType="numeric" placeholder="38.7" />
       </Field>
       <FieldRow>
         <Field label="Heart rate (bpm)" style={{ flex: 1 }}>
-          <Input keyboardType="numeric" placeholder="60" />
+          <Input value={hr} onChangeText={setHr} keyboardType="numeric" placeholder="60" />
         </Field>
         <Field label="Respiratory rate" style={{ flex: 1 }}>
-          <Input keyboardType="numeric" placeholder="20" />
+          <Input value={resp} onChangeText={setResp} keyboardType="numeric" placeholder="20" />
         </Field>
       </FieldRow>
 
@@ -209,10 +249,16 @@ export default function Diagnosis() {
 
       {/* 10. TREATMENT / ACTION */}
       <SectionTitle>10 · Treatment / action</SectionTitle>
-      <Field label="Medication given"><Input placeholder="e.g. Procaine Penicillin G" /></Field>
+      <Field label="Medication given">
+        <Input value={vetName} onChangeText={setVetName} placeholder="e.g. Procaine Penicillin G" />
+      </Field>
       <FieldRow>
-        <Field label="Dosage" style={{ flex: 1 }}><Input placeholder="e.g. 20 ml IM" /></Field>
-        <Field label="Follow-up date" style={{ flex: 1 }}><Input placeholder="YYYY-MM-DD" /></Field>
+        <Field label="BCS (for diagnosis record)" style={{ flex: 1 }}>
+          <Input value={bcs} onChangeText={setBcs} keyboardType="numeric" placeholder="3.0" />
+        </Field>
+        <Field label="Follow-up date" style={{ flex: 1 }}>
+          <Input value={followUp} onChangeText={setFollowUp} placeholder="YYYY-MM-DD" />
+        </Field>
       </FieldRow>
       <Field label="Isolation required">
         <Chips>
@@ -224,7 +270,11 @@ export default function Diagnosis() {
       {/* 11. REMARKS */}
       <SectionTitle>11 · Remarks</SectionTitle>
       <Field>
-        <Textarea placeholder="Free-text notes — what did you see, hear, smell?" />
+        <Textarea
+          value={freeRemarks}
+          onChangeText={setFreeRemarks}
+          placeholder="Free-text notes — what did you see, hear, smell?"
+        />
       </Field>
 
       {/* CUSTOM FIELDS */}
@@ -256,14 +306,85 @@ export default function Diagnosis() {
       ))}
       <Button label="Add custom field" icon="plus" variant="outline" onPress={addCustom} />
 
+      {submitError ? <Banner tone="danger">{submitError}</Banner> : null}
+
       <View style={{ height: 12 }} />
       <Button
-        label="Submit diagnosis"
-        onPress={() => router.replace(
-          diagnosis === "Confirmed disease"
-            ? "/(tabs)/record/success?name=Diagnosis (escalated to case)"
-            : "/(tabs)/record/success?name=Animal diagnosis",
-        )}
+        label={mutation.isPending ? "Submitting…" : "Submit diagnosis"}
+        loading={mutation.isPending}
+        disabled={mutation.isPending || !animal}
+        onPress={async () => {
+          setSubmitError(null);
+          if (!operator) return setSubmitError("Pick the operator before submitting.");
+          if (!animal) return setSubmitError("Pick the animal being examined.");
+          if (!company) return setSubmitError("Default company not loaded yet. Try again in a moment.");
+          if (operator !== defaultOperator) await setStoredOperator(operator);
+
+          const action: DiagnosisAction =
+            diagnosis === "Confirmed disease"
+              ? "Escalated to Case"
+              : diagnosis === "Suspected illness"
+              ? "Logged — monitor"
+              : "No action — normal";
+
+          // Pack the rich UI state into Frappe's narrative fields so nothing
+          // collected is lost. The DocType doesn't model every chip group.
+          const differential = [
+            `Appetite: ${appetite}`,
+            `Behavior: ${behavior}`,
+            `Eyes: ${eyes}`,
+            `Nose: ${nose}`,
+            `Mouth: ${mouth}`,
+            `Skin: ${Array.from(skin).join(", ")}`,
+            `Dung: ${dung}`,
+            `Locomotion: ${loco}`,
+            `Repro discharge: ${reproDischarge}`,
+            `Heat signs: ${heatSigns}`,
+            ...Object.entries(flags)
+              .filter(([, v]) => v)
+              .map(([k]) => `Flag: ${k}`),
+            ...customs
+              .filter((c) => c.label.trim() || c.value.trim())
+              .map((c) => `${c.label.trim() || "Custom"}: ${c.value.trim()}`),
+            weight ? `Weight: ${weight} kg` : null,
+            examiner !== APP.user ? `Examiner: ${examiner}` : null,
+            condition !== "(specify)" ? `Specific condition: ${condition}` : null,
+            isolation === "Yes" ? "Isolation required: Yes" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+
+          try {
+            await mutation.mutateAsync({
+              animal: animal.id,
+              operator,
+              company,
+              diagnosisDate: todayISO(),
+              actionTaken: action,
+              bcs: bcs ? Number(bcs) : undefined,
+              temperatureC: temp ? Number(temp) : undefined,
+              heartRate: hr ? Number(hr) : undefined,
+              respirationRate: resp ? Number(resp) : undefined,
+              differentialNotes: [differential, freeRemarks].filter(Boolean).join("\n\n") || undefined,
+              followUpDate: followUp || undefined,
+              vetName: vetName || undefined,
+              confirmedByVet: vetConfirmed,
+            });
+            Alert.alert(
+              "Diagnosis submitted",
+              action === "Escalated to Case"
+                ? `${animal.name} flagged. A draft Animal Health Case has been created.`
+                : `${animal.name} examined and logged.`,
+            );
+            router.replace(
+              action === "Escalated to Case"
+                ? "/(tabs)/record/success?name=Diagnosis (escalated to case)"
+                : "/(tabs)/record/success?name=Animal diagnosis",
+            );
+          } catch (err) {
+            setSubmitError(extractFrappeError(err));
+          }
+        }}
       />
     </Screen>
   );

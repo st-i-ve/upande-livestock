@@ -164,6 +164,60 @@ const parseSetCookie = (raw: string[] | string | undefined): string => {
     .join("; ");
 };
 
+export const todayISO = (): string => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+/**
+ * Pulls the first user-readable message Frappe attaches to a *successful*
+ * response (via frappe.msgprint on the server). Returns null if there's
+ * nothing useful.
+ */
+export const extractFrappeMessage = (response: any): string | null => {
+  const data = response?.data ?? response;
+  if (data?._server_messages) {
+    try {
+      const outer = JSON.parse(data._server_messages);
+      const arr = Array.isArray(outer) ? outer : [outer];
+      for (const item of arr) {
+        try {
+          const inner = typeof item === "string" ? JSON.parse(item) : item;
+          if (inner?.message) return String(inner.message).replace(/<[^>]+>/g, "");
+        } catch {
+          if (typeof item === "string") return item;
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return null;
+};
+
+/**
+ * Create + submit a Frappe doc in two steps. Returns the submitted doc.
+ * Server scripts fire on submit.
+ */
+export const frappeCreateAndSubmit = async <T = any>(
+  doctype: string,
+  fields: Record<string, any>,
+): Promise<T> => {
+  const client = await getClient();
+  const insertRes = await client.post("/api/method/frappe.client.insert", {
+    doc: { doctype, ...fields },
+  });
+  const draft = insertRes.data?.message;
+  if (!draft) throw new Error(`Frappe insert returned no document for ${doctype}`);
+  const submitRes = await client.post("/api/method/frappe.client.submit", {
+    doc: draft,
+  });
+  return (submitRes.data?.message ?? submitRes.data) as T;
+};
+
 export const api = {
   /**
    * Logs in to a Frappe site and persists the cookie + sid.

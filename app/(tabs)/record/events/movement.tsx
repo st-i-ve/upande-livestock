@@ -1,39 +1,106 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { APP, COLORS, RADIUS } from "@/constants/theme";
-import { herds } from "@/data/mock";
+import { COLORS, RADIUS } from "@/constants/theme";
 import type { Animal } from "@/types";
+import { useAuthStore } from "@/src/auth/authStore";
+import { useHerds } from "@/src/hooks/useHerds";
+import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { extractFrappeError, todayISO } from "@/src/services/api";
 
 const REASONS = ["Routine age-out", "Repro status", "Other"] as const;
 
 export default function Movement() {
-  const [toHerd, setToHerd] = useState(herds[0].n);
+  const defaultOperator = useAuthStore((s) => s.employeeName);
+  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
+  const { data: herds = [] } = useHerds();
+
+  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const [toHerd, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
   const [selected, setSelected] = useState<Animal[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Source herd is auto-derived. Show "Mixed" only when the picked animals
-  // straddle multiple herds.
   const fromHerd = selected.length === 0
     ? "—"
     : Array.from(new Set(selected.map((a) => a.herd))).length === 1
       ? selected[0].herd
       : "Mixed (per animal)";
 
+  // Default the destination herd once the herd list arrives.
+  React.useEffect(() => {
+    if (!toHerd && herds.length) setToHerd(herds[0].n);
+  }, [herds, toHerd]);
+
+  const mutation = useCreateAnimalEvent();
   const removeOne = (id: string) => setSelected((prev) => prev.filter((a) => a.id !== id));
+
+  const handleSubmit = async () => {
+    setError(null);
+    if (!operator) {
+      setError("Pick the operator (your Employee record) before submitting.");
+      return;
+    }
+    if (selected.length === 0) {
+      setError("Pick at least one animal.");
+      return;
+    }
+    if (!toHerd) {
+      setError("Pick a destination herd.");
+      return;
+    }
+    // Persist operator override so the next form pre-fills it.
+    if (operator !== defaultOperator) await setStoredOperator(operator);
+
+    const remarks = reason === "Other" ? otherReason : reason;
+    // One Animal Event per moved animal — server script updates per-animal
+    // current_herd. We sequence rather than parallelize so a partial failure
+    // gives the user a clear "X of Y moved" message.
+    let succeeded = 0;
+    for (const a of selected) {
+      try {
+        await mutation.mutateAsync({
+          eventType: "Movement",
+          animal: a.id,
+          currentHerd: a.herd,
+          toHerd,
+          operator,
+          eventDate: todayISO(),
+          remarks,
+        });
+        succeeded += 1;
+      } catch (err) {
+        setError(
+          `${succeeded} of ${selected.length} moved. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+        );
+        return;
+      }
+    }
+    Alert.alert(
+      "Movement recorded",
+      `${succeeded} animal${succeeded === 1 ? "" : "s"} moved to ${toHerd}.`,
+    );
+    router.replace(`/(tabs)/record/success?name=Movement`);
+  };
 
   return (
     <Screen title="Movement" subtitle="Move animals between herds" back>
+      <Field label="Operator">
+        <EmployeePickerButton value={operator} onChange={setOperator} />
+      </Field>
+
       <Field label="Animals to move" help="Search by tag, or open the By herd tab to grab a whole herd.">
         <AnimalPickerButton
           mode="multi"
@@ -43,7 +110,6 @@ export default function Movement() {
         />
       </Field>
 
-      {/* Selected list — operator double-checks before submitting. */}
       {selected.length > 0 ? (
         <>
           <SectionTitle>Selected ({selected.length})</SectionTitle>
@@ -68,10 +134,10 @@ export default function Movement() {
           <Input value={fromHerd} editable={false} />
         </Field>
         <Field label="To herd" style={{ flex: 1 }}>
-          <Picker value={toHerd} onChange={setToHerd} options={herds.map((h) => h.n)} />
+          <Picker value={toHerd || (herds[0]?.n ?? "")} onChange={setToHerd} options={herds.map((h) => h.n)} />
         </Field>
       </FieldRow>
-      <Field label="Date"><Input value={APP.today} /></Field>
+      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
 
       <Field label="Reason">
         <Chips>
@@ -86,10 +152,13 @@ export default function Movement() {
         </Field>
       ) : null}
 
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+
       <Button
-        label="Submit move"
-        disabled={selected.length === 0}
-        onPress={() => router.replace("/(tabs)/record/success?name=Movement")}
+        label={mutation.isPending ? "Submitting…" : "Submit move"}
+        disabled={mutation.isPending || selected.length === 0}
+        loading={mutation.isPending}
+        onPress={handleSubmit}
       />
     </Screen>
   );
