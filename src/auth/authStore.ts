@@ -3,11 +3,7 @@ import { create } from "zustand";
 import { getEmployeeForUser } from "@/src/frappe/employee";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
-import {
-  DEFAULT_INSTANCE_URL,
-  STORAGE_KEYS,
-  storage,
-} from "@/src/services/storage";
+import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -33,7 +29,9 @@ const STORAGE_KEY_EMPLOYEE = "operator_employee";
 export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true,
-  instanceUrl: DEFAULT_INSTANCE_URL,
+  /** Empty on a fresh install — the user enters a Frappe site URL on the
+   *  login screen. Persisted as soon as login is attempted. */
+  instanceUrl: "",
   email: null,
   fullname: null,
   employeeName: null,
@@ -56,7 +54,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
       set({
         isAuthenticated: !!cookie,
-        instanceUrl: url || DEFAULT_INSTANCE_URL,
+        instanceUrl: url || "",
         email,
         fullname,
         employeeName: employee,
@@ -70,7 +68,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: async (email, password, url) => {
-    const target = url || get().instanceUrl || DEFAULT_INSTANCE_URL;
+    const target = (url || get().instanceUrl || "").trim();
+    if (!target) {
+      throw new Error("Enter a Frappe instance URL before signing in.");
+    }
     const data = await api.login(email, password, target);
 
     // Best-effort: resolve the Employee linked to this user. If none, the

@@ -5,7 +5,6 @@ import {
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -18,9 +17,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { COLORS, FONT_FAMILY } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { extractFrappeError } from "@/src/services/api";
+import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -28,44 +28,45 @@ export default function LoginScreen() {
   const [obscure, setObscure] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [devOpen, setDevOpen] = useState(false);
 
   const instanceUrl = useAuthStore((s) => s.instanceUrl);
   const storedEmail = useAuthStore((s) => s.email);
-  const setInstanceUrl = useAuthStore((s) => s.setInstanceUrl);
   const login = useAuthStore((s) => s.login);
 
-  const [urlDraft, setUrlDraft] = useState(instanceUrl);
+  // Editable mirror of the stored URL. Persists via the login flow.
+  const [url, setUrl] = useState(instanceUrl);
 
   useEffect(() => {
     if (storedEmail && !email) setEmail(storedEmail);
   }, [storedEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setUrlDraft(instanceUrl);
-  }, [instanceUrl]);
+    // Pick up any value loaded from storage after first paint.
+    if (instanceUrl && !url) setUrl(instanceUrl);
+  }, [instanceUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = async () => {
     if (loading) return;
     setError(null);
+    if (!url.trim()) {
+      setError("Enter the Frappe instance URL.");
+      return;
+    }
     if (!email.trim() || !password) {
       setError("Enter email and password.");
       return;
     }
     setLoading(true);
     try {
-      await login(email.trim(), password, instanceUrl);
-      // _layout AuthGate routes to /(tabs) when isAuthenticated flips.
+      // login() persists the URL to storage as a side-effect of api.login(),
+      // and also writes it through the auth store. So once a session is
+      // started, the URL is remembered until the user changes it here again.
+      await login(email.trim(), password, url.trim());
     } catch (err) {
       setError(extractFrappeError(err));
     } finally {
       setLoading(false);
     }
-  };
-
-  const saveDevUrl = async () => {
-    await setInstanceUrl(urlDraft);
-    setDevOpen(false);
   };
 
   return (
@@ -88,14 +89,29 @@ export default function LoginScreen() {
             >
               <View style={s.content}>
                 <View style={s.header}>
-                  <Pressable onLongPress={() => setDevOpen(true)} delayLongPress={1200}>
-                    <Image
-                      source={require("../../assets/images/upande_logo_no_bg.png")}
-                      style={s.logo}
-                      resizeMode="contain"
-                    />
-                  </Pressable>
+                  <Image
+                    source={require("../../assets/images/upande_logo_no_bg.png")}
+                    style={s.logo}
+                    resizeMode="contain"
+                  />
                   <Text style={s.title}>Upande Livestock</Text>
+                </View>
+
+                <View style={s.field}>
+                  <TextInput
+                    value={url}
+                    onChangeText={setUrl}
+                    placeholder={INSTANCE_URL_PLACEHOLDER}
+                    placeholderTextColor={COLORS.textSubtle}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    returnKeyType="next"
+                    style={s.input}
+                  />
+                  <Text style={s.fieldHint}>
+                    Frappe site URL. Saved on sign-in; change here any time.
+                  </Text>
                 </View>
 
                 <View style={s.field}>
@@ -142,43 +158,6 @@ export default function LoginScreen() {
           </KeyboardAvoidingView>
         </TouchableWithoutFeedback>
       </SafeAreaView>
-
-      <Modal
-        visible={devOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDevOpen(false)}
-      >
-        <Pressable style={s.modalBackdrop} onPress={() => setDevOpen(false)}>
-          <Pressable style={s.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={s.modalTitle}>Frappe instance URL</Text>
-            <Text style={s.modalSub}>
-              The Frappe site this app talks to. Defaults to the Westwood
-              Dairies production site.
-            </Text>
-            <TextInput
-              value={urlDraft}
-              onChangeText={setUrlDraft}
-              placeholder="https://upande-kaitet2.c.frappe.cloud"
-              placeholderTextColor={COLORS.textSubtle}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={s.modalInput}
-            />
-            <View style={s.modalActions}>
-              <Pressable onPress={() => setDevOpen(false)} style={s.modalBtn}>
-                <Text style={s.modalBtnLabel}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={saveDevUrl}
-                style={[s.modalBtn, s.modalBtnPrimary]}
-              >
-                <Text style={[s.modalBtnLabel, { color: COLORS.bg }]}>Save</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </ImageBackground>
   );
 }
@@ -188,7 +167,7 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
   content: { width: "100%", maxWidth: 400, alignSelf: "center" },
-  header: { alignItems: "center", marginBottom: 40 },
+  header: { alignItems: "center", marginBottom: 32 },
   logo: { width: 180, height: 180 },
   title: {
     color: COLORS.text,
@@ -210,6 +189,13 @@ const s = StyleSheet.create({
     color: COLORS.text,
     fontFamily: FONT_FAMILY.regular,
   },
+  fieldHint: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontFamily: FONT_FAMILY.regular,
+    marginTop: 6,
+    paddingHorizontal: 18,
+  },
   eye: {
     position: "absolute",
     right: 14,
@@ -222,57 +208,5 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginBottom: 8,
     textAlign: "center",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.lg,
-    padding: 20,
-    gap: 8,
-  },
-  modalTitle: {
-    fontSize: 14,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-  },
-  modalSub: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    lineHeight: 15,
-    marginBottom: 8,
-  },
-  modalInput: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: COLORS.text,
-  },
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginTop: 12,
-  },
-  modalBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: RADIUS.sm,
-  },
-  modalBtnPrimary: { backgroundColor: COLORS.text },
-  modalBtnLabel: {
-    fontSize: 12,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.medium,
   },
 });
