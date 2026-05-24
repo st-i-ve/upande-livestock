@@ -1,36 +1,113 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
-import { Alert } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
-import { Field, Input, Textarea } from "@/components/Field";
+import { Field, FieldRow, Input, Textarea } from "@/components/Field";
+import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { SectionTitle } from "@/components/SectionTitle";
+import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
-import type { CaseSeverity } from "@/src/frappe/animalHealthCase";
+import type {
+  CaseSeverity,
+  HealthTreatmentInput,
+} from "@/src/frappe/animalHealthCase";
+import { getItemSnapshot } from "@/src/frappe/item";
 import { useCreateAnimalHealthCase } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
+import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 const SEVERITIES: CaseSeverity[] = ["Mild", "Moderate", "Severe", "Critical"];
 
+type TreatmentRow = {
+  id: number;
+  itemCode: string;
+  itemName: string;
+  qty: string;
+  uom: string;
+  rate: string;
+  rateSource: "last_purchase" | "valuation" | "none" | "manual" | "";
+  sourceWarehouse: string;
+  withdrawalDays: string;
+  description: string;
+};
+
 export default function CaseNew() {
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
+  const { data: settings } = useLivestockSettings();
+  const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
 
   const [operator, setOperator] = useState<string | null>(defaultOperator);
   const [selected, setSelected] = useState<Animal[]>([]);
   const [condition, setCondition] = useState("");
   const [severity, setSeverity] = useState<CaseSeverity>("Moderate");
   const [notes, setNotes] = useState("");
+  const [treatments, setTreatments] = useState<TreatmentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalHealthCase();
+
+  // Sum cost for the form summary tile.
+  const totalCost = useMemo(
+    () =>
+      treatments.reduce((acc, t) => {
+        const q = Number(t.qty) || 0;
+        const r = Number(t.rate) || 0;
+        return acc + q * r;
+      }, 0),
+    [treatments],
+  );
+
+  const addTreatment = () =>
+    setTreatments((prev) => [
+      ...prev,
+      {
+        id: Date.now() + prev.length,
+        itemCode: "",
+        itemName: "",
+        qty: "1",
+        uom: "",
+        rate: "",
+        rateSource: "",
+        sourceWarehouse: defaultDrugWarehouse,
+        withdrawalDays: "",
+        description: "",
+      },
+    ]);
+
+  const updateTreatment = (id: number, patch: Partial<TreatmentRow>) =>
+    setTreatments((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  const removeTreatment = (id: number) =>
+    setTreatments((prev) => prev.filter((r) => r.id !== id));
+
+  // When the user picks an Item, look up its name + UOM + last_purchase_rate
+  // (falling back to valuation_rate). Operator can still override the rate.
+  const handlePickItem = async (id: number, itemCode: string) => {
+    updateTreatment(id, { itemCode });
+    try {
+      const snap = await getItemSnapshot(itemCode);
+      if (snap) {
+        updateTreatment(id, {
+          itemName: snap.itemName,
+          uom: snap.stockUom,
+          rate: snap.rate ? String(snap.rate) : "",
+          rateSource: snap.rateSource,
+        });
+      }
+    } catch (e) {
+      console.warn("[case] Item snapshot lookup failed", e);
+    }
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -40,6 +117,33 @@ export default function CaseNew() {
     if (!condition.trim() && !notes.trim()) {
       return setError("Describe the condition or symptoms before opening a case.");
     }
+
+    // Validate any treatment rows the user actually filled in.
+    const builtTreatments: HealthTreatmentInput[] = [];
+    for (const t of treatments) {
+      if (!t.itemCode && !t.qty && !t.description) continue; // empty row, skip
+      if (!t.itemCode) return setError("Pick an item on every treatment row (or remove the row).");
+      const qty = Number(t.qty) || 0;
+      if (qty <= 0) return setError(`Treatment ${t.itemName || t.itemCode}: enter a quantity > 0.`);
+      if (!t.sourceWarehouse) {
+        return setError(
+          `Treatment ${t.itemName || t.itemCode}: pick a source warehouse (or set Drug warehouse in Livestock Settings for a default).`,
+        );
+      }
+      builtTreatments.push({
+        itemCode: t.itemCode,
+        itemName: t.itemName || undefined,
+        qty,
+        uom: t.uom || undefined,
+        rate: Number(t.rate) || 0,
+        sourceWarehouse: t.sourceWarehouse,
+        withdrawalDays: t.withdrawalDays ? Number(t.withdrawalDays) : undefined,
+        description: t.description.trim() || undefined,
+        administeredBy: operator,
+        treatmentDate: todayISO(),
+      });
+    }
+
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     const presentingSymptoms = [condition.trim(), notes.trim()].filter(Boolean).join(" — ");
@@ -56,6 +160,7 @@ export default function CaseNew() {
           caseStatus: "Open",
           presentingSymptoms,
           severity,
+          treatments: builtTreatments.length ? builtTreatments : undefined,
         });
         if (r.queued) queued += 1;
         else succeeded += 1;
@@ -69,7 +174,10 @@ export default function CaseNew() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} case${succeeded === 1 ? "" : "s"} opened`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert("Health cases opened", parts.join(" · "));
+    Alert.alert(
+      "Health cases opened",
+      `${parts.join(" · ")}${builtTreatments.length ? `\n${builtTreatments.length} treatment${builtTreatments.length === 1 ? "" : "s"} per case.` : ""}`,
+    );
     router.replace("/(tabs)/record/success?name=Health case");
   };
 
@@ -78,10 +186,7 @@ export default function CaseNew() {
       <Field label="Operator">
         <EmployeePickerButton value={operator} onChange={setOperator} />
       </Field>
-      <Field
-        label="Animal(s)"
-        help="Pick one or many — same condition opens a case per animal."
-      >
+      <Field label="Animal(s)" help="One or many — same condition opens a case per animal.">
         <AnimalPickerButton
           mode="multi"
           title="Select animals"
@@ -90,9 +195,7 @@ export default function CaseNew() {
           onPickMulti={setSelected}
         />
       </Field>
-      <Field label="Date">
-        <Input value={todayISO()} editable={false} />
-      </Field>
+      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
       <Field label="Condition">
         <Input value={condition} onChangeText={setCondition} placeholder="Mastitis, lameness, ..." />
       </Field>
@@ -102,6 +205,125 @@ export default function CaseNew() {
       <Field label="Presenting symptoms / notes">
         <Textarea value={notes} onChangeText={setNotes} placeholder="Observations, treatment plan, ..." />
       </Field>
+
+      <SectionTitle>Treatment log</SectionTitle>
+      <Banner tone="info">
+        Each treatment row issues stock and contributes to the case's total cost. Rate is auto-picked
+        from the item's last purchase price (fallback: valuation rate); override per row if needed.
+      </Banner>
+      {treatments.length === 0 ? (
+        <Text style={s.empty}>No treatments yet. Tap “Add treatment” to log drugs administered.</Text>
+      ) : null}
+      {treatments.map((t) => {
+        const qty = Number(t.qty) || 0;
+        const rate = Number(t.rate) || 0;
+        return (
+          <View key={t.id} style={s.txBox}>
+            <Field label="Item">
+              <FrappeSearchPicker
+                doctype="Item"
+                value={t.itemCode || null}
+                onChange={(name) => handlePickItem(t.id, name)}
+                fields={["name", "item_name", "item_code", "stock_uom"]}
+                displayField="item_name"
+                metaField="item_code"
+                searchField="item_name"
+                filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
+                icon="pill"
+              />
+            </Field>
+            <Field label="Issue from warehouse">
+              <FrappeSearchPicker
+                doctype="Warehouse"
+                value={t.sourceWarehouse || null}
+                onChange={(name) => updateTreatment(t.id, { sourceWarehouse: name })}
+                fields={["name", "warehouse_name"]}
+                displayField="warehouse_name"
+                searchField="warehouse_name"
+                filters={[["disabled", "=", 0]]}
+                icon="warehouse"
+              />
+            </Field>
+            <FieldRow>
+              <Field label="Qty" style={{ flex: 1 }}>
+                <Input
+                  value={t.qty}
+                  onChangeText={(v) => updateTreatment(t.id, { qty: v })}
+                  keyboardType="numeric"
+                  placeholder="1"
+                />
+              </Field>
+              <Field label="UOM" style={{ flex: 1 }}>
+                <Input
+                  value={t.uom}
+                  onChangeText={(v) => updateTreatment(t.id, { uom: v })}
+                  placeholder="ml"
+                />
+              </Field>
+            </FieldRow>
+            <FieldRow>
+              <Field
+                label="Rate (KES)"
+                help={
+                  t.rateSource === "last_purchase"
+                    ? "Last purchase price"
+                    : t.rateSource === "valuation"
+                      ? "Current valuation rate (no purchase history)"
+                      : t.rateSource === "manual"
+                        ? "Manual override"
+                        : t.rateSource === "none"
+                          ? "No rate on the item — enter manually"
+                          : ""
+                }
+                style={{ flex: 1 }}
+              >
+                <Input
+                  value={t.rate}
+                  onChangeText={(v) =>
+                    updateTreatment(t.id, { rate: v, rateSource: "manual" })
+                  }
+                  keyboardType="numeric"
+                  placeholder="0"
+                />
+              </Field>
+              <Field label="Amount (KES)" style={{ flex: 1 }}>
+                <Input
+                  value={(qty * rate).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  editable={false}
+                />
+              </Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label="Withdrawal days" style={{ flex: 1 }}>
+                <Input
+                  value={t.withdrawalDays}
+                  onChangeText={(v) => updateTreatment(t.id, { withdrawalDays: v })}
+                  keyboardType="numeric"
+                  placeholder="0"
+                />
+              </Field>
+            </FieldRow>
+            <Field label="Description / dosage">
+              <Input
+                value={t.description}
+                onChangeText={(v) => updateTreatment(t.id, { description: v })}
+                placeholder="e.g. Procaine Penicillin 20 ml IM"
+              />
+            </Field>
+            <Button label="Remove treatment" variant="link" onPress={() => removeTreatment(t.id)} />
+          </View>
+        );
+      })}
+      <Button label="Add treatment" icon="plus" variant="outline" onPress={addTreatment} />
+
+      {treatments.length > 0 ? (
+        <View style={s.summary}>
+          <Text style={s.summaryLabel}>Total treatment cost (per case)</Text>
+          <Text style={s.summaryValue}>
+            {totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} KES
+          </Text>
+        </View>
+      ) : null}
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
@@ -114,3 +336,39 @@ export default function CaseNew() {
     </Screen>
   );
 }
+
+const s = StyleSheet.create({
+  empty: {
+    color: COLORS.textSubtle,
+    fontSize: 12,
+    paddingVertical: 6,
+  },
+  txBox: {
+    backgroundColor: COLORS.bgMuted,
+    padding: 11,
+    borderRadius: RADIUS.md,
+    marginBottom: 8,
+  },
+  summary: {
+    backgroundColor: COLORS.bgMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    marginTop: 4,
+    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontFamily: FONT_FAMILY.medium,
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontFamily: FONT_FAMILY.semibold,
+    fontVariant: ["tabular-nums"],
+  },
+});
