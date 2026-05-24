@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { APP, COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
@@ -45,6 +46,8 @@ function Subheader({ children }: { children: React.ReactNode }) {
 export default function Profile() {
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
+  const employeeName = useAuthStore((s) => s.employeeName);
+  const setEmployeeName = useAuthStore((s) => s.setEmployeeName);
   const logout = useAuthStore((s) => s.logout);
   const pending = usePendingCount();
   const online = useNetworkStatus();
@@ -81,6 +84,20 @@ export default function Profile() {
             <Text style={s.name} numberOfLines={1}>{displayName}</Text>
             <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
             <Text style={s.caption} numberOfLines={1}>{APP.farm}</Text>
+          </View>
+        </View>
+
+        <View style={s.empWrapper}>
+          <Subheader>My employee</Subheader>
+          <View style={s.empBody}>
+            <EmployeePickerButton
+              value={employeeName}
+              onChange={(name) => setEmployeeName(name)}
+              placeholder="Tap to pick your Employee"
+            />
+            <Text style={s.empHint}>
+              Used as the default operator on every record you submit. Pick once; we remember it.
+            </Text>
           </View>
         </View>
 
@@ -229,5 +246,26 @@ const s = StyleSheet.create({
     color: COLORS.bg,
     fontSize: 11,
     fontFamily: FONT_FAMILY.semibold,
+  },
+  empWrapper: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 16,
+    borderRadius: RADIUS.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+    overflow: "hidden",
+    paddingBottom: 12,
+  },
+  empBody: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  empHint: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontFamily: FONT_FAMILY.regular,
+    lineHeight: 15,
   },
 });
