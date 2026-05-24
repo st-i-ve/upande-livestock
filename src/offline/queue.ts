@@ -16,7 +16,8 @@ export type PendingMutationType =
   | "Animal"
   | "CalfFeeding"
   | "AnimalDiagnosis"
-  | "AnimalHealthCase";
+  | "AnimalHealthCase"
+  | "FeedingWorkOrder";
 
 export type PendingMutation = {
   /** Stable client-side id (used as idempotency key for retries). */

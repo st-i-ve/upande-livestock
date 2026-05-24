@@ -107,16 +107,22 @@ export default function Milk() {
     let queued = 0;
     const submitted: string[] = [];
 
-    for (const herd of herdsInPlay) {
-      const cowsMilked = grouped[herd].length;
-      const v = yields[herd] ?? EMPTY;
+    for (const herdName of herdsInPlay) {
+      const cowsMilked = grouped[herdName].length;
+      const v = yields[herdName] ?? EMPTY;
       const t = Number(v.total) || 0;
       const d = Number(v.discard) || 0;
       const c = allCol ? Math.max(t - d, 0) : Number(v.colostrum) || 0;
+      // Look up the Herds doc and submit its `herd_name` as the Link value.
+      // The Animal's current_herd stores the herd's Frappe name, which in
+      // this schema equals herd_name — but we resolve explicitly so the
+      // intent matches the field semantics.
+      const herdDoc = herds.find((h) => h.n === herdName);
+      const herdLink = herdDoc?.herdName ?? herdName;
 
       try {
         const r = await mutation.mutateAsync({
-          herd,
+          herd: herdLink,
           session,
           recordingDate: todayISO(),
           totalYieldKg: t,
@@ -129,10 +135,10 @@ export default function Milk() {
         });
         if (r.queued) queued += 1;
         else succeeded += 1;
-        submitted.push(`${herd} (${cowsMilked} cows · ${t} kg)`);
+        submitted.push(`${herdLink} (${cowsMilked} cows · ${t} kg)`);
       } catch (err) {
         setError(
-          `Stopped at ${herd}: ${extractFrappeError(err)}. ${submitted.length} recording${submitted.length === 1 ? "" : "s"} already submitted.`,
+          `Stopped at ${herdName}: ${extractFrappeError(err)}. ${submitted.length} recording${submitted.length === 1 ? "" : "s"} already submitted.`,
         );
         return;
       }
@@ -206,10 +212,11 @@ export default function Milk() {
           {herdsInPlay.map((herd) => {
             const cnt = grouped[herd].length;
             const v = yields[herd] ?? EMPTY;
+            const label = herds.find((h) => h.n === herd)?.herdName ?? herd;
             return (
               <View key={herd} style={s.herdCard}>
                 <View style={s.herdCardHeader}>
-                  <Text style={s.herdName} numberOfLines={1}>{herd}</Text>
+                  <Text style={s.herdName} numberOfLines={1}>{label}</Text>
                   <Text style={s.herdMeta}>{cnt} cow{cnt === 1 ? "" : "s"}</Text>
                 </View>
                 <FieldRow>

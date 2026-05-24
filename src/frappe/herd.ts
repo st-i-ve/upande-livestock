@@ -28,6 +28,7 @@ const mapRationItem = (row: any): RationItem => ({
 
 export const mapHerd = (row: HerdRow): Herd => ({
   n: row.name,
+  herdName: row.herd_name || row.name,
   cat: row.custom_herd_category ?? "",
   cnt: Number(row.number_of_animals ?? 0),
   cc: row.cost_center ?? row.custom_cost_center ?? "",

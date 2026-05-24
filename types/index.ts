@@ -17,6 +17,10 @@ export type RationItem = { name: string; pct: number };
 
 export type Herd = {
   n: string;
+  /** Frappe `Herds.herd_name` — display label. Equal to `n` when naming
+   *  rule is "By fieldname" (herd_name), but kept separate for safety.
+   *  Optional because mock fixture data doesn't carry it. */
+  herdName?: string;
   cat: string;
   cnt: number;
   cc: string;
