@@ -15,7 +15,6 @@ import { useCreateAnimalDisposal } from "@/src/hooks/mutations";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
-// Exact strings the DocType accepts (em-dashes, no hyphens).
 const TYPES: DisposalType[] = [
   "Culled (Farm Use)",
   "Died — Natural Causes",
@@ -26,7 +25,7 @@ const TYPES: DisposalType[] = [
 ];
 
 export default function CullNew() {
-  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<DisposalType>(TYPES[0]);
   const [salvage, setSalvage] = useState("");
   const [reason, setReason] = useState("");
@@ -34,42 +33,65 @@ export default function CullNew() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalDisposal();
-  const s = Number(salvage) || 0;
+  const sVal = Number(salvage) || 0;
 
   const handleSubmit = async () => {
     setError(null);
-    if (!animal) return setError("Pick an animal.");
+    if (selected.length === 0) return setError("Pick at least one animal.");
 
-    try {
-      const r = await mutation.mutateAsync({
-        animal: animal.id,
-        animalName: animal.name,
-        disposalType: type,
-        disposalDate: todayISO(),
-        salePrice: s > 0 ? s : undefined,
-        reasonDetails: reason.trim() || undefined,
-        witness: witness.trim() || undefined,
-      });
-      Alert.alert(
-        r.queued ? "Queued offline" : "Disposal recorded",
-        r.queued
-          ? `Saved locally. Will sync (and post the write-off / insurance JEs) when online.`
-          : `${animal.name} marked ${type}.\n\nFrappe will post the write-off JE and (if insured) the insurance receivable JE.`,
-      );
-      router.replace("/(tabs)/record/success?name=Cull / death");
-    } catch (err) {
-      setError(extractFrappeError(err));
+    let succeeded = 0;
+    let queued = 0;
+    const completed: string[] = [];
+
+    for (const animal of selected) {
+      try {
+        const r = await mutation.mutateAsync({
+          animal: animal.id,
+          animalName: animal.name,
+          disposalType: type,
+          disposalDate: todayISO(),
+          salePrice: sVal > 0 ? sVal : undefined,
+          reasonDetails: reason.trim() || undefined,
+          witness: witness.trim() || undefined,
+        });
+        if (r.queued) queued += 1;
+        else succeeded += 1;
+        completed.push(animal.name);
+      } catch (err) {
+        setError(
+          `${completed.length} of ${selected.length} disposed. Stopped at ${animal.name}: ${extractFrappeError(err)}`,
+        );
+        return;
+      }
     }
+
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} marked ${type}`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert(
+      "Disposal recorded",
+      `${parts.join(" · ")}\n${succeeded > 0 ? "Write-off JE posted per animal; insurance JE for any covered animals." : ""}`,
+    );
+    router.replace("/(tabs)/record/success?name=Cull / death");
   };
 
   return (
     <Screen title="Record cull / death" subtitle="Write-off to expense" back>
       <Banner tone="warning">
-        This removes the animal from the active herd and writes off its book value. If insurance is on
-        the animal, Frappe also posts the insurance receivable JE automatically.
+        Submitting removes the animals from active herds and writes off their book values. If
+        insurance is on the animal, Frappe also posts the insurance receivable JE.
       </Banner>
-      <Field label="Animal">
-        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
+      <Field
+        label="Animals"
+        help="Pick one, several, or a whole herd via the By-herd tab. Same disposal type applied to each."
+      >
+        <AnimalPickerButton
+          mode="multi"
+          title="Select animals"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
+          value={selected}
+          onPickMulti={setSelected}
+        />
       </Field>
       <Field label="Type">
         <Picker value={type} onChange={(v) => setType(v as DisposalType)} options={TYPES} />
@@ -78,7 +100,7 @@ export default function CullNew() {
         <Field label="Date" style={{ flex: 1 }}>
           <Input value={todayISO()} editable={false} />
         </Field>
-        <Field label="Salvage value (KES)" style={{ flex: 1 }}>
+        <Field label="Salvage value per animal (KES)" style={{ flex: 1 }}>
           <Input value={salvage} onChangeText={setSalvage} keyboardType="numeric" placeholder="0" />
         </Field>
       </FieldRow>
@@ -93,16 +115,17 @@ export default function CullNew() {
         <Input value={witness} onChangeText={setWitness} placeholder="Manager or vet name" />
       </Field>
       <View style={styles.box}>
-        <KV k="Salvage value" v={`${s.toLocaleString()} KES`} />
-        <KV k="Book value" v="(pulled from Animal record on submit)" />
-        <KV k="Net loss" v="(computed by Frappe; insurance JE if covered)" />
+        <KV k="Animals" v={String(selected.length)} />
+        <KV k="Salvage per animal" v={`${sVal.toLocaleString()} KES`} />
+        <KV k="Total salvage" v={`${(sVal * selected.length).toLocaleString()} KES`} />
+        <KV k="Book values" v="(pulled per animal on submit)" />
       </View>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit"}
-        disabled={mutation.isPending || !animal}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         variant="danger"
         onPress={handleSubmit}

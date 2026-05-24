@@ -50,7 +50,7 @@ export default function GenericEvent() {
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
   const [operator, setOperator] = useState<string | null>(defaultOperator);
-  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [selected, setSelected] = useState<Animal[]>([]);
   const [weight, setWeight] = useState("");
   const [bcs, setBcs] = useState("");
   const [activityCost, setActivityCost] = useState("");
@@ -77,8 +77,13 @@ export default function GenericEvent() {
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
-    if (!animal) return setError("Pick an animal.");
+    if (selected.length === 0) return setError("Pick at least one animal.");
     if (spec.needsWeight && !weight) return setError("Enter the weight (kg).");
+    if (spec.needsWeight && selected.length > 1) {
+      // Weight is per-animal — applying the same value to many is almost
+      // certainly wrong data. Make the user confirm by picking single.
+      return setError("Weight recording takes one animal at a time. Unselect the others.");
+    }
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
     const drugIssues: AnimalDrugIssueInput[] = drugs
@@ -108,52 +113,58 @@ export default function GenericEvent() {
     if (remarks) remarksBits.push(remarks);
     const finalRemarks = remarksBits.join(" · ") || undefined;
 
-    try {
+    let succeeded = 0;
+    let queued = 0;
+    for (const a of selected) {
       const common = {
-        animal: animal.id,
-        currentHerd: animal.herd,
+        animal: a.id,
+        currentHerd: a.herd,
         operator,
         eventDate: todayISO(),
         remarks: finalRemarks,
       } as const;
-
-      let r: { queued: boolean; data: any };
-      switch (spec.eventType) {
-        case "Weight Recording":
-          r = await mutation.mutateAsync({
-            ...common,
-            eventType: "Weight Recording",
-            weightKg: Number(weight),
-            bcs: bcs ? Number(bcs) : undefined,
-          });
-          break;
-        case "Vaccination":
-        case "Deworming":
-        case "Dehorning":
-        case "Hoof Trimming":
-          r = await mutation.mutateAsync({
-            ...common,
-            eventType: spec.eventType,
-            drugIssues: drugIssues.length ? drugIssues : undefined,
-            activityCost: activityCost ? Number(activityCost) : undefined,
-          });
-          break;
-        case "Heat Detection":
-          r = await mutation.mutateAsync({ ...common, eventType: "Heat Detection" });
-          break;
-        default:
-          throw new Error(`Unhandled event type ${spec.eventType}`);
+      try {
+        let r: { queued: boolean; data: any };
+        switch (spec.eventType) {
+          case "Weight Recording":
+            r = await mutation.mutateAsync({
+              ...common,
+              eventType: "Weight Recording",
+              weightKg: Number(weight),
+              bcs: bcs ? Number(bcs) : undefined,
+            });
+            break;
+          case "Vaccination":
+          case "Deworming":
+          case "Dehorning":
+          case "Hoof Trimming":
+            r = await mutation.mutateAsync({
+              ...common,
+              eventType: spec.eventType,
+              drugIssues: drugIssues.length ? drugIssues : undefined,
+              activityCost: activityCost ? Number(activityCost) : undefined,
+            });
+            break;
+          case "Heat Detection":
+            r = await mutation.mutateAsync({ ...common, eventType: "Heat Detection" });
+            break;
+          default:
+            throw new Error(`Unhandled event type ${spec.eventType}`);
+        }
+        if (r.queued) queued += 1;
+        else succeeded += 1;
+      } catch (err) {
+        setError(
+          `${succeeded + queued} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+        );
+        return;
       }
-      Alert.alert(
-        r.queued ? "Queued offline" : `${spec.title} recorded`,
-        r.queued
-          ? `${animal.name} saved locally. Will sync when online.`
-          : `${animal.name} updated.`,
-      );
-      router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
-    } catch (err) {
-      setError(extractFrappeError(err));
     }
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} submitted`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert(`${spec.title} recorded`, parts.join(" · "));
+    router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
   };
 
   return (
@@ -161,8 +172,20 @@ export default function GenericEvent() {
       <Field label="Operator">
         <EmployeePickerButton value={operator} onChange={setOperator} />
       </Field>
-      <Field label="Animal">
-        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
+      <Field
+        label={spec.needsWeight ? "Animal" : "Animal(s)"}
+        help={
+          spec.needsWeight
+            ? "Pick one animal — weight is per-animal."
+            : "Pick one cow, several, or a whole herd. Same details applied per animal."
+        }
+      >
+        <AnimalPickerButton
+          mode="multi"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
+          value={selected}
+          onPickMulti={setSelected}
+        />
       </Field>
       <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
 
@@ -234,7 +257,7 @@ export default function GenericEvent() {
 
       <Button
         label={mutation.isPending ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
-        disabled={mutation.isPending || !animal}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

@@ -21,7 +21,7 @@ export default function PD() {
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
   const [operator, setOperator] = useState<string | null>(defaultOperator);
-  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [selected, setSelected] = useState<Animal[]>([]);
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,31 +31,39 @@ export default function PD() {
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
-    if (!animal) return setError("Pick the served cow.");
+    if (selected.length === 0) return setError("Pick at least one cow.");
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
-    try {
-      const r = await mutation.mutateAsync({
-        eventType: "Pregnancy Diagnosis",
-        animal: animal.id,
-        currentHerd: animal.herd,
-        operator,
-        eventDate: todayISO(),
-        diagnosisResult: result,
-        remarks: remarks || undefined,
-      });
-      Alert.alert(
-        r.queued ? "Queued offline" : "PD recorded",
-        r.queued
-          ? `${animal.name} saved locally. Will sync when online.`
-          : result === "Confirmed"
-            ? `${animal.name} confirmed pregnant. Expected calving in 280 days.`
-            : `${animal.name} marked ${result}.`,
-      );
-      router.replace("/(tabs)/record/success?name=Pregnancy diagnosis");
-    } catch (err) {
-      setError(extractFrappeError(err));
+    let succeeded = 0;
+    let queued = 0;
+    for (const a of selected) {
+      try {
+        const r = await mutation.mutateAsync({
+          eventType: "Pregnancy Diagnosis",
+          animal: a.id,
+          currentHerd: a.herd,
+          operator,
+          eventDate: todayISO(),
+          diagnosisResult: result,
+          remarks: remarks || undefined,
+        });
+        if (r.queued) queued += 1;
+        else succeeded += 1;
+      } catch (err) {
+        setError(
+          `${succeeded + queued} of ${selected.length} diagnosed. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+        );
+        return;
+      }
     }
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} marked ${result}`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert(
+      "PD recorded",
+      `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
+    );
+    router.replace("/(tabs)/record/success?name=Pregnancy diagnosis");
   };
 
   return (
@@ -63,13 +71,17 @@ export default function PD() {
       <Field label="Operator">
         <EmployeePickerButton value={operator} onChange={setOperator} />
       </Field>
-      <Field label="Cow">
+      <Field
+        label="Cow(s)"
+        help="Pick one or many — same result applied to each. One Animal Event per cow."
+      >
         <AnimalPickerButton
-          title="Select served cow"
-          placeholder="Search served cow..."
+          mode="multi"
+          title="Select served cows"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search served cow..."}
           include={(a) => a.sex === "F"}
-          value={animal}
-          onPickSingle={setAnimal}
+          value={selected}
+          onPickMulti={setSelected}
         />
       </Field>
       <Field label="Diagnosis date"><Input value={todayISO()} editable={false} /></Field>
@@ -88,7 +100,7 @@ export default function PD() {
 
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit PD"}
-        disabled={mutation.isPending || !animal}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />
