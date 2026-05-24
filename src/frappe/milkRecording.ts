@@ -21,8 +21,38 @@ export type CreateMilkRecordingInput = {
 };
 
 /**
+ * Patch the milking Stock Entry's `custom_cows_milked` field. The After
+ * Submit script on Milk Recording doesn't propagate this — Frappe creates
+ * the Stock Entry with the field defaulting to 0. We update it via
+ * frappe.client.set_value so the SE matches the Milk Recording's count.
+ *
+ * Best-effort: returns false on failure (allow_on_submit=0 on the field,
+ * permissions, etc.) without throwing — the caller logs but doesn't abort.
+ */
+const patchStockEntryCowsMilked = async (
+  stockEntry: string,
+  count: number,
+): Promise<boolean> => {
+  if (!stockEntry || count <= 0) return false;
+  try {
+    const client = await getClient();
+    await client.post("/api/method/frappe.client.set_value", {
+      doctype: "Stock Entry",
+      name: stockEntry,
+      fieldname: { custom_cows_milked: count },
+    });
+    return true;
+  } catch (e) {
+    console.warn("[milk] Failed to set custom_cows_milked on", stockEntry, e);
+    return false;
+  }
+};
+
+/**
  * Create + submit a Milk Recording. The After Submit server script auto-creates
- * the Stock Entry and Revenue JE (see livestock_server_scripts §4).
+ * the Stock Entry and Revenue JE (see livestock_server_scripts §4). We then
+ * back-patch the Stock Entry's custom_cows_milked field (server script does
+ * not propagate it).
  */
 export const createMilkRecording = async (
   input: CreateMilkRecordingInput,
@@ -53,7 +83,30 @@ export const createMilkRecording = async (
   if (input.operator) body.operator = input.operator;
   if (input.remarks) body.remarks = input.remarks;
 
-  return frappeCreateAndSubmit("Milk Recording", body);
+  const result = await frappeCreateAndSubmit<{
+    name: string;
+    stock_entry?: string;
+  }>("Milk Recording", body);
+
+  // Re-fetch to read the stock_entry field that the After Submit script
+  // back-fills via frappe.db.set_value (the submit response is taken before
+  // the script runs, so the field on `result` may be empty).
+  let stockEntry = result?.stock_entry;
+  if (!stockEntry && result?.name) {
+    try {
+      const client = await getClient();
+      const fresh = await client.get(
+        `/api/resource/Milk Recording/${encodeURIComponent(result.name)}`,
+      );
+      stockEntry = fresh.data?.data?.stock_entry;
+    } catch (e) {
+      console.warn("[milk] Failed to re-fetch Milk Recording for SE link", e);
+    }
+  }
+  if (stockEntry && input.cowsMilked) {
+    await patchStockEntryCowsMilked(stockEntry, input.cowsMilked);
+  }
+  return result;
 };
 
 export const MILK_LIST_FIELDS = [

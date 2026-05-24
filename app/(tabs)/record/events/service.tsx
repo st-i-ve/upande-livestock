@@ -20,7 +20,7 @@ export default function Service() {
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
   const [operator, setOperator] = useState<string | null>(defaultOperator);
-  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
   const [sireCatalog, setSireCatalog] = useState<string>("");
@@ -32,31 +32,38 @@ export default function Service() {
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
-    if (!animal) return setError("Pick the cow to service.");
+    if (selected.length === 0) return setError("Pick at least one cow to service.");
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
-    try {
-      const r = await mutation.mutateAsync({
-        eventType: "Service",
-        animal: animal.id,
-        currentHerd: animal.herd,
-        operator,
-        eventDate: todayISO(),
-        serviceType: type,
-        semenItem: straw || undefined,
-        sire: sireCatalog || undefined,
-        remarks: remarks || undefined,
-      });
-      Alert.alert(
-        r.queued ? "Queued offline" : "Service recorded",
-        r.queued
-          ? `${animal.name} saved locally. Will sync when the device is back online.`
-          : `${animal.name} marked as served.`,
-      );
-      router.replace("/(tabs)/record/success?name=Service");
-    } catch (err) {
-      setError(extractFrappeError(err));
+    let succeeded = 0;
+    let queued = 0;
+    for (const a of selected) {
+      try {
+        const r = await mutation.mutateAsync({
+          eventType: "Service",
+          animal: a.id,
+          currentHerd: a.herd,
+          operator,
+          eventDate: todayISO(),
+          serviceType: type,
+          semenItem: straw || undefined,
+          sire: sireCatalog || undefined,
+          remarks: remarks || undefined,
+        });
+        if (r.queued) queued += 1;
+        else succeeded += 1;
+      } catch (err) {
+        setError(
+          `${succeeded + queued} of ${selected.length} served. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+        );
+        return;
+      }
     }
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} served`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert("Service recorded", parts.join(" · "));
+    router.replace("/(tabs)/record/success?name=Service");
   };
 
   return (
@@ -64,13 +71,17 @@ export default function Service() {
       <Field label="Operator">
         <EmployeePickerButton value={operator} onChange={setOperator} />
       </Field>
-      <Field label="Cow">
+      <Field
+        label="Cow(s)"
+        help="Pick one or many. Same straw issued per cow; one Animal Event per cow on submit."
+      >
         <AnimalPickerButton
-          title="Select cow (eligible only)"
-          placeholder="Search cow on heat..."
+          mode="multi"
+          title="Select cows (eligible only)"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search cow on heat..."}
           include={(a) => a.sex === "F" && !a.pregnant && a.repro !== "Calf"}
-          value={animal}
-          onPickSingle={setAnimal}
+          value={selected}
+          onPickMulti={setSelected}
         />
       </Field>
       <FieldRow>
@@ -81,7 +92,7 @@ export default function Service() {
           <Picker value={type} onChange={(v) => setType(v as "A.I." | "Natural")} options={["A.I.", "Natural"]} />
         </Field>
       </FieldRow>
-      <Field label="Semen straw (Item)" help="Search Frappe Items. 1 straw issued from Stores on submit.">
+      <Field label="Semen straw (Item)" help="Search Frappe Items. 1 straw issued from Stores per cow on submit.">
         <FrappeSearchPicker
           doctype="Item"
           value={straw || null}
@@ -111,7 +122,7 @@ export default function Service() {
 
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit service"}
-        disabled={mutation.isPending || !animal}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />
