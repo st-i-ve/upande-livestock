@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
 
-import { DEFAULT_INSTANCE_URL, STORAGE_KEYS, storage } from "./storage";
+import { STORAGE_KEYS, storage } from "./storage";
 
 const normalizeBaseUrl = (url: string) => url.trim().replace(/\/+$/, "");
 
@@ -113,8 +113,10 @@ export const getWorkingUrl = async (inputUrl: string): Promise<string | null> =>
 };
 
 export const getClient = async (): Promise<AxiosInstance> => {
-  const baseUrl =
-    (await storage.getItem(STORAGE_KEYS.INSTANCE_URL)) || DEFAULT_INSTANCE_URL;
+  const baseUrl = await storage.getItem(STORAGE_KEYS.INSTANCE_URL);
+  if (!baseUrl) {
+    throw new Error("No Frappe instance URL set. Sign in to configure one.");
+  }
   const cookie = await storage.getItem(STORAGE_KEYS.COOKIE);
   const sid = await storage.getItem(STORAGE_KEYS.SID);
 
