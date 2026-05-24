@@ -44,8 +44,8 @@ export default function Diagnosis() {
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
 
-  // Live picked animal + operator (replacing the stub picker that never lifted).
-  const [animal, setAnimal] = useState<Animal | null>(null);
+  // Live picked animals + operator (replacing the stub picker that never lifted).
+  const [selected, setSelected] = useState<Animal[]>([]);
   const [operator, setOperator] = useState<string | null>(defaultOperator);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const mutation = useCreateAnimalDiagnosis();
@@ -112,8 +112,16 @@ export default function Diagnosis() {
       <Field label="Operator">
         <EmployeePickerButton value={operator} onChange={setOperator} />
       </Field>
-      <Field label="Animal">
-        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
+      <Field
+        label="Animal(s)"
+        help="Pick one or many. Same vitals + diagnosis applied per animal — one record each."
+      >
+        <AnimalPickerButton
+          mode="multi"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
+          value={selected}
+          onPickMulti={setSelected}
+        />
       </Field>
       <FieldRow>
         <Field label="Date of examination" style={{ flex: 1 }}>
@@ -312,11 +320,11 @@ export default function Diagnosis() {
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit diagnosis"}
         loading={mutation.isPending}
-        disabled={mutation.isPending || !animal}
+        disabled={mutation.isPending || selected.length === 0}
         onPress={async () => {
           setSubmitError(null);
           if (!operator) return setSubmitError("Pick the operator before submitting.");
-          if (!animal) return setSubmitError("Pick the animal being examined.");
+          if (selected.length === 0) return setSubmitError("Pick at least one animal.");
           if (!company) return setSubmitError("Default company not loaded yet. Try again in a moment.");
           if (operator !== defaultOperator) await setStoredOperator(operator);
 
@@ -354,38 +362,46 @@ export default function Diagnosis() {
             .filter(Boolean)
             .join(" · ");
 
-          try {
-            const r = await mutation.mutateAsync({
-              animal: animal.id,
-              operator,
-              company,
-              diagnosisDate: todayISO(),
-              actionTaken: action,
-              bcs: bcs ? Number(bcs) : undefined,
-              temperatureC: temp ? Number(temp) : undefined,
-              heartRate: hr ? Number(hr) : undefined,
-              respirationRate: resp ? Number(resp) : undefined,
-              differentialNotes: [differential, freeRemarks].filter(Boolean).join("\n\n") || undefined,
-              followUpDate: followUp || undefined,
-              vetName: vetName || undefined,
-              confirmedByVet: vetConfirmed,
-            });
-            Alert.alert(
-              r.queued ? "Queued offline" : "Diagnosis submitted",
-              r.queued
-                ? `${animal.name} saved locally. Will sync when online.`
-                : action === "Escalated to Case"
-                  ? `${animal.name} flagged. A draft Animal Health Case has been created.`
-                  : `${animal.name} examined and logged.`,
-            );
-            router.replace(
-              action === "Escalated to Case"
-                ? "/(tabs)/record/success?name=Diagnosis (escalated to case)"
-                : "/(tabs)/record/success?name=Animal diagnosis",
-            );
-          } catch (err) {
-            setSubmitError(extractFrappeError(err));
+          let succeeded = 0;
+          let queued = 0;
+          for (const a of selected) {
+            try {
+              const r = await mutation.mutateAsync({
+                animal: a.id,
+                operator,
+                company,
+                diagnosisDate: todayISO(),
+                actionTaken: action,
+                bcs: bcs ? Number(bcs) : undefined,
+                temperatureC: temp ? Number(temp) : undefined,
+                heartRate: hr ? Number(hr) : undefined,
+                respirationRate: resp ? Number(resp) : undefined,
+                differentialNotes: [differential, freeRemarks].filter(Boolean).join("\n\n") || undefined,
+                followUpDate: followUp || undefined,
+                vetName: vetName || undefined,
+                confirmedByVet: vetConfirmed,
+              });
+              if (r.queued) queued += 1;
+              else succeeded += 1;
+            } catch (err) {
+              setSubmitError(
+                `${succeeded + queued} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+              );
+              return;
+            }
           }
+          const parts: string[] = [];
+          if (succeeded) parts.push(`${succeeded} diagnosed`);
+          if (queued) parts.push(`${queued} queued (offline)`);
+          Alert.alert(
+            "Diagnosis submitted",
+            `${parts.join(" · ")}${action === "Escalated to Case" && succeeded > 0 ? "\nA draft Animal Health Case has been created per animal." : ""}`,
+          );
+          router.replace(
+            action === "Escalated to Case"
+              ? "/(tabs)/record/success?name=Diagnosis (escalated to case)"
+              : "/(tabs)/record/success?name=Animal diagnosis",
+          );
         }}
       />
     </Screen>

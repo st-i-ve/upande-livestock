@@ -14,7 +14,7 @@ import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 export default function SaleNew() {
-  const [animal, setAnimal] = useState<Animal | null>(null);
+  const [selected, setSelected] = useState<Animal[]>([]);
   const [price, setPrice] = useState("");
   const [buyer, setBuyer] = useState("");
   const [phone, setPhone] = useState("");
@@ -23,50 +23,71 @@ export default function SaleNew() {
 
   const mutation = useCreateAnimalDisposal();
 
-  // Book value comes from the Animal record server-side; we surface the
-  // sale price impact for the operator's confidence. The script computes
-  // the actual gain_loss after pulling current_book_value.
   const p = Number(price) || 0;
+  const totalProceeds = p * selected.length;
 
   const handleSubmit = async () => {
     setError(null);
-    if (!animal) return setError("Pick an animal to sell.");
+    if (selected.length === 0) return setError("Pick at least one animal to sell.");
     if (!buyer.trim()) return setError("Enter a buyer name.");
-    if (p <= 0) return setError("Enter a sale price.");
+    if (p <= 0) return setError("Enter a sale price per animal.");
 
-    try {
-      const r = await mutation.mutateAsync({
-        animal: animal.id,
-        animalName: animal.name,
-        disposalType: "Sold",
-        disposalDate: todayISO(),
-        salePrice: p,
-        buyerName: buyer.trim(),
-        buyerContact: phone.trim() || undefined,
-        reasonDetails: reason.trim() || undefined,
-      });
-      Alert.alert(
-        r.queued ? "Queued offline" : "Sale recorded",
-        r.queued
-          ? `Sale saved locally. Will sync when online — Sales Invoice, Payment Entry and write-off JE will post then.`
-          : `${animal.name} sold to ${buyer.trim()} for ${p.toLocaleString()} KES.\n\nFrappe will post the Sales Invoice, Payment Entry, and write-off JE.`,
-      );
-      router.replace("/(tabs)/record/success?name=Sale");
-    } catch (err) {
-      setError(extractFrappeError(err));
+    let succeeded = 0;
+    let queued = 0;
+    const completed: string[] = [];
+
+    for (const animal of selected) {
+      try {
+        const r = await mutation.mutateAsync({
+          animal: animal.id,
+          animalName: animal.name,
+          disposalType: "Sold",
+          disposalDate: todayISO(),
+          salePrice: p,
+          buyerName: buyer.trim(),
+          buyerContact: phone.trim() || undefined,
+          reasonDetails: reason.trim() || undefined,
+        });
+        if (r.queued) queued += 1;
+        else succeeded += 1;
+        completed.push(animal.name);
+      } catch (err) {
+        setError(
+          `${completed.length} of ${selected.length} sold. Stopped at ${animal.name}: ${extractFrappeError(err)}`,
+        );
+        return;
+      }
     }
+
+    const parts: string[] = [];
+    if (succeeded) parts.push(`${succeeded} sold to ${buyer.trim()}`);
+    if (queued) parts.push(`${queued} queued (offline)`);
+    Alert.alert(
+      "Sale recorded",
+      `${parts.join(" · ")}\n${succeeded > 0 ? `Sales Invoice + Payment Entry + write-off JE posted per animal.` : ""}`,
+    );
+    router.replace("/(tabs)/record/success?name=Sale");
   };
 
   return (
     <Screen title="Record sale" subtitle="Posts gain/loss to GL" back>
-      <Field label="Animal to sell">
-        <AnimalPickerButton value={animal} onPickSingle={setAnimal} />
+      <Field
+        label="Animals to sell"
+        help="Pick one cow, several, or a whole herd via the By-herd tab. Same buyer + price applied to each."
+      >
+        <AnimalPickerButton
+          mode="multi"
+          title="Select animals to sell"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
+          value={selected}
+          onPickMulti={setSelected}
+        />
       </Field>
       <FieldRow>
         <Field label="Date" style={{ flex: 1 }}>
           <Input value={todayISO()} editable={false} />
         </Field>
-        <Field label="Sale price (KES)" style={{ flex: 1 }}>
+        <Field label="Price per animal (KES)" style={{ flex: 1 }}>
           <Input value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="0" />
         </Field>
       </FieldRow>
@@ -80,16 +101,17 @@ export default function SaleNew() {
         <Textarea value={reason} onChangeText={setReason} placeholder="End of productive life, surplus, etc." />
       </Field>
       <View style={s.box}>
-        <KV k="Sale price" v={`${p.toLocaleString()} KES`} />
-        <KV k="Book value" v="(pulled from Animal record on submit)" />
-        <KV k="Gain / loss" v="(computed by Frappe)" />
+        <KV k="Animals selected" v={String(selected.length)} />
+        <KV k="Price per animal" v={`${p.toLocaleString()} KES`} />
+        <KV k="Total proceeds" v={`${totalProceeds.toLocaleString()} KES`} />
+        <KV k="Book values" v="(pulled per animal on submit)" />
       </View>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit sale"}
-        disabled={mutation.isPending || !animal}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

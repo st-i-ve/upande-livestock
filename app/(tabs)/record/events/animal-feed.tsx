@@ -80,12 +80,31 @@ export default function AnimalFeed() {
         wipWarehouse,
         description: remarks.trim() ? remarks.trim() : `TMR ${herd.n} · ${session}`,
       });
-      Alert.alert(
-        r.queued ? "Queued offline" : "Feeding Work Order submitted",
-        r.queued
-          ? `Saved locally. Will sync when online.`
-          : `Work Order created for ${herd.n}: ${kgNum} kg from BOM ${herd.bom}.`,
-      );
+
+      // Compose a result message reflecting the three possible outcomes:
+      // offline-queued, draft-on-shortfall, or fully submitted.
+      if (r.queued) {
+        Alert.alert("Queued offline", "Saved locally. Will sync when online.");
+      } else {
+        const wo = r.data;
+        if (wo?.draft) {
+          const shortfallText = (wo.shortfalls ?? [])
+            .slice(0, 8)
+            .map((sf: any) =>
+              `• ${sf.itemName} — need ${sf.requiredQty.toFixed(2)} ${sf.uom}, have ${sf.availableQty.toFixed(2)}`,
+            )
+            .join("\n");
+          Alert.alert(
+            "Saved as Draft — stock insufficient",
+            `${wo.workOrder?.name ?? "Work Order"} created in Draft (not submitted). Top up the source warehouse and submit from desktop.\n\n${shortfallText || "Check the BOM raw materials at the manufacturing warehouse."}`,
+          );
+        } else {
+          Alert.alert(
+            "Feeding Work Order submitted",
+            `${wo?.workOrder?.name ? wo.workOrder.name + " · " : ""}${herd.n}: ${kgNum} kg from BOM ${herd.bom}.`,
+          );
+        }
+      }
       router.replace(`/(tabs)/record/success?name=Animal feeding`);
     } catch (err) {
       setSubmitError(extractFrappeError(err));

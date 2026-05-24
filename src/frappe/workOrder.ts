@@ -1,6 +1,7 @@
-import { frappeCreateAndSubmit } from "@/src/services/api";
+import { frappeCreateAndSubmit, frappeInsertDraft } from "@/src/services/api";
 
 import { getDocument } from "./generic";
+import { getStockBins } from "./stock";
 
 export type CreateFeedingWorkOrderInput = {
   /** Herd doc name — written to custom_herd. */
@@ -20,51 +21,124 @@ export type CreateFeedingWorkOrderInput = {
   description?: string;
 };
 
-/**
- * Snapshot of a Work Order's MFG row layout, with the few fields the mobile
- * caller cares about. The full doc has plenty more — we only set what's
- * needed to drive Frappe's status transition to "Completed".
- */
+export type StockShortfall = {
+  itemCode: string;
+  itemName: string;
+  requiredQty: number;
+  availableQty: number;
+  uom: string;
+};
+
+export type FeedingWorkOrderResult = {
+  /** The submitted Work Order (Completed) or the Draft on shortfall. */
+  workOrder: any;
+  /** True when stock check failed and the doc was saved as Draft. */
+  draft: boolean;
+  /** Items that came up short, only set when `draft` is true. */
+  shortfalls: StockShortfall[];
+};
+
 const datetimeNow = (): string => {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+type BomDoc = {
+  item?: string;
+  item_code?: string;
+  quantity?: number;
+  items?: Array<{
+    item_code: string;
+    item_name?: string;
+    qty: number;
+    stock_qty?: number;
+    stock_uom?: string;
+    uom?: string;
+    source_warehouse?: string;
+  }>;
+};
+
+/** Pulls BOM with its `items` child table for requirements computation. */
+const fetchBom = (bomNo: string) => getDocument<BomDoc>("BOM", bomNo);
+
 /**
- * Resolves the Work Order's `production_item` from a BOM. BOMs have an
- * `item` link to the produced Item.
+ * For a given Work Order target qty, scale BOM line quantities to the
+ * required production. BOMs publish per-batch quantities (`bom.quantity`);
+ * if the WO produces a different qty we scale linearly.
  */
-const resolveProductionItem = async (bomNo: string): Promise<string | null> => {
-  const bom = await getDocument<{ item?: string; item_code?: string }>(
-    "BOM",
-    bomNo,
-    ["item", "item_code"],
-  );
-  return bom?.item ?? bom?.item_code ?? null;
+const scaleRequirements = (bom: BomDoc, targetQty: number) => {
+  const batchQty = Number(bom.quantity ?? 1) || 1;
+  const factor = targetQty / batchQty;
+  return (bom.items ?? []).map((row) => ({
+    itemCode: row.item_code,
+    itemName: row.item_name || row.item_code,
+    requiredQty: Number(row.stock_qty ?? row.qty ?? 0) * factor,
+    uom: row.stock_uom || row.uom || "",
+    sourceWarehouse: row.source_warehouse || "",
+  }));
 };
 
 /**
- * Create + submit a Work Order for a herd's TMR feeding. The doc is created
- * with qty == material_transferred_for_manufacturing == produced_qty so
- * Frappe's status calculator drives it to "Completed" on submit, matching
- * the shape the desktop UX produces.
+ * Compare required quantities (per BOM × WO qty) to current Bin balances
+ * at each item's source warehouse. Items with no source_warehouse on the
+ * BOM line fall back to the Work Order's WIP warehouse.
+ */
+const checkStock = async (
+  requirements: ReturnType<typeof scaleRequirements>,
+  fallbackWarehouse: string,
+): Promise<StockShortfall[]> => {
+  const shortfalls: StockShortfall[] = [];
+  for (const r of requirements) {
+    if (r.requiredQty <= 0) continue;
+    const wh = r.sourceWarehouse || fallbackWarehouse;
+    const bins = await getStockBins({
+      warehouse: wh,
+      itemCodeLike: r.itemCode,
+      includeEmpty: true,
+      limit: 5,
+    });
+    // The bin query uses LIKE; pick the exact match if present.
+    const exact = bins.find((b) => b.itemCode === r.itemCode);
+    const available = exact?.actualQty ?? bins[0]?.actualQty ?? 0;
+    if (available < r.requiredQty) {
+      shortfalls.push({
+        itemCode: r.itemCode,
+        itemName: r.itemName,
+        requiredQty: r.requiredQty,
+        availableQty: available,
+        uom: r.uom,
+      });
+    }
+  }
+  return shortfalls;
+};
+
+/**
+ * Create a Work Order for TMR feeding. Pre-flight checks raw-material
+ * stock at the source warehouse; on shortfall the WO is saved as Draft
+ * (docstatus=0) so the user can review and submit manually from desktop
+ * after stock arrives. With sufficient stock the WO is created + submitted
+ * straight to "Completed" via the standard insert→submit two-step.
  *
- * required_items are auto-filled by Frappe from the BOM on insert — we do
- * not pass them.
+ * Returns the doc plus a boolean + shortfall list so the caller can show
+ * the operator what to top up.
  */
 export const createFeedingWorkOrder = async (
   input: CreateFeedingWorkOrderInput,
-): Promise<any> => {
-  const productionItem =
-    input.productionItem ?? (await resolveProductionItem(input.bomNo));
+): Promise<FeedingWorkOrderResult> => {
+  const bom = await fetchBom(input.bomNo);
+  if (!bom) throw new Error(`BOM ${input.bomNo} not found.`);
+  const productionItem = input.productionItem ?? bom.item ?? bom.item_code;
   if (!productionItem) {
     throw new Error(`Could not resolve a production item from BOM ${input.bomNo}.`);
   }
 
+  const requirements = scaleRequirements(bom, input.qty);
+  const shortfalls = await checkStock(requirements, input.wipWarehouse);
+
   const fg = input.fgWarehouse ?? input.wipWarehouse;
   const stamp = datetimeNow();
-
   const body: Record<string, any> = {
     naming_series: "MFG-WO-.YYYY.-",
     production_item: productionItem,
@@ -73,8 +147,6 @@ export const createFeedingWorkOrder = async (
     custom_no_of_cows: input.noOfCows,
     company: input.company,
     qty: input.qty,
-    material_transferred_for_manufacturing: input.qty,
-    produced_qty: input.qty,
     wip_warehouse: input.wipWarehouse,
     fg_warehouse: fg,
     transfer_material_against: "Work Order",
@@ -83,9 +155,22 @@ export const createFeedingWorkOrder = async (
     description: input.description || `TMR ${input.herd}`,
     stock_uom: "Kilogram",
     planned_start_date: stamp,
-    actual_start_date: stamp,
-    actual_end_date: stamp,
   };
 
-  return frappeCreateAndSubmit("Work Order", body);
+  if (shortfalls.length > 0) {
+    // Save as Draft only — no actual dates, no submit. The user reviews
+    // and tops up stock before submitting.
+    const draft = await frappeInsertDraft("Work Order", body);
+    return { workOrder: draft, draft: true, shortfalls };
+  }
+
+  // Sufficient stock: drive the WO through to Completed by setting the
+  // transferred + produced quantities + actual dates, then submit.
+  body.material_transferred_for_manufacturing = input.qty;
+  body.produced_qty = input.qty;
+  body.actual_start_date = stamp;
+  body.actual_end_date = stamp;
+
+  const submitted = await frappeCreateAndSubmit("Work Order", body);
+  return { workOrder: submitted, draft: false, shortfalls: [] };
 };
