@@ -12,7 +12,10 @@ export const STORAGE_KEYS = {
   FEED_WIP_WAREHOUSE: "feed_wip_warehouse",
 } as const;
 
-export const DEFAULT_INSTANCE_URL = "https://upande-kaitet2.c.frappe.cloud";
+/** Placeholder shown on the empty Instance URL field. NOT used as a silent
+ *  default — the user must explicitly enter (or accept) a URL on first
+ *  login. Kept exported for the login form to render as a hint. */
+export const INSTANCE_URL_PLACEHOLDER = "https://your-site.c.frappe.cloud";
 
 export const storage = {
   async getItem(key: string): Promise<string | null> {
