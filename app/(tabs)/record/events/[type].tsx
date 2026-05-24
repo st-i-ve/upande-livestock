@@ -10,6 +10,7 @@ import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Screen } from "@/components/Screen";
+import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { COLORS, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
@@ -60,6 +61,9 @@ export default function GenericEvent() {
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const { data: settings } = useLivestockSettings();
+  const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
+
   const mutation = useCreateAnimalEvent();
 
   if (!spec) {
@@ -83,8 +87,19 @@ export default function GenericEvent() {
         itemCode: d.itemCode.trim(),
         qty: Number(d.qty),
         uom: d.uom || undefined,
+        // Required by the Animal Drug Issue child table.
+        sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse || undefined,
         withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
       }));
+
+    if (spec.needsDrugs && drugs.length > 0) {
+      const missing = drugIssues.find((d) => !d.sourceWarehouse);
+      if (missing) {
+        return setError(
+          "Pick a source warehouse on every drug row (or set Drug warehouse in Livestock Settings to apply a default).",
+        );
+      }
+    }
 
     const remarksBits: string[] = [];
     if (spec.needsMethod) remarksBits.push(`Method: ${method}`);
@@ -192,7 +207,13 @@ export default function GenericEvent() {
         </Field>
       ) : null}
 
-      {spec.needsDrugs ? <DrugRows rows={drugs} onChange={setDrugs} /> : null}
+      {spec.needsDrugs ? (
+        <DrugRows
+          rows={drugs}
+          onChange={setDrugs}
+          defaultWarehouse={defaultDrugWarehouse}
+        />
+      ) : null}
 
       {spec.needsActivityCost ? (
         <Field label="Activity cost (KES)">
@@ -228,20 +249,32 @@ type DrugRow = {
   itemCode: string;
   qty: string;
   uom: string;
+  /** Required by Animal Drug Issue — Frappe rejects the doc without it. */
+  sourceWarehouse: string;
   withdrawalDays: string;
 };
 
 function DrugRows({
   rows,
   onChange,
+  defaultWarehouse,
 }: {
   rows: DrugRow[];
   onChange: (rows: DrugRow[]) => void;
+  /** Pre-fills sourceWarehouse on new rows (Livestock Settings drug warehouse). */
+  defaultWarehouse: string;
 }) {
   const add = () =>
     onChange([
       ...rows,
-      { id: Date.now() + rows.length, itemCode: "", qty: "1", uom: "", withdrawalDays: "" },
+      {
+        id: Date.now() + rows.length,
+        itemCode: "",
+        qty: "1",
+        uom: "",
+        sourceWarehouse: defaultWarehouse,
+        withdrawalDays: "",
+      },
     ]);
   const update = (id: number, patch: Partial<DrugRow>) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -250,7 +283,11 @@ function DrugRows({
   return (
     <Field
       label="Drugs / vaccines (optional)"
-      help="Each row issues stock from Stores and posts a vet expense JE on submit. Use the exact Frappe Item code."
+      help={
+        defaultWarehouse
+          ? `Each row issues stock and posts a vet expense JE on submit. Source warehouse defaults to ${defaultWarehouse}.`
+          : "Each row issues stock and posts a vet expense JE on submit. Pick a source warehouse for each row — set a default via Livestock Settings → Drug warehouse."
+      }
     >
       {rows.length === 0 ? (
         <Text style={s.drugEmpty}>No drug rows. Tap “Add drug” if any drug was used.</Text>
@@ -272,27 +309,39 @@ function DrugRows({
               icon="pill"
             />
           </Field>
-          <Field label="Qty">
-            <Input
-              value={r.qty}
-              onChangeText={(t) => update(r.id, { qty: t })}
-              keyboardType="numeric"
-              placeholder="1"
+          <Field label="Issue from warehouse">
+            <FrappeSearchPicker
+              doctype="Warehouse"
+              value={r.sourceWarehouse || null}
+              onChange={(name) => update(r.id, { sourceWarehouse: name })}
+              fields={["name", "warehouse_name"]}
+              displayField="warehouse_name"
+              searchField="warehouse_name"
+              filters={[["disabled", "=", 0]]}
+              icon="warehouse"
             />
           </Field>
           <FieldRow>
+            <Field label="Qty" style={{ flex: 1 }}>
+              <Input
+                value={r.qty}
+                onChangeText={(t) => update(r.id, { qty: t })}
+                keyboardType="numeric"
+                placeholder="1"
+              />
+            </Field>
             <Field label="UOM" style={{ flex: 1 }}>
               <Input value={r.uom} onChangeText={(t) => update(r.id, { uom: t })} placeholder="ECH" />
             </Field>
-            <Field label="Withdrawal days" style={{ flex: 1 }}>
-              <Input
-                value={r.withdrawalDays}
-                onChangeText={(t) => update(r.id, { withdrawalDays: t })}
-                keyboardType="numeric"
-                placeholder="0"
-              />
-            </Field>
           </FieldRow>
+          <Field label="Withdrawal days">
+            <Input
+              value={r.withdrawalDays}
+              onChangeText={(t) => update(r.id, { withdrawalDays: t })}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+          </Field>
           <Button label="Remove row" variant="link" onPress={() => remove(r.id)} />
         </View>
       ))}
