@@ -25,6 +25,10 @@ import {
   CreateMilkRecordingInput,
   createMilkRecording,
 } from "@/src/frappe/milkRecording";
+import {
+  CreateFeedingWorkOrderInput,
+  createFeedingWorkOrder,
+} from "@/src/frappe/workOrder";
 import { isOfflineError } from "@/src/offline/dispatcher";
 import {
   PendingMutationType,
@@ -98,6 +102,8 @@ const labelDx = (i: CreateAnimalDiagnosisInput): string =>
   `Diagnosis · ${i.animal}`;
 const labelCase = (i: CreateAnimalHealthCaseInput): string =>
   `Health case · ${i.animal}`;
+const labelWorkOrder = (i: CreateFeedingWorkOrderInput): string =>
+  `TMR feed · ${i.herd}`;
 
 // ---------------------------------------------------------------------------
 
@@ -160,6 +166,15 @@ export const useCreateAnimalHealthCase = () => {
   return useMutation({
     mutationFn: (input: CreateAnimalHealthCaseInput) =>
       tryDirectOrEnqueue("AnimalHealthCase", input, createAnimalHealthCase, labelCase(input)),
+    onSuccess: () => invalidateAll(qc),
+  });
+};
+
+export const useCreateFeedingWorkOrder = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateFeedingWorkOrderInput) =>
+      tryDirectOrEnqueue("FeedingWorkOrder", input, createFeedingWorkOrder, labelWorkOrder(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };

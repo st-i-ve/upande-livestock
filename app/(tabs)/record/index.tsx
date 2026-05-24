@@ -12,7 +12,6 @@ type Item = { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string;
 const SECTIONS: { title: string; items: Item[] }[] = [
   { title: "Daily routine", items: [
     { icon: "water", label: "Milk recording", href: "/(tabs)/record/events/milk" },
-    { icon: "baby-bottle-outline", label: "Calf feeding", href: "/(tabs)/record/events/calf-feed" },
     { icon: "grain", label: "Animal feeding (TMR)", href: "/(tabs)/record/events/animal-feed" },
   ]},
   { title: "Health & breeding", items: [

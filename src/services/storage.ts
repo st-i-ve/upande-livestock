@@ -8,6 +8,8 @@ export const STORAGE_KEYS = {
   EMAIL: "email",
   FULLNAME: "fullname",
   PENDING_QUEUE: "pending_queue",
+  /** Last manufacturing warehouse used for TMR feeding Work Orders. */
+  FEED_WIP_WAREHOUSE: "feed_wip_warehouse",
 } as const;
 
 export const DEFAULT_INSTANCE_URL = "https://upande-kaitet2.c.frappe.cloud";
