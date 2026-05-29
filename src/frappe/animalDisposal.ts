@@ -5,6 +5,7 @@ import { listDocuments } from "./generic";
 // (—) — must be sent verbatim. Verified against the live DocType.
 export type DisposalType =
   | "Sold"
+  | "Gifted"
   | "Culled (Farm Use)"
   | "Died — Natural Causes"
   | "Died — Disease"
@@ -26,6 +27,12 @@ export type CreateAnimalDisposalInput = {
   costCenter?: string;
   incomeAccount?: string;
   disposalAccount?: string;
+  /** Insurance claim amount (KES). Used by Frappe server scripts to post the receivable JE. */
+  insuranceClaimAmount?: number;
+  /** Recipient name when disposalType === "Gifted". */
+  giftedTo?: string;
+  /** Destination (place / organisation) when disposalType === "Gifted". */
+  giftDestination?: string;
 };
 
 /**
@@ -108,6 +115,9 @@ export const createAnimalDisposal = async (
   if (input.costCenter) body.cost_center = input.costCenter;
   if (input.incomeAccount) body.income_account = input.incomeAccount;
   if (input.disposalAccount) body.disposal_account = input.disposalAccount;
+  if (input.insuranceClaimAmount != null) body.insurance_claim_amount = input.insuranceClaimAmount;
+  if (input.giftedTo) body.custom_gifted_to = input.giftedTo;
+  if (input.giftDestination) body.custom_gift_destination = input.giftDestination;
 
   return frappeCreateAndSubmit("Animal Disposal", body);
 };
