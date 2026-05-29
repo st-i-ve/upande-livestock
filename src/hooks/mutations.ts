@@ -15,7 +15,9 @@ import {
 } from "@/src/frappe/animalDisposal";
 import {
   CreateAnimalHealthCaseInput,
+  UpdateAnimalHealthCaseInput,
   createAnimalHealthCase,
+  updateAnimalHealthCase,
 } from "@/src/frappe/animalHealthCase";
 import {
   CreateCalfFeedingInput,
@@ -106,6 +108,8 @@ const labelDx = (i: CreateAnimalDiagnosisInput): string =>
   `Diagnosis · ${i.animal}`;
 const labelCase = (i: CreateAnimalHealthCaseInput): string =>
   `Health case · ${i.animal}`;
+const labelCaseUpdate = (i: UpdateAnimalHealthCaseInput): string =>
+  `Case close · ${i.name} · ${i.caseStatus}`;
 const labelWorkOrder = (i: CreateFeedingWorkOrderInput): string =>
   `TMR feed · ${i.herd}`;
 const labelBatchDrug = (i: BatchDrugIssueInput): string =>
@@ -190,6 +194,15 @@ export const useBatchDrugIssue = () => {
   return useMutation({
     mutationFn: (input: BatchDrugIssueInput) =>
       tryDirectOrEnqueue("BatchDrugIssue", input, submitBatchDrugIssue, labelBatchDrug(input)),
+    onSuccess: () => invalidateAll(qc),
+  });
+};
+
+export const useUpdateAnimalHealthCase = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateAnimalHealthCaseInput) =>
+      tryDirectOrEnqueue("AnimalHealthCaseUpdate", input, updateAnimalHealthCase, labelCaseUpdate(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };
