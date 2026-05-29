@@ -1,5 +1,5 @@
-import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
-import { countDocuments, listDocuments } from "./generic";
+import { frappeCreateAndSubmit, getClient, todayISO } from "@/src/services/api";
+import { countDocuments, getDocument, listDocuments } from "./generic";
 
 export type CaseStatus =
   | "Open"
@@ -155,3 +155,81 @@ export const createAnimalHealthCase = async (
   }
   return frappeCreateAndSubmit("Animal Health Case", body);
 };
+
+// ---------------------------------------------------------------------------
+// Update path — used to close a case with an outcome.
+
+export type UpdateAnimalHealthCaseInput = {
+  /** Frappe doc name of the existing case. */
+  name: string;
+  /** New status. Only the closing-statuses make sense here. */
+  caseStatus: "Recovered" | "Chronic" | "Died";
+  closingNotes?: string;
+  closingDate?: string;
+};
+
+export async function updateAnimalHealthCase(
+  input: UpdateAnimalHealthCaseInput,
+): Promise<any> {
+  const client = await getClient();
+  const body: Record<string, any> = {
+    case_status: input.caseStatus,
+  };
+  if (input.closingNotes) body.closing_notes = input.closingNotes;
+  if (input.closingDate) body.closing_date = input.closingDate;
+  const res = await client.put(
+    `/api/resource/Animal Health Case/${encodeURIComponent(input.name)}`,
+    body,
+  );
+  return res.data?.data;
+}
+
+export type AnimalHealthCaseDetail = {
+  name: string;
+  animal: string;
+  animalName: string;
+  caseStatus: CaseStatus;
+  severity: CaseSeverity | null;
+  openedDate: string;
+  closingDate: string | null;
+  closingNotes: string | null;
+  presentingSymptoms: string;
+  totalTreatmentCost: number;
+  treatments: {
+    treatmentDate: string;
+    itemCode: string;
+    itemName: string;
+    qty: number;
+    uom: string;
+    rate: number;
+    amount: number;
+  }[];
+};
+
+export async function getAnimalHealthCase(name: string): Promise<AnimalHealthCaseDetail | null> {
+  const row = await getDocument<any>("Animal Health Case", name);
+  if (!row) return null;
+  return {
+    name: row.name,
+    animal: row.animal,
+    animalName: row.animal_name || row.animal,
+    caseStatus: row.case_status,
+    severity: row.severity ?? null,
+    openedDate: row.opened_date,
+    closingDate: row.closing_date ?? null,
+    closingNotes: row.closing_notes ?? null,
+    presentingSymptoms: row.presenting_symptoms ?? "",
+    totalTreatmentCost: Number(row.total_treatment_cost ?? 0),
+    treatments: Array.isArray(row.treatments)
+      ? row.treatments.map((t: any) => ({
+          treatmentDate: t.treatment_date ?? "",
+          itemCode: t.item_code,
+          itemName: t.item_name || t.item_code,
+          qty: Number(t.qty ?? 0),
+          uom: t.uom || "",
+          rate: Number(t.rate ?? 0),
+          amount: Number(t.amount ?? Number(t.qty ?? 0) * Number(t.rate ?? 0)),
+        }))
+      : [],
+  };
+}
