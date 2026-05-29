@@ -32,6 +32,7 @@ export type AnimalDetail = Animal & {
   sire: string | null;
   dam: string | null;
   status: string | null;
+  insuredValue: number;
   weightHistory: AnimalWeightRecord[];
 };
 
@@ -71,6 +72,7 @@ const mapAnimalDetail = (row: AnimalRow): AnimalDetail => ({
   sire: row.sire_name ?? null,
   dam: row.dam ?? null,
   status: row.status ?? null,
+  insuredValue: Number(row.insured_value ?? 0),
   weightHistory: Array.isArray(row.weight_history)
     ? row.weight_history.map(mapWeightRow)
     : [],
