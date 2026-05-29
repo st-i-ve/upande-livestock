@@ -55,6 +55,7 @@ export default function Cases() {
             open.map((c) => (
               <Row
                 key={c.name}
+                onPress={() => router.push(`/(tabs)/alerts/cases/${encodeURIComponent(c.name)}` as any)}
                 left={<Avatar icon="stethoscope" tone="danger" />}
                 title={`${c.animalName} · ${c.presentingSymptoms || "—"}`}
                 meta={`${c.name} · ${c.openedDate}${c.totalTreatmentCost ? ` · ${Math.round(c.totalTreatmentCost).toLocaleString()} KES` : ""}`}
@@ -69,6 +70,7 @@ export default function Cases() {
               {closed.map((c) => (
                 <Row
                   key={c.name}
+                  onPress={() => router.push(`/(tabs)/alerts/cases/${encodeURIComponent(c.name)}` as any)}
                   left={<Avatar icon="stethoscope" />}
                   title={`${c.animalName} · ${c.presentingSymptoms || "—"}`}
                   meta={`${c.name} · ${c.openedDate}${c.duration != null ? ` · ${c.duration}d` : ""}`}
