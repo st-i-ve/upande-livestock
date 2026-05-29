@@ -6,6 +6,7 @@ import { createAnimalHealthCase } from "@/src/frappe/animalHealthCase";
 import { createCalfFeeding } from "@/src/frappe/calfFeeding";
 import { createMilkRecording } from "@/src/frappe/milkRecording";
 import { createFeedingWorkOrder } from "@/src/frappe/workOrder";
+import { submitBatchDrugIssue } from "@/src/frappe/batchDrugIssue";
 import { extractFrappeError } from "@/src/services/api";
 
 import {
@@ -30,6 +31,7 @@ const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
   AnimalDiagnosis: createAnimalDiagnosis,
   AnimalHealthCase: createAnimalHealthCase,
   FeedingWorkOrder: createFeedingWorkOrder,
+  BatchDrugIssue: submitBatchDrugIssue,
 };
 
 /**
