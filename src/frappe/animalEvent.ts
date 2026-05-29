@@ -70,9 +70,15 @@ type EventSpecificInput =
       bcs?: number;
     }
   | {
-      eventType: "Vaccination" | "Deworming" | "Dehorning" | "Hoof Trimming";
-      drugIssues?: AnimalDrugIssueInput[];
-      activityCost?: number;
+      eventType: "Vaccination" | "Deworming" | "Hoof Trimming";
+      /** Free-text name of the vet who performed the procedure. */
+      vetName: string;
+    }
+  | {
+      eventType: "Dehorning";
+      vetName: string;
+      /** Employee IDs of farmhands holding the animal. */
+      handlerIds?: string[];
     }
   | { eventType: "Heat Detection" };
 
@@ -209,13 +215,14 @@ export const createAnimalEvent = async (
 
     case "Vaccination":
     case "Deworming":
-    case "Dehorning":
     case "Hoof Trimming":
-      if (input.drugIssues?.length) {
-        base.custom_drug_issues = input.drugIssues.map(mapDrugIssue);
-      }
-      if (input.activityCost != null) {
-        base.custom_activity_cost = input.activityCost;
+      base.custom_vet_name = input.vetName;
+      break;
+
+    case "Dehorning":
+      base.custom_vet_name = input.vetName;
+      if (input.handlerIds?.length) {
+        base.custom_handlers = input.handlerIds.join(", ");
       }
       break;
 
