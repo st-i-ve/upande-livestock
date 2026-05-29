@@ -87,6 +87,13 @@ export function AnimalDetail({ id }: { id: string }) {
             value: `${a.parity}${a.dim !== null ? ` / ${a.dim}d` : ""}`,
             small: true,
           },
+          ...(a.insuredValue > 0
+            ? [{
+                label: "Insured value",
+                value: `KES ${a.insuredValue.toLocaleString()}`,
+                small: true,
+              }]
+            : []),
         ]}
       />
 
