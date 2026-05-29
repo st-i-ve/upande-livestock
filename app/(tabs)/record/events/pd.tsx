@@ -11,6 +11,7 @@ import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useServicedPendingPd } from "@/src/hooks/useServicedPendingPd";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -27,6 +28,7 @@ export default function PD() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
+  const { data: servedIds, isLoading: filterLoading } = useServicedPendingPd();
 
   const handleSubmit = async () => {
     setError(null);
@@ -73,13 +75,23 @@ export default function PD() {
       </Field>
       <Field
         label="Cow(s)"
-        help="Pick one or many — same result applied to each. One Animal Event per cow."
+        help={
+          filterLoading
+            ? "Loading served animals…"
+            : "Only animals with an open service. Pick one or many — same result applied to each."
+        }
       >
         <AnimalPickerButton
           mode="multi"
           title="Select served cows"
-          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search served cow..."}
-          include={(a) => a.sex === "F"}
+          placeholder={
+            filterLoading
+              ? "Loading served animals…"
+              : selected.length
+                ? `${selected.length} selected — tap to change`
+                : "Search served cow..."
+          }
+          include={(a) => a.sex === "F" && (servedIds ? servedIds.has(a.id) : false)}
           value={selected}
           onPickMulti={setSelected}
         />
