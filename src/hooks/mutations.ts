@@ -29,6 +29,10 @@ import {
   CreateFeedingWorkOrderInput,
   createFeedingWorkOrder,
 } from "@/src/frappe/workOrder";
+import {
+  BatchDrugIssueInput,
+  submitBatchDrugIssue,
+} from "@/src/frappe/batchDrugIssue";
 import { isOfflineError } from "@/src/offline/dispatcher";
 import {
   PendingMutationType,
@@ -104,6 +108,8 @@ const labelCase = (i: CreateAnimalHealthCaseInput): string =>
   `Health case · ${i.animal}`;
 const labelWorkOrder = (i: CreateFeedingWorkOrderInput): string =>
   `TMR feed · ${i.herd}`;
+const labelBatchDrug = (i: BatchDrugIssueInput): string =>
+  `Batch drug issue · ${i.eventNames.length} animals`;
 
 // ---------------------------------------------------------------------------
 
@@ -175,6 +181,15 @@ export const useCreateFeedingWorkOrder = () => {
   return useMutation({
     mutationFn: (input: CreateFeedingWorkOrderInput) =>
       tryDirectOrEnqueue("FeedingWorkOrder", input, createFeedingWorkOrder, labelWorkOrder(input)),
+    onSuccess: () => invalidateAll(qc),
+  });
+};
+
+export const useBatchDrugIssue = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: BatchDrugIssueInput) =>
+      tryDirectOrEnqueue("BatchDrugIssue", input, submitBatchDrugIssue, labelBatchDrug(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };
