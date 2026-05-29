@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -9,47 +9,56 @@ import { Chip, Chips } from "@/components/Chips";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
+import { HandlersPicker } from "@/components/HandlersPicker";
+import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
-import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { COLORS, RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
-  AnimalDrugIssueInput,
+  AnimalEventInput,
   AnimalEventType,
 } from "@/src/frappe/animalEvent";
-import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { BatchDrugRow } from "@/src/frappe/batchDrugIssue";
+import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
+import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 type Spec = {
   title: string;
   eventType: AnimalEventType;
-  // Which fields this screen should show beyond the universal ones.
   needsWeight?: boolean;
   needsDrugs?: boolean;
   needsActivityCost?: boolean;
   needsMethod?: boolean;
   needsFeet?: boolean;
   needsHeatSigns?: boolean;
-  multi?: boolean;
+  /** Vet-procedure screens hide the Operator picker, show a Vet text field instead. */
+  isVetProcedure?: boolean;
+  /** Dehorning also collects Handlers. */
+  needsHandlers?: boolean;
 };
 
 const SPECS: Record<string, Spec> = {
   weight:      { title: "Weight recording",  eventType: "Weight Recording",  needsWeight: true },
-  vaccination: { title: "Vaccination",       eventType: "Vaccination",       needsDrugs: true, needsActivityCost: true },
-  deworming:   { title: "Deworming",         eventType: "Deworming",         needsDrugs: true, needsActivityCost: true },
-  dehorning:   { title: "Dehorning",         eventType: "Dehorning",         needsMethod: true, needsActivityCost: true },
-  hoof:        { title: "Hoof trimming",     eventType: "Hoof Trimming",     needsFeet: true, needsActivityCost: true },
+  vaccination: { title: "Vaccination",       eventType: "Vaccination",       needsDrugs: true, needsActivityCost: true, isVetProcedure: true },
+  deworming:   { title: "Deworming",         eventType: "Deworming",         needsDrugs: true, needsActivityCost: true, isVetProcedure: true },
+  dehorning:   { title: "Dehorning",         eventType: "Dehorning",         needsMethod: true, needsActivityCost: true, isVetProcedure: true, needsHandlers: true },
+  hoof:        { title: "Hoof trimming",     eventType: "Hoof Trimming",     needsFeet: true, needsActivityCost: true, isVetProcedure: true },
   heat:        { title: "Heat detection",    eventType: "Heat Detection",    needsHeatSigns: true },
 };
 
 export default function GenericEvent() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const spec = SPECS[type || ""];
+
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
   const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const [vetName, setVetName] = useState("");
+  const [handlerIds, setHandlerIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Animal[]>([]);
   const [weight, setWeight] = useState("");
   const [bcs, setBcs] = useState("");
@@ -62,9 +71,13 @@ export default function GenericEvent() {
   const [error, setError] = useState<string | null>(null);
 
   const { data: settings } = useLivestockSettings();
+  const { data: company } = useDefaultCompany();
   const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
 
-  const mutation = useCreateAnimalEvent();
+  const eventMutation = useCreateAnimalEvent();
+  const batchMutation = useBatchDrugIssue();
+
+  const submitting = eventMutation.isPending || batchMutation.isPending;
 
   if (!spec) {
     return (
@@ -74,31 +87,34 @@ export default function GenericEvent() {
     );
   }
 
+  const filledDrugRows = useMemo(
+    () => drugs.filter((d) => d.itemCode.trim() && Number(d.qty) > 0),
+    [drugs],
+  );
+
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+
+    // ----- validation --------------------------------------------------------
     if (selected.length === 0) return setError("Pick at least one animal.");
-    if (spec.needsWeight && !weight) return setError("Enter the weight (kg).");
-    if (spec.needsWeight && selected.length > 1) {
-      // Weight is per-animal — applying the same value to many is almost
-      // certainly wrong data. Make the user confirm by picking single.
-      return setError("Weight recording takes one animal at a time. Unselect the others.");
+
+    if (spec.isVetProcedure) {
+      if (!vetName.trim()) return setError("Enter the vet's name.");
+      if (!operator) return setError("Operator missing — sign out and back in.");
+      if (!company) return setError("Default company not loaded yet. Try again in a moment.");
+    } else {
+      if (!operator) return setError("Pick the operator before submitting.");
     }
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
-    const drugIssues: AnimalDrugIssueInput[] = drugs
-      .filter((d) => d.itemCode.trim() && Number(d.qty) > 0)
-      .map((d) => ({
-        itemCode: d.itemCode.trim(),
-        qty: Number(d.qty),
-        uom: d.uom || undefined,
-        // Required by the Animal Drug Issue child table.
-        sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse || undefined,
-        withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
-      }));
+    if (spec.needsWeight) {
+      if (!weight) return setError("Enter the weight (kg).");
+      if (selected.length > 1) {
+        return setError("Weight recording takes one animal at a time. Unselect the others.");
+      }
+    }
 
-    if (spec.needsDrugs && drugs.length > 0) {
-      const missing = drugIssues.find((d) => !d.sourceWarehouse);
+    if (spec.needsDrugs && filledDrugRows.length > 0) {
+      const missing = filledDrugRows.find((d) => !d.sourceWarehouse);
       if (missing) {
         return setError(
           "Pick a source warehouse on every drug row (or set Drug warehouse in Livestock Settings to apply a default).",
@@ -106,78 +122,152 @@ export default function GenericEvent() {
       }
     }
 
+    if (operator && operator !== defaultOperator) await setStoredOperator(operator);
+
+    // ----- compose per-cow events -------------------------------------------
     const remarksBits: string[] = [];
     if (spec.needsMethod) remarksBits.push(`Method: ${method}`);
     if (spec.needsFeet) remarksBits.push(`Feet: ${feet}`);
     if (spec.needsHeatSigns && heatSigns) remarksBits.push(`Heat signs: ${heatSigns}`);
     if (remarks) remarksBits.push(remarks);
-    const finalRemarks = remarksBits.join(" · ") || undefined;
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const baseRemarks = [remarksBits.join(" · ") || null, `Batch ${batchId}`]
+      .filter(Boolean)
+      .join(" · ");
 
-    let succeeded = 0;
-    let queued = 0;
+    const eventNames: string[] = [];
+    let succeededEvents = 0;
+    let queuedEvents = 0;
+
     for (const a of selected) {
       const common = {
         animal: a.id,
         currentHerd: a.herd,
-        operator,
+        operator: operator!, // checked above
         eventDate: todayISO(),
-        remarks: finalRemarks,
+        remarks: baseRemarks,
       } as const;
-      try {
-        let r: { queued: boolean; data: any };
+
+      const payload: AnimalEventInput = (() => {
         switch (spec.eventType) {
           case "Weight Recording":
-            r = await mutation.mutateAsync({
+            return {
               ...common,
               eventType: "Weight Recording",
               weightKg: Number(weight),
               bcs: bcs ? Number(bcs) : undefined,
-            });
-            break;
+            };
           case "Vaccination":
           case "Deworming":
-          case "Dehorning":
           case "Hoof Trimming":
-            r = await mutation.mutateAsync({
+            return {
               ...common,
               eventType: spec.eventType,
-              drugIssues: drugIssues.length ? drugIssues : undefined,
-              activityCost: activityCost ? Number(activityCost) : undefined,
-            });
-            break;
+              vetName: vetName.trim(),
+            };
+          case "Dehorning":
+            return {
+              ...common,
+              eventType: "Dehorning",
+              vetName: vetName.trim(),
+              handlerIds: handlerIds.length ? handlerIds : undefined,
+            };
           case "Heat Detection":
-            r = await mutation.mutateAsync({ ...common, eventType: "Heat Detection" });
-            break;
+            return { ...common, eventType: "Heat Detection" };
           default:
             throw new Error(`Unhandled event type ${spec.eventType}`);
         }
-        if (r.queued) queued += 1;
-        else succeeded += 1;
+      })();
+
+      try {
+        const r = await eventMutation.mutateAsync(payload);
+        if (r.queued) queuedEvents += 1;
+        else {
+          succeededEvents += 1;
+          if (r.data?.name) eventNames.push(r.data.name);
+        }
       } catch (err) {
         setError(
-          `${succeeded + queued} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+          `${succeededEvents + queuedEvents} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
         );
         return;
       }
     }
-    const parts: string[] = [];
-    if (succeeded) parts.push(`${succeeded} submitted`);
-    if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert(`${spec.title} recorded`, parts.join(" · "));
+
+    // ----- batch drug issue (vet procedures only) ----------------------------
+    let batchOutcome: "ok" | "skipped" | "failed" = "skipped";
+    let batchError = "";
+
+    const hasBatchWork =
+      spec.isVetProcedure &&
+      (filledDrugRows.length > 0 || (activityCost && Number(activityCost) > 0));
+
+    if (hasBatchWork && company) {
+      const batchPayload = {
+        drugRows: filledDrugRows.map<BatchDrugRow>((d) => ({
+          itemCode: d.itemCode.trim(),
+          qty: Number(d.qty),
+          uom: d.uom || undefined,
+          sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse,
+          withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
+        })),
+        activityCost: activityCost ? Number(activityCost) : undefined,
+        eventNames,
+        batchId,
+        remarks: `${spec.title} · ${selected.length} animals · ${todayISO()}`,
+        company,
+      };
+
+      try {
+        const r = await batchMutation.mutateAsync(batchPayload);
+        if (r.queued) batchOutcome = "ok"; // queued counts as ok from the operator's view
+        else batchOutcome = "ok";
+      } catch (err) {
+        batchOutcome = "failed";
+        batchError = extractFrappeError(err);
+      }
+    }
+
+    // ----- success / partial messaging --------------------------------------
+    const eventParts: string[] = [];
+    if (succeededEvents) eventParts.push(`${succeededEvents} submitted`);
+    if (queuedEvents) eventParts.push(`${queuedEvents} queued (offline)`);
+
+    if (batchOutcome === "failed") {
+      Alert.alert(
+        `${spec.title} — partial`,
+        `${eventParts.join(" · ") || "Events recorded"}, but the drug issue failed: ${batchError}\n\nEvents: ${eventNames.join(", ") || "(none — were they queued?)"}\nTop up the source warehouse and create the Material Issue from desktop.`,
+      );
+    } else {
+      const extra = batchOutcome === "ok" ? "\nBatch drug issue submitted." : "";
+      Alert.alert(`${spec.title} recorded`, `${eventParts.join(" · ")}${extra}`);
+    }
     router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
   };
 
   return (
     <Screen title={spec.title} subtitle="New event" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
+      {/* Operator picker: hidden for vet procedures (auto-set from auth). */}
+      {!spec.isVetProcedure ? (
+        <Field label="Operator">
+          <EmployeePickerButton value={operator} onChange={setOperator} />
+        </Field>
+      ) : null}
+
+      {spec.isVetProcedure ? (
+        <Field label="Vet" help="Free-text — the vet who performed the procedure.">
+          <Input value={vetName} onChangeText={setVetName} placeholder="Dr. Mwangi" />
+        </Field>
+      ) : null}
+
       <Field
         label={spec.needsWeight ? "Animal" : "Animal(s)"}
         help={
           spec.needsWeight
             ? "Pick one animal — weight is per-animal."
-            : "Pick one cow, several, or a whole herd. Same details applied per animal."
+            : spec.isVetProcedure
+              ? "Pick one cow, several, or a whole herd. Drug quantities below are the total for the batch."
+              : "Pick one cow, several, or a whole herd. Same details applied per animal."
         }
       >
         <AnimalPickerButton
@@ -187,6 +277,7 @@ export default function GenericEvent() {
           onPickMulti={setSelected}
         />
       </Field>
+
       <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
 
       {spec.needsWeight ? (
@@ -207,6 +298,12 @@ export default function GenericEvent() {
               <Chip key={m} label={m} active={method === m} onPress={() => setMethod(m)} />
             ))}
           </Chips>
+        </Field>
+      ) : null}
+
+      {spec.needsHandlers ? (
+        <Field label="Handlers" help="Farmhands assisting the vet.">
+          <HandlersPicker value={handlerIds} onChange={setHandlerIds} />
         </Field>
       ) : null}
 
@@ -239,7 +336,7 @@ export default function GenericEvent() {
       ) : null}
 
       {spec.needsActivityCost ? (
-        <Field label="Activity cost (KES)">
+        <Field label="Activity cost (KES)" help="Total vet fee for the batch.">
           <Input
             value={activityCost}
             onChangeText={setActivityCost}
@@ -249,6 +346,19 @@ export default function GenericEvent() {
         </Field>
       ) : null}
 
+      {spec.isVetProcedure && (filledDrugRows.length > 0 || (activityCost && Number(activityCost) > 0)) ? (
+        <View style={s.summary}>
+          <KV
+            k="Stock Entry"
+            v={filledDrugRows.length > 0 ? `1 Material Issue for ${selected.length || "—"} animals` : "—"}
+          />
+          <KV
+            k="Vet Expense JE"
+            v={activityCost && Number(activityCost) > 0 ? `1 entry · KES ${Number(activityCost).toLocaleString()}` : "—"}
+          />
+        </View>
+      ) : null}
+
       <Field label="Remarks">
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Optional notes" />
       </Field>
@@ -256,9 +366,9 @@ export default function GenericEvent() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <Button
-        label={mutation.isPending ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
-        disabled={mutation.isPending || selected.length === 0}
-        loading={mutation.isPending}
+        label={submitting ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
+        disabled={submitting || selected.length === 0}
+        loading={submitting}
         onPress={handleSubmit}
       />
     </Screen>
@@ -272,7 +382,6 @@ type DrugRow = {
   itemCode: string;
   qty: string;
   uom: string;
-  /** Required by Animal Drug Issue — Frappe rejects the doc without it. */
   sourceWarehouse: string;
   withdrawalDays: string;
 };
@@ -284,7 +393,6 @@ function DrugRows({
 }: {
   rows: DrugRow[];
   onChange: (rows: DrugRow[]) => void;
-  /** Pre-fills sourceWarehouse on new rows (Livestock Settings drug warehouse). */
   defaultWarehouse: string;
 }) {
   const add = () =>
@@ -308,12 +416,12 @@ function DrugRows({
       label="Drugs / vaccines (optional)"
       help={
         defaultWarehouse
-          ? `Each row issues stock and posts a vet expense JE on submit. Source warehouse defaults to ${defaultWarehouse}.`
-          : "Each row issues stock and posts a vet expense JE on submit. Pick a source warehouse for each row — set a default via Livestock Settings → Drug warehouse."
+          ? `Quantities are the total for the whole batch. One Stock Entry is created from these rows. Source warehouse defaults to ${defaultWarehouse}.`
+          : "Quantities are the total for the whole batch. Pick a source warehouse for each row — set a default via Livestock Settings → Drug warehouse."
       }
     >
       {rows.length === 0 ? (
-        <Text style={s.drugEmpty}>No drug rows. Tap “Add drug” if any drug was used.</Text>
+        <Text style={s.drugEmpty}>No drug rows. Tap "Add drug" if any drug was used.</Text>
       ) : null}
       {rows.map((r) => (
         <View key={r.id} style={s.drugBox}>
@@ -345,7 +453,7 @@ function DrugRows({
             />
           </Field>
           <FieldRow>
-            <Field label="Qty" style={{ flex: 1 }}>
+            <Field label="Qty (batch total)" style={{ flex: 1 }}>
               <Input
                 value={r.qty}
                 onChangeText={(t) => update(r.id, { qty: t })}
@@ -354,7 +462,7 @@ function DrugRows({
               />
             </Field>
             <Field label="UOM" style={{ flex: 1 }}>
-              <Input value={r.uom} onChangeText={(t) => update(r.id, { uom: t })} placeholder="ECH" />
+              <Input value={r.uom} onChangeText={(t) => update(r.id, { uom: t })} placeholder="ml" />
             </Field>
           </FieldRow>
           <Field label="Withdrawal days">
@@ -384,5 +492,12 @@ const s = StyleSheet.create({
     color: COLORS.textSubtle,
     fontSize: 12,
     paddingVertical: 4,
+  },
+  summary: {
+    backgroundColor: COLORS.bgMuted,
+    padding: 11,
+    borderRadius: RADIUS.md,
+    marginBottom: 10,
+    gap: 4,
   },
 });
