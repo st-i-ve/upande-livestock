@@ -47,6 +47,20 @@ export type LivestockSettingsDoc = {
   custom_default_bull_herd?: string;
   custom_default_dry_herd?: string;
   custom_default_payout_percent?: number;
+  /** Lactating group the dam moves into post-calving. */
+  custom_lactating_herd?: string;
+  /** Animals aged 2-4 months (extracted from the 0-2 herd at ~3 months). */
+  custom_weaning_herd?: string;
+  /** Animals aged 4-12 months (weaners). */
+  custom_weaner_herd?: string;
+  /** Animals 12+ months — heifers ready for service. */
+  custom_bulling_heifer_herd?: string;
+  /** Heifers confirmed in-calf (post-PD-Confirmed) but not yet calved. */
+  custom_incalf_heifer_herd?: string;
+  /** Mature cows confirmed in-calf (post-PD-Confirmed). */
+  custom_incalf_cow_herd?: string;
+  /** Cost-centre / debit account for the vet expense JE posted from batch drug issues. */
+  custom_vet_expense_credit_account?: string;
 };
 
 export const getLivestockSettings = async (): Promise<LivestockSettingsDoc> => {
