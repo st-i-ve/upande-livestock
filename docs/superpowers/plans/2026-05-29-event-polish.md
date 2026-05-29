@@ -1,5 +1,7 @@
 # Event polish — sub-project A — Implementation Plan
 
+**Status:** Implemented 2026-05-29 (commits `013f750`, `9cdfe49`, `07b306d`, `8341fcb`, `0241e3a`, `c5268c0`). Frappe schema migration (§7 / Task 7 Step 1) and the manual verification matrix (Task 7 Step 2) are operator tasks — execute on the live site before relying on the new flow.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land four tightly-related changes on the vet-procedure event screens (Vaccination, Deworming, Dehorning, Hoof Trimming) and the PD screen: (1) one aggregated Stock Entry per batch submit, (2) "Vet" text field replacing the visible Operator picker, (3) Handlers multi-Employee picker on Dehorning, (4) PD picker filtered to animals with an open service.
