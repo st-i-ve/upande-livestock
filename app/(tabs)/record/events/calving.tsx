@@ -15,6 +15,7 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
+import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -23,6 +24,7 @@ export default function Calving() {
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: animals = [] } = useAnimals();
   const { data: herds = [] } = useHerds();
+  const { data: settings } = useLivestockSettings();
 
   const [operator, setOperator] = useState<string | null>(defaultOperator);
   const [dam, setDam] = useState<Animal | null>(null);
@@ -33,17 +35,35 @@ export default function Calving() {
   const [birthWt, setBirthWt] = useState("");
   const [coatColour, setCoatColour] = useState("");
   const [toHerd, setToHerd] = useState<string>("");
+  const [calfTargetHerd, setCalfTargetHerd] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const pregnantCount = animals.filter((a) => a.pregnant).length;
 
-  // Default dam-destination to a milking herd if there is one.
+  // Default dam destination: Livestock Settings → custom_lactating_herd if set,
+  // otherwise the first milking herd, otherwise the first available herd.
   useEffect(() => {
-    if (!toHerd && herds.length) {
-      const milking = herds.find((h) => h.isMilking);
-      setToHerd(milking?.n ?? herds[0].n);
+    if (toHerd || !herds.length) return;
+    const fromSettings = settings?.custom_lactating_herd;
+    if (fromSettings && herds.some((h) => h.n === fromSettings)) {
+      setToHerd(fromSettings);
+      return;
     }
-  }, [herds, toHerd]);
+    const milking = herds.find((h) => h.isMilking);
+    setToHerd(milking?.n ?? herds[0].n);
+  }, [herds, toHerd, settings]);
+
+  // Default calf target herd: Female → custom_default_heifer_herd (the 0-2 group),
+  // Male → custom_default_bull_herd. Refreshes when sex flips.
+  useEffect(() => {
+    if (outcome !== "Live Birth") return;
+    const target =
+      sex === "Female"
+        ? settings?.custom_default_heifer_herd
+        : settings?.custom_default_bull_herd;
+    if (target && herds.some((h) => h.n === target)) setCalfTargetHerd(target);
+    else if (!calfTargetHerd && herds.length) setCalfTargetHerd(herds[0].n);
+  }, [sex, outcome, settings, herds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mutation = useCreateAnimalEvent();
 
@@ -68,6 +88,7 @@ export default function Calving() {
         calfBookNumber: outcome === "Live Birth" ? calfBook.trim() : undefined,
         calfBurnName: outcome === "Live Birth" ? calfName.trim() : undefined,
         calfGender: outcome === "Live Birth" ? sex : undefined,
+        calfTargetHerd: outcome === "Live Birth" ? calfTargetHerd || undefined : undefined,
         birthWeightKg: birthWt ? Number(birthWt) : undefined,
         coatColour: coatColour || undefined,
       });
@@ -119,13 +140,22 @@ export default function Calving() {
         </Field>
       </FieldRow>
 
-      <Field label="Dam moves to herd">
+      <Field
+        label="Dam moves to herd"
+        help={settings?.custom_lactating_herd ? "Default from Livestock Settings → Lactating herd." : "Pick the milking group the dam will join."}
+      >
         <Picker value={toHerd} onChange={setToHerd} options={herds.map((h) => h.n)} />
       </Field>
 
       {outcome === "Live Birth" ? (
         <>
           <SectionTitle>Calf details</SectionTitle>
+          <Field
+            label="Calf moves to herd"
+            help={sex === "Female" ? "Default: heifer herd from Livestock Settings." : "Default: bull herd from Livestock Settings."}
+          >
+            <Picker value={calfTargetHerd} onChange={setCalfTargetHerd} options={herds.map((h) => h.n)} />
+          </Field>
           <Field label="Calf book number">
             <Input value={calfBook} onChangeText={setCalfBook} placeholder="e.g. A001/26" autoCapitalize="characters" />
           </Field>
