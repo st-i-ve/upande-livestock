@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import type { Animal } from "@/types";
 import { avatarToneFor, initials, pillFor } from "@/services/utils";
 
@@ -9,6 +9,8 @@ import { Pill } from "./Pill";
 import { Row } from "./Row";
 
 export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => void; meta?: string }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const p = pillFor(a);
   return (
     <Row
@@ -26,7 +28,8 @@ export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => voi
   );
 }
 
-const s = StyleSheet.create({
-  name: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  id: { fontSize: 11, color: COLORS.textSubtle, fontFamily: "monospace" },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    name: { fontSize: 16, fontWeight: "600", color: c.text },
+    id: { fontSize: 13, color: c.textSubtle, fontFamily: "monospace" },
+  });

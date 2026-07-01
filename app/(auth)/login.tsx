@@ -1,37 +1,43 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
+  useColorScheme,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { TextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
-import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { BANNER_COLORS } from "@/constants/paperTheme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { extractFrappeError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 
 export default function LoginScreen() {
+  const c = useColors();
+  const scheme = useColorScheme();
+  const dark = scheme === "dark";
+  const s = useMemo(() => makeStyles(c), [c]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [obscure, setObscure] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const instanceUrl = useAuthStore((s) => s.instanceUrl);
-  const storedEmail = useAuthStore((s) => s.email);
-  const login = useAuthStore((s) => s.login);
+  const instanceUrl = useAuthStore((st) => st.instanceUrl);
+  const storedEmail = useAuthStore((st) => st.email);
+  const login = useAuthStore((st) => st.login);
 
   // Editable mirror of the stored URL. Persists via the login flow.
   const [url, setUrl] = useState(instanceUrl);
@@ -41,7 +47,6 @@ export default function LoginScreen() {
   }, [storedEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // Pick up any value loaded from storage after first paint.
     if (instanceUrl && !url) setUrl(instanceUrl);
   }, [instanceUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -58,9 +63,6 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      // login() persists the URL to storage as a side-effect of api.login(),
-      // and also writes it through the auth store. So once a session is
-      // started, the URL is remembered until the user changes it here again.
       await login(email.trim(), password, url.trim());
     } catch (err) {
       setError(extractFrappeError(err));
@@ -69,9 +71,25 @@ export default function LoginScreen() {
     }
   };
 
+  // Paper TextInput theming for the outlined pill inputs.
+  const inputTheme = {
+    roundness: 50,
+    colors: {
+      background: c.bg,
+      onSurfaceVariant: c.textMuted, // label / placeholder
+      primary: c.text, // active outline + label
+    },
+  } as const;
+
+  const banner = BANNER_COLORS[dark ? "dark" : "light"].error;
+
   return (
     <ImageBackground
-      source={require("../../assets/images/home_bg.png")}
+      source={
+        dark
+          ? require("../../assets/images/home_bg_d.png")
+          : require("../../assets/images/home_bg.png")
+      }
       style={s.background}
       resizeMode="cover"
     >
@@ -90,67 +108,82 @@ export default function LoginScreen() {
               <View style={s.content}>
                 <View style={s.header}>
                   <Image
-                    source={require("../../assets/images/upande_logo_no_bg.png")}
+                    source={
+                      dark
+                        ? require("../../assets/images/upande_logo_no_bg_d.png")
+                        : require("../../assets/images/upande_logo_no_bg.png")
+                    }
                     style={s.logo}
                     resizeMode="contain"
                   />
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
 
-                <View style={s.field}>
-                  <TextInput
-                    value={url}
-                    onChangeText={setUrl}
-                    placeholder={INSTANCE_URL_PLACEHOLDER}
-                    placeholderTextColor={COLORS.textSubtle}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
-                    returnKeyType="next"
-                    style={s.input}
-                  />
-                  <Text style={s.fieldHint}>
-                    Frappe site URL. Saved on sign-in; change here any time.
-                  </Text>
-                </View>
+                <TextInput
+                  mode="outlined"
+                  label="Frappe site URL"
+                  value={url}
+                  onChangeText={setUrl}
+                  placeholder={INSTANCE_URL_PLACEHOLDER}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  returnKeyType="next"
+                  outlineStyle={s.outline}
+                  textColor={c.text}
+                  theme={inputTheme}
+                  style={s.input}
+                />
 
-                <View style={s.field}>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="Enter email"
-                    placeholderTextColor={COLORS.textSubtle}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                    returnKeyType="next"
-                    style={s.input}
-                  />
-                </View>
+                <TextInput
+                  mode="outlined"
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  returnKeyType="next"
+                  outlineStyle={s.outline}
+                  textColor={c.text}
+                  theme={inputTheme}
+                  style={s.input}
+                />
 
-                <View style={s.field}>
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Enter password"
-                    placeholderTextColor={COLORS.textSubtle}
-                    secureTextEntry={obscure}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                    style={[s.input, { paddingRight: 44 }]}
-                  />
-                  <Pressable onPress={() => setObscure((v) => !v)} hitSlop={10} style={s.eye}>
-                    <MaterialCommunityIcons
-                      name={obscure ? "eye" : "eye-off"}
-                      size={20}
-                      color={COLORS.textMuted}
+                <TextInput
+                  mode="outlined"
+                  label="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={obscure}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  outlineStyle={s.outline}
+                  textColor={c.text}
+                  theme={inputTheme}
+                  style={s.input}
+                  right={
+                    <TextInput.Icon
+                      icon={obscure ? "eye" : "eye-off"}
+                      onPress={() => setObscure((v) => !v)}
+                      color={c.textMuted}
                     />
-                  </Pressable>
-                </View>
+                  }
+                />
 
-                {error ? <Text style={s.error}>{error}</Text> : null}
+                {error ? (
+                  <View style={[s.banner, { backgroundColor: banner.bg }]}>
+                    <MaterialCommunityIcons
+                      name="alert-circle-outline"
+                      size={22}
+                      color={banner.fg}
+                      style={{ marginTop: 1 }}
+                    />
+                    <Text style={[s.bannerText, { color: banner.fg }]}>{error}</Text>
+                  </View>
+                ) : null}
 
                 <Button label="Login" onPress={handleLogin} loading={loading} />
               </View>
@@ -162,51 +195,31 @@ export default function LoginScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  background: { flex: 1, backgroundColor: COLORS.bg },
-  container: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
-  content: { width: "100%", maxWidth: 400, alignSelf: "center" },
-  header: { alignItems: "center", marginBottom: 32 },
-  logo: { width: 180, height: 180 },
-  title: {
-    color: COLORS.text,
-    letterSpacing: 1,
-    fontFamily: FONT_FAMILY.regular,
-    fontSize: 36,
-    lineHeight: 44,
-    marginTop: 6,
-  },
-  field: { marginBottom: 14, position: "relative" },
-  input: {
-    backgroundColor: COLORS.bg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    borderRadius: 50,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    fontSize: 14,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.regular,
-  },
-  fieldHint: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    marginTop: 6,
-    paddingHorizontal: 18,
-  },
-  eye: {
-    position: "absolute",
-    right: 14,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
-  error: {
-    color: COLORS.danger,
-    fontSize: 12,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    background: { flex: 1, backgroundColor: c.bg },
+    container: { flex: 1 },
+    scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
+    content: { width: "100%", maxWidth: 400, alignSelf: "center" },
+    header: { alignItems: "center", marginBottom: 40 },
+    logo: { width: 200, height: 200 },
+    title: {
+      color: c.text,
+      letterSpacing: 1,
+      fontSize: 40,
+      lineHeight: 48,
+      marginTop: 6,
+    },
+    input: { marginBottom: 14, backgroundColor: c.bg },
+    outline: { borderRadius: 50 },
+    banner: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      marginTop: 4,
+      marginBottom: 8,
+      padding: 14,
+      borderRadius: 14,
+    },
+    bannerText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  });
