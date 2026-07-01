@@ -155,11 +155,6 @@ export default function LoginScreen() {
 
   const banner = BANNER_COLORS[dark ? "dark" : "light"].error;
 
-  // Ring shrinks into the logo and fades as the URL field rolls open.
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: 1 - reveal.value,
-    transform: [{ scale: 1 - reveal.value * 0.5 }],
-  }));
   // URL field eases open by growing its height (roll-down) and fading in.
   const urlStyle = useAnimatedStyle(() => ({
     height: reveal.value * URL_FIELD_HEIGHT,
@@ -193,18 +188,6 @@ export default function LoginScreen() {
                   <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
                     <View style={s.logoBox}>
                       {dark ? <View style={s.disc} /> : null}
-                      <Animated.View pointerEvents="none" style={[s.ring, ringStyle]}>
-                        {hasInstance ? (
-                          <View style={[s.solidRing, { borderColor: c.text }]} />
-                        ) : (
-                          <>
-                            <View style={[s.arcTop, { borderColor: c.text }]} />
-                            <View style={[s.arcBottom, { borderColor: c.text }]} />
-                            <View style={[s.dot, s.dotLeft, { backgroundColor: c.text }]} />
-                            <View style={[s.dot, s.dotRight, { backgroundColor: c.text }]} />
-                          </>
-                        )}
-                      </Animated.View>
                       <Image
                         source={require("../../assets/images/upande_logo_no_bg.png")}
                         style={s.logo}
@@ -212,6 +195,21 @@ export default function LoginScreen() {
                       />
                     </View>
                   </Pressable>
+
+                  {/* Instance status: glowing green when a link is set, amber otherwise. */}
+                  <View style={s.statusRow}>
+                    <View style={[s.statusGlow, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }]} />
+                    <View
+                      style={[
+                        s.statusDot,
+                        {
+                          backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER,
+                          shadowColor: hasInstance ? STATUS_GREEN : STATUS_AMBER,
+                        },
+                      ]}
+                    />
+                  </View>
+
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
 
@@ -308,11 +306,8 @@ export default function LoginScreen() {
 const RING = 220;
 const DISC = 190;
 const LOGO = 168;
-const STROKE = 3;
-const DOT = 10;
-// Vertical offset that pulls the two arcs apart, opening a gap at each side
-// (9 o'clock / 3 o'clock) for the dots to sit in.
-const ARC_GAP = 7;
+const STATUS_GREEN = "#22C55E";
+const STATUS_AMBER = "#F59E0B";
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
@@ -322,40 +317,24 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     content: { width: FIELD_WIDTH, alignSelf: "center" },
     header: { alignItems: "center", marginBottom: 40 },
     logoBox: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
-    ring: { position: "absolute", width: RING, height: RING },
-    // Instance set: a complete solid ring.
-    solidRing: {
+    // Instance status dot with a soft glow, sitting just below the logo.
+    statusRow: { height: 14, alignItems: "center", justifyContent: "center", marginTop: -8 },
+    statusGlow: {
       position: "absolute",
-      width: RING,
-      height: RING,
-      borderRadius: RING / 2,
-      borderWidth: STROKE,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      opacity: 0.3,
     },
-    // No instance: two semicircular arcs, offset to leave a gap on each side.
-    arcTop: {
-      position: "absolute",
-      top: -ARC_GAP,
-      width: RING,
-      height: RING / 2,
-      borderTopLeftRadius: RING / 2,
-      borderTopRightRadius: RING / 2,
-      borderWidth: STROKE,
-      borderBottomWidth: 0,
+    statusDot: {
+      width: 11,
+      height: 11,
+      borderRadius: 5.5,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.9,
+      shadowRadius: 6,
+      elevation: 6,
     },
-    arcBottom: {
-      position: "absolute",
-      bottom: -ARC_GAP,
-      width: RING,
-      height: RING / 2,
-      borderBottomLeftRadius: RING / 2,
-      borderBottomRightRadius: RING / 2,
-      borderWidth: STROKE,
-      borderTopWidth: 0,
-    },
-    // Circular dots centred in the side gaps between the two arcs.
-    dot: { position: "absolute", width: DOT, height: DOT, borderRadius: DOT / 2, top: RING / 2 - DOT / 2 },
-    dotLeft: { left: -DOT / 2 + 2 },
-    dotRight: { right: -DOT / 2 + 2 },
     disc: {
       position: "absolute",
       width: DISC,
