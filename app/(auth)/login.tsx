@@ -12,7 +12,6 @@ import {
   StyleSheet,
   Text,
   TextInput as RNTextInput,
-  useColorScheme,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
@@ -30,6 +29,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/Button";
 import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
+import { useScheme } from "@/src/theme/themeStore";
 import { useAuthStore } from "@/src/auth/authStore";
 import { extractFrappeError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
@@ -46,8 +46,7 @@ const URL_FIELD_HEIGHT = 72;
 
 export default function LoginScreen() {
   const c = useColors();
-  const scheme = useColorScheme();
-  const dark = scheme === "dark";
+  const dark = useScheme() === "dark";
   const s = useMemo(() => makeStyles(c), [c]);
 
   const [email, setEmail] = useState("");
