@@ -2,23 +2,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import React, { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 
-const ICON_SIZE = 26;
-const BAR_CONTENT_HEIGHT = 64;
-const CIRCLE_DIAMETER = 46;
-const CIRCLE_LIFT = 14;
-
-const labelStyle = {
-  fontSize: 12,
-  fontFamily: FONT_FAMILY.medium,
-  letterSpacing: 0.3,
-  marginTop: 2,
-};
+const ICON_SIZE = 27;
+const BAR_CONTENT_HEIGHT = 58;
+const CIRCLE_DIAMETER = 48;
+const CIRCLE_LIFT = 10;
 
 function RecordTabButton(props: BottomTabBarButtonProps) {
   const c = useColors();
@@ -35,9 +27,8 @@ function RecordTabButton(props: BottomTabBarButtonProps) {
       style={s.recordCell}
     >
       <View style={[s.recordCircle, selected && s.recordCircleSelected]}>
-        <MaterialCommunityIcons name="plus" size={22} color={c.bg} />
+        <MaterialCommunityIcons name="plus" size={24} color={c.bg} />
       </View>
-      <Text style={[s.recordLabel, selected && s.recordLabelSelected]}>Record</Text>
     </Pressable>
   );
 }
@@ -52,6 +43,7 @@ export default function TabLayout() {
         headerShown: false,
         animation: "shift",
         sceneStyle: { backgroundColor: c.bg },
+        tabBarShowLabel: false,
         tabBarActiveTintColor: c.text,
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: {
@@ -59,13 +51,12 @@ export default function TabLayout() {
           borderTopColor: c.borderSubtle,
           backgroundColor: c.bg,
           height: BAR_CONTENT_HEIGHT + insets.bottom,
-          paddingTop: 8,
-          paddingBottom: insets.bottom + 6,
+          paddingTop: 6,
+          paddingBottom: insets.bottom,
           overflow: "visible",
           elevation: 0,
         },
         tabBarItemStyle: { paddingTop: 0, paddingBottom: 0 },
-        tabBarLabelStyle: labelStyle,
       }}
     >
       <Tabs.Screen
@@ -130,8 +121,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     recordCell: {
       flex: 1,
       alignItems: "center",
-      justifyContent: "flex-end",
-      paddingBottom: 4,
+      justifyContent: "center",
     },
     recordCircle: {
       position: "absolute",
@@ -144,12 +134,4 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       justifyContent: "center",
     },
     recordCircleSelected: {},
-    recordLabel: {
-      fontSize: 12,
-      fontFamily: FONT_FAMILY.medium,
-      letterSpacing: 0.3,
-      color: c.textMuted,
-      marginTop: 2,
-    },
-    recordLabelSelected: { color: c.text },
   });
