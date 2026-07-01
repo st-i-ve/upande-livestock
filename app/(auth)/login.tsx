@@ -1,9 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
   Dimensions,
-  Easing,
   Image,
   ImageBackground,
   Keyboard,
@@ -18,6 +16,13 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { TextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -60,8 +65,8 @@ export default function LoginScreen() {
   const [url, setUrl] = useState(instanceUrl);
   const hasInstance = !!url.trim();
 
-  // Reveal animation: 0 = URL hidden (ring shown), 1 = URL shown (ring gone).
-  const reveal = useRef(new Animated.Value(0)).current;
+  // Reveal progress: 0 = URL hidden (ring shown), 1 = URL shown (ring gone).
+  const reveal = useSharedValue(0);
   const urlInputRef = useRef<RNTextInput | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedRef = useRef(false);
@@ -81,16 +86,13 @@ export default function LoginScreen() {
     }
   };
 
+  const focusUrl = () => urlInputRef.current?.focus();
+
   const hideUrl = () => {
     clearHideTimer();
     urlInputRef.current?.blur();
     setUrlRevealed(false);
-    Animated.timing(reveal, {
-      toValue: 0,
-      duration: 260,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
+    reveal.value = withTiming(0, { duration: 280, easing: Easing.in(Easing.cubic) });
   };
 
   // Collapse after a period of inactivity, but only while the field is not
@@ -105,14 +107,13 @@ export default function LoginScreen() {
   const revealUrl = () => {
     if (urlRevealed) return;
     setUrlRevealed(true);
-    Animated.timing(reveal, {
-      toValue: 1,
-      duration: 340,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished) urlInputRef.current?.focus();
-    });
+    reveal.value = withTiming(
+      1,
+      { duration: 360, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(focusUrl)();
+      },
+    );
     // Fallback: if focus never lands, still collapse after the idle window.
     armHideTimer();
   };
@@ -155,9 +156,15 @@ export default function LoginScreen() {
   const banner = BANNER_COLORS[dark ? "dark" : "light"].error;
 
   // Ring shrinks into the logo and fades as the URL field rolls open.
-  const ringScale = reveal.interpolate({ inputRange: [0, 1], outputRange: [1, 0.5] });
-  const ringOpacity = reveal.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const urlHeight = reveal.interpolate({ inputRange: [0, 1], outputRange: [0, URL_FIELD_HEIGHT] });
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: 1 - reveal.value,
+    transform: [{ scale: 1 - reveal.value * 0.5 }],
+  }));
+  // URL field eases open by growing its height (roll-down) and fading in.
+  const urlStyle = useAnimatedStyle(() => ({
+    height: reveal.value * URL_FIELD_HEIGHT,
+    opacity: reveal.value,
+  }));
 
   return (
     <ImageBackground
@@ -190,12 +197,8 @@ export default function LoginScreen() {
                         pointerEvents="none"
                         style={[
                           s.ring,
-                          {
-                            borderColor: c.text,
-                            borderStyle: hasInstance ? "solid" : "dotted",
-                            opacity: ringOpacity,
-                            transform: [{ scale: ringScale }],
-                          },
+                          { borderColor: c.text, borderStyle: hasInstance ? "solid" : "dotted" },
+                          ringStyle,
                         ]}
                       />
                       <Image
@@ -210,7 +213,7 @@ export default function LoginScreen() {
 
                 <Animated.View
                   pointerEvents={urlRevealed ? "auto" : "none"}
-                  style={{ height: urlHeight, opacity: reveal, overflow: "hidden" }}
+                  style={[s.urlWrap, urlStyle]}
                 >
                   <TextInput
                     ref={urlInputRef as any}
@@ -332,6 +335,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       lineHeight: 48,
       marginTop: 6,
     },
+    urlWrap: { overflow: "hidden" },
     urlInput: { marginBottom: 16, backgroundColor: c.bg },
     input: { marginBottom: 14, backgroundColor: c.bg },
     outline: { borderRadius: 50 },
