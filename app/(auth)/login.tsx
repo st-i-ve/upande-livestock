@@ -315,7 +315,7 @@ export default function LoginScreen() {
 
 const RING = 220;
 const DISC = 190;
-const LOGO = 168;
+const LOGO = 185;
 const STATUS_GREEN = "#2ECC71";
 const STATUS_AMBER = "#F39C12";
 
