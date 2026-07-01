@@ -296,12 +296,21 @@ export default function GenericEvent() {
               : "Pick one cow, several, or a whole herd. Same details applied per animal."
         }
       >
-        <AnimalPickerButton
-          mode="multi"
-          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
-          value={selected}
-          onPickMulti={setSelected}
-        />
+        {spec.needsWeight ? (
+          <AnimalPickerButton
+            mode="single"
+            placeholder={selected[0] ? `${selected[0].name} · ${selected[0].id}` : "Search by tag or name…"}
+            value={selected[0] ?? null}
+            onPickSingle={(a) => setSelected([a])}
+          />
+        ) : (
+          <AnimalPickerButton
+            mode="multi"
+            placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
+            value={selected}
+            onPickMulti={setSelected}
+          />
+        )}
       </Field>
 
       <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
