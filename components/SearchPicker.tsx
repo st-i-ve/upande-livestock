@@ -37,7 +37,7 @@ export function SearchPicker({
         </Text>
         <MaterialCommunityIcons name="magnify" size={16} color={c.textMuted} />
       </Pressable>
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={() => setOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={s.handle} />
@@ -101,7 +101,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderTopRightRadius: 18,
       paddingHorizontal: 14,
       paddingTop: 8,
-      paddingBottom: 24,
+      paddingBottom: 36,
       maxHeight: "75%",
     },
     handle: { width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },

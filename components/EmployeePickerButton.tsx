@@ -54,7 +54,7 @@ export function EmployeePickerButton({
         <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={() => setOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={s.handle} />
@@ -141,7 +141,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     borderTopRightRadius: 18,
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 24,
+    paddingBottom: 36,
     maxHeight: "85%",
     minHeight: "55%",
   },

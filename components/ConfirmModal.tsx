@@ -34,6 +34,7 @@ export function ConfirmModal({
       transparent
       animationType="fade"
       statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onCancel}
     >
       <Pressable style={s.scrim} onPress={onCancel}>
