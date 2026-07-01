@@ -124,11 +124,11 @@ export default function LoginScreen() {
   useEffect(() => clearHideTimer, []);
 
   useEffect(() => {
-    // Loop the glow between dim and bright forever (yoyo).
+    // Radar-style ping: a ripple expands outward and fades, then repeats.
     pulse.value = withRepeat(
-      withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1, { duration: 1500, easing: Easing.out(Easing.ease) }),
       -1,
-      true,
+      false,
     );
   }, [pulse]);
 
@@ -172,10 +172,10 @@ export default function LoginScreen() {
     height: reveal.value * URL_FIELD_HEIGHT,
     opacity: reveal.value,
   }));
-  // Glow breathes: dims + shrinks, then brightens + grows.
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.15 + pulse.value * 0.45,
-    transform: [{ scale: 0.8 + pulse.value * 0.4 }],
+  // Radar ping: the ripple grows and fades out from the dot.
+  const rippleStyle = useAnimatedStyle(() => ({
+    opacity: 0.8 * (1 - pulse.value),
+    transform: [{ scale: 1 + pulse.value * 0.8 }],
   }));
 
   return (
@@ -216,17 +216,9 @@ export default function LoginScreen() {
                   {/* Instance status: glowing green when a link is set, amber otherwise. */}
                   <View style={s.statusRow}>
                     <Animated.View
-                      style={[s.statusGlow, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }, glowStyle]}
+                      style={[s.statusRipple, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }, rippleStyle]}
                     />
-                    <View
-                      style={[
-                        s.statusDot,
-                        {
-                          backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER,
-                          shadowColor: hasInstance ? STATUS_GREEN : STATUS_AMBER,
-                        },
-                      ]}
-                    />
+                    <View style={[s.statusDot, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }]} />
                   </View>
 
                   <Text style={s.title}>Upande Livestock</Text>
@@ -325,8 +317,8 @@ export default function LoginScreen() {
 const RING = 220;
 const DISC = 190;
 const LOGO = 168;
-const STATUS_GREEN = "#22C55E";
-const STATUS_AMBER = "#F59E0B";
+const STATUS_GREEN = "#2ECC71";
+const STATUS_AMBER = "#F39C12";
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
@@ -336,23 +328,19 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     content: { width: FIELD_WIDTH, alignSelf: "center" },
     header: { alignItems: "center", marginBottom: 40 },
     logoBox: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
-    // Instance status dot with a soft glow, sitting just below the logo.
-    statusRow: { height: 14, alignItems: "center", justifyContent: "center", marginTop: 16, marginBottom: 4 },
-    statusGlow: {
+    // Instance status: a solid dot with an expanding radar-ping ripple,
+    // matching the "check for updates" indicator. Green = link set, amber = not.
+    statusRow: { width: 24, height: 24, alignItems: "center", justifyContent: "center", marginTop: 16, marginBottom: 4 },
+    statusRipple: {
       position: "absolute",
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      opacity: 0.3,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
     },
     statusDot: {
-      width: 11,
-      height: 11,
-      borderRadius: 5.5,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.9,
-      shadowRadius: 6,
-      elevation: 6,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
     },
     disc: {
       position: "absolute",
