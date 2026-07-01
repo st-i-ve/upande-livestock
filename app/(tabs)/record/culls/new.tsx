@@ -10,7 +10,8 @@ import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { KV } from "@/components/KV";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import type { DisposalType } from "@/src/frappe/animalDisposal";
 import { attachFile, type FileAsset } from "@/src/frappe/files";
 import { listDocuments } from "@/src/frappe/generic";
@@ -29,6 +30,8 @@ const TYPES: DisposalType[] = [
 ];
 
 export default function CullNew() {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const params = useLocalSearchParams<{ disposalType?: string; animalId?: string }>();
   const initialType =
     (params.disposalType && TYPES.includes(params.disposalType as DisposalType)
@@ -270,6 +273,7 @@ export default function CullNew() {
   );
 }
 
-const styles = StyleSheet.create({
-  box: { backgroundColor: COLORS.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    box: { backgroundColor: c.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
+  });

@@ -1,11 +1,12 @@
 // components/AttachmentPicker.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import type { FileAsset } from "@/src/frappe/files";
+import { useColors } from "@/src/hooks/useColors";
 
 /**
  * Multi-file picker for post-mortem attachments. Returns assets the
@@ -24,6 +25,8 @@ export function AttachmentPicker({
   label?: string;
   helpText?: string;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const pick = async () => {
     const result = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*"],
@@ -54,39 +57,40 @@ export function AttachmentPicker({
       <Text style={s.help}>{helpText}</Text>
       {value.map((a, i) => (
         <View key={`${a.uri}-${i}`} style={s.row}>
-          <MaterialCommunityIcons name="paperclip" size={14} color={COLORS.textMuted} />
+          <MaterialCommunityIcons name="paperclip" size={14} color={c.textMuted} />
           <Text style={s.fileName} numberOfLines={1}>{a.name}</Text>
           <Pressable onPress={() => remove(i)} hitSlop={8}>
-            <MaterialCommunityIcons name="close" size={14} color={COLORS.textMuted} />
+            <MaterialCommunityIcons name="close" size={14} color={c.textMuted} />
           </Pressable>
         </View>
       ))}
       <Pressable onPress={pick} style={s.btn}>
-        <MaterialCommunityIcons name="plus" size={14} color={COLORS.text} />
+        <MaterialCommunityIcons name="plus" size={14} color={c.text} />
         <Text style={s.btnText}>Add file</Text>
       </Pressable>
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
   box: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
+    borderColor: c.border,
     borderRadius: RADIUS.md,
     padding: 10,
     marginBottom: 10,
     gap: 6,
   },
-  label: { fontSize: 12, color: COLORS.textMuted, fontFamily: FONT_FAMILY.medium },
-  help: { fontSize: 11, color: COLORS.textSubtle },
+  label: { fontSize: 12, color: c.textMuted, fontFamily: FONT_FAMILY.medium },
+  help: { fontSize: 11, color: c.textSubtle },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingVertical: 4,
   },
-  fileName: { flex: 1, fontSize: 12, color: COLORS.text },
+  fileName: { flex: 1, fontSize: 12, color: c.text },
   btn: {
     flexDirection: "row",
     alignItems: "center",
@@ -94,8 +98,8 @@ const s = StyleSheet.create({
     alignSelf: "flex-start",
     paddingVertical: 4,
     paddingHorizontal: 8,
-    backgroundColor: COLORS.bgMuted,
+    backgroundColor: c.bgMuted,
     borderRadius: RADIUS.md,
   },
-  btnText: { fontSize: 12, color: COLORS.text, fontFamily: FONT_FAMILY.medium },
+  btnText: { fontSize: 12, color: c.text, fontFamily: FONT_FAMILY.medium },
 });

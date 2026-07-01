@@ -11,7 +11,8 @@ import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import type {
   CaseSeverity,
@@ -40,6 +41,8 @@ type TreatmentRow = {
 };
 
 export default function CaseNew() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
@@ -337,38 +340,39 @@ export default function CaseNew() {
   );
 }
 
-const s = StyleSheet.create({
-  empty: {
-    color: COLORS.textSubtle,
-    fontSize: 12,
-    paddingVertical: 6,
-  },
-  txBox: {
-    backgroundColor: COLORS.bgMuted,
-    padding: 11,
-    borderRadius: RADIUS.md,
-    marginBottom: 8,
-  },
-  summary: {
-    backgroundColor: COLORS.bgMuted,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: RADIUS.md,
-    marginTop: 4,
-    marginBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.medium,
-  },
-  summaryValue: {
-    fontSize: 14,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-    fontVariant: ["tabular-nums"],
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    empty: {
+      color: c.textSubtle,
+      fontSize: 12,
+      paddingVertical: 6,
+    },
+    txBox: {
+      backgroundColor: c.bgMuted,
+      padding: 11,
+      borderRadius: RADIUS.md,
+      marginBottom: 8,
+    },
+    summary: {
+      backgroundColor: c.bgMuted,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: RADIUS.md,
+      marginTop: 4,
+      marginBottom: 12,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    summaryLabel: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.medium,
+    },
+    summaryValue: {
+      fontSize: 14,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+      fontVariant: ["tabular-nums"],
+    },
+  });

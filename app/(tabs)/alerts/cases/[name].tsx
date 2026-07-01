@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AttachmentPicker } from "@/components/AttachmentPicker";
@@ -12,7 +12,8 @@ import { KV } from "@/components/KV";
 import { Loader } from "@/components/Loader";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { attachFile, type FileAsset } from "@/src/frappe/files";
 import { useAnimal } from "@/src/hooks/useAnimal";
 import { useAnimalHealthCase } from "@/src/hooks/useAnimalHealthCase";
@@ -22,6 +23,8 @@ import { extractFrappeError, todayISO } from "@/src/services/api";
 type Outcome = "Recovered" | "Chronic" | "Died";
 
 export default function CaseDetail() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { name } = useLocalSearchParams<{ name: string }>();
   const decodedName = name ? decodeURIComponent(name) : "";
   const { data: theCase, isLoading, error, refetch } = useAnimalHealthCase(decodedName);
@@ -184,7 +187,8 @@ export default function CaseDetail() {
   );
 }
 
-const s = StyleSheet.create({
-  box: { backgroundColor: COLORS.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
-  body: { fontSize: 13, color: COLORS.text, marginBottom: 12, fontFamily: FONT_FAMILY.regular },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    box: { backgroundColor: c.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
+    body: { fontSize: 13, color: c.text, marginBottom: 12, fontFamily: FONT_FAMILY.regular },
+  });

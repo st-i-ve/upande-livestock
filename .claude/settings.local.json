@@ -33,7 +33,17 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Stive\\\\Documents\\\\code\\\\flutter\\\\Upande-Scout\\\\upande_scout_rn\\\\app\" -Recurse -Force | Where-Object { -not $_.PSIsContainer -and $_.Extension -in '.tsx','.ts' } | Format-Table @{n='Path';e={$_.FullName.Replace\\('C:\\\\Users\\\\Stive\\\\Documents\\\\code\\\\flutter\\\\Upande-Scout\\\\upande_scout_rn\\\\',''\\)}} -AutoSize)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Stive\\\\Documents\\\\code\\\\flutter\\\\Upande-Scout\\\\upande_scout_rn\\\\constants\" -Recurse -Force -ErrorAction SilentlyContinue | Format-Table Name -AutoSize; \"--- HOOKS ---\"; Get-ChildItem \"C:\\\\Users\\\\Stive\\\\Documents\\\\code\\\\flutter\\\\Upande-Scout\\\\upande_scout_rn\\\\hooks\" -Force -ErrorAction SilentlyContinue | Format-Table Name -AutoSize)",
       "PowerShell(Get-ChildItem \"assets\" -Recurse -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Format-Table Name, @{n='Path';e={$_.FullName.Replace\\(\"$pwd\\\\\",\"\"\\)}} -AutoSize)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(npx eas *)",
+      "Bash(npx --yes eas-cli@latest --version)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('eas.json','utf8'\\)\\); console.log\\('eas.json is valid JSON'\\)\")",
+      "Bash(xargs grep -l \"useColorScheme\")",
+      "Bash(npx --yes expo install react-native-paper)",
+      "Bash(npx expo *)",
+      "Bash(npx eslint *)",
+      "Bash(grep -Ei \"tabs\\\\\\\\\\\\\\\\\\(index|record|herds|alerts\\)|alerts.*cases|useColors|useMemo\")",
+      "Bash(echo \"grep exit: $?\")",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

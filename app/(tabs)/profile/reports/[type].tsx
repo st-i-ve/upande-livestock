@@ -13,7 +13,8 @@ import { MetricGrid } from "@/components/MetricGrid";
 import { Pill } from "@/components/Pill";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
-import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { FONT_FAMILY } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import {
   useAllHealthCases,
@@ -23,6 +24,8 @@ import {
 import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
@@ -360,10 +363,12 @@ const medianWeight = (xs: number[]): number => {
 // ---------------------------------------------------------------------------
 
 function UnknownReport() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <Screen title="Report" back>
       <View style={s.empty}>
-        <MaterialCommunityIcons name="file-question-outline" size={48} color={COLORS.textSubtle} />
+        <MaterialCommunityIcons name="file-question-outline" size={48} color={c.textSubtle} />
         <Text style={s.emptyText}>Unknown report.</Text>
       </View>
     </Screen>
@@ -379,33 +384,34 @@ export default function Report() {
   return <UnknownReport />;
 }
 
-const s = StyleSheet.create({
-  sectionHeader: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-    letterSpacing: -0.2,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    marginTop: 3,
-  },
-  empty: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    textAlign: "center",
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    sectionHeader: {
+      marginTop: 4,
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+      letterSpacing: -0.2,
+    },
+    sectionSubtitle: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      marginTop: 3,
+    },
+    empty: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 60,
+      gap: 12,
+    },
+    emptyText: {
+      fontSize: 13,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      textAlign: "center",
+    },
+  });

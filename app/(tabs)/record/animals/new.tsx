@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
@@ -10,7 +10,8 @@ import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useCreateAnimal } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { useHerds } from "@/src/hooks/useHerds";
@@ -20,6 +21,8 @@ const ORIGINS = ["Purchased", "Transferred In", "Born on Farm"] as const;
 const REPRO = ["Heifer", "Calf", "Bull", "Open", "Pregnant", "Dry", "Served"] as const;
 
 export default function NewAnimal() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { data: company } = useDefaultCompany();
   const { data: herds = [] } = useHerds();
 
@@ -211,16 +214,17 @@ export default function NewAnimal() {
   );
 }
 
-const s = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: COLORS.bgMuted,
-    borderRadius: RADIUS.md,
-    padding: 12,
-    marginBottom: 8,
-  },
-  toggleTitle: { fontSize: 12, fontWeight: "600", color: COLORS.text },
-  toggleSub: { fontSize: 10, color: COLORS.textMuted, marginTop: 2 },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: c.bgMuted,
+      borderRadius: RADIUS.md,
+      padding: 12,
+      marginBottom: 8,
+    },
+    toggleTitle: { fontSize: 12, fontWeight: "600", color: c.text },
+    toggleSub: { fontSize: 10, color: c.textMuted, marginTop: 2 },
+  });

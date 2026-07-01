@@ -11,7 +11,8 @@ import {
   View,
 } from "react-native";
 
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useEmployee, useEmployeeSearch } from "@/src/hooks/useEmployees";
 
 export function EmployeePickerButton({
@@ -23,6 +24,8 @@ export function EmployeePickerButton({
   onChange: (employeeName: string) => void;
   placeholder?: string;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   // Active search-time state pulls a fresh list per query keystroke (debounced
@@ -42,13 +45,13 @@ export function EmployeePickerButton({
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [s.btn, pressed && { backgroundColor: COLORS.bgMuted }]}
+        style={({ pressed }) => [s.btn, pressed && { backgroundColor: c.bgMuted }]}
       >
-        <MaterialCommunityIcons name="account-tie" size={16} color={COLORS.textMuted} />
+        <MaterialCommunityIcons name="account-tie" size={16} color={c.textMuted} />
         <Text style={[s.btnLabel, !selected && !value && s.placeholder]} numberOfLines={1}>
           {buttonLabel}
         </Text>
-        <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.textSubtle} />
+        <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -58,27 +61,27 @@ export function EmployeePickerButton({
             <View style={s.header}>
               <Text style={s.title}>Select operator</Text>
               <Pressable onPress={() => setOpen(false)} hitSlop={8}>
-                <MaterialCommunityIcons name="close" size={20} color={COLORS.text} />
+                <MaterialCommunityIcons name="close" size={20} color={c.text} />
               </Pressable>
             </View>
             <View style={s.searchRow}>
-              <MaterialCommunityIcons name="magnify" size={16} color={COLORS.textSubtle} />
+              <MaterialCommunityIcons name="magnify" size={16} color={c.textSubtle} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Search by name"
-                placeholderTextColor={COLORS.textSubtle}
+                placeholderTextColor={c.textSubtle}
                 style={s.searchInput}
               />
             </View>
             {isLoading ? (
               <View style={s.empty}>
-                <ActivityIndicator color={COLORS.text} />
+                <ActivityIndicator color={c.text} />
                 <Text style={s.emptyText}>Loading…</Text>
               </View>
             ) : hits.length === 0 ? (
               <View style={s.empty}>
-                <MaterialCommunityIcons name="account-question-outline" size={28} color={COLORS.textSubtle} />
+                <MaterialCommunityIcons name="account-question-outline" size={28} color={c.textSubtle} />
                 <Text style={s.emptyText}>No employees match</Text>
               </View>
             ) : (
@@ -94,8 +97,8 @@ export function EmployeePickerButton({
                     }}
                     style={({ pressed }) => [
                       s.row,
-                      value === item.name && { backgroundColor: COLORS.bgMuted },
-                      pressed && { backgroundColor: COLORS.bgMuted },
+                      value === item.name && { backgroundColor: c.bgMuted },
+                      pressed && { backgroundColor: c.bgMuted },
                     ]}
                   >
                     <View style={{ flex: 1 }}>
@@ -103,7 +106,7 @@ export function EmployeePickerButton({
                       <Text style={s.meta} numberOfLines={1}>{item.name}{item.userId ? ` · ${item.userId}` : ""}</Text>
                     </View>
                     {value === item.name ? (
-                      <MaterialCommunityIcons name="check" size={18} color={COLORS.text} />
+                      <MaterialCommunityIcons name="check" size={18} color={c.text} />
                     ) : null}
                   </Pressable>
                 )}
@@ -116,23 +119,24 @@ export function EmployeePickerButton({
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
   btn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
+    borderColor: c.border,
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  btnLabel: { flex: 1, fontSize: 13, color: COLORS.text },
-  placeholder: { color: COLORS.textSubtle },
+  btnLabel: { flex: 1, fontSize: 13, color: c.text },
+  placeholder: { color: c.textSubtle },
 
   backdrop: { flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: c.bg,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     paddingHorizontal: 14,
@@ -141,9 +145,9 @@ const s = StyleSheet.create({
     maxHeight: "85%",
     minHeight: "55%",
   },
-  handle: { width: 36, height: 4, backgroundColor: COLORS.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  handle: { width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  title: { fontSize: 14, fontFamily: FONT_FAMILY.semibold, color: COLORS.text },
+  title: { fontSize: 14, fontFamily: FONT_FAMILY.semibold, color: c.text },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -151,21 +155,21 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
+    borderColor: c.border,
     borderRadius: RADIUS.md,
     marginBottom: 8,
   },
-  searchInput: { flex: 1, color: COLORS.text, fontSize: 13, padding: 0 },
+  searchInput: { flex: 1, color: c.text, fontSize: 13, padding: 0 },
   empty: { paddingVertical: 30, alignItems: "center", gap: 8 },
-  emptyText: { color: COLORS.textSubtle, fontSize: 12 },
+  emptyText: { color: c.textSubtle, fontSize: 12 },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
+    borderBottomColor: c.borderSubtle,
   },
-  name: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: COLORS.text },
-  meta: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
+  name: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: c.text },
+  meta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
 });

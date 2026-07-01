@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/Avatar";
@@ -7,7 +7,8 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { usePendingQueue } from "@/src/hooks/useQueueStatus";
 import { drainNow } from "@/src/offline/autoDrain";
@@ -32,6 +33,8 @@ const TYPE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> =
 };
 
 export default function Pending() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const queue = usePendingQueue();
   const online = useNetworkStatus();
 
@@ -70,7 +73,7 @@ export default function Pending() {
 
       {queue.length === 0 ? (
         <View style={s.empty}>
-          <MaterialCommunityIcons name="check-all" size={40} color={COLORS.textSubtle} />
+          <MaterialCommunityIcons name="check-all" size={40} color={c.textSubtle} />
           <Text style={s.emptyText}>Nothing pending. You're all caught up.</Text>
         </View>
       ) : (
@@ -92,7 +95,7 @@ export default function Pending() {
                 hitSlop={8}
                 style={s.discard}
               >
-                <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+                <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
               </Pressable>
             </View>
           ))}
@@ -102,47 +105,48 @@ export default function Pending() {
   );
 }
 
-const s = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  title: {
-    fontSize: 13,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-  },
-  meta: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  error: {
-    fontSize: 11,
-    color: COLORS.danger,
-    marginTop: 4,
-  },
-  discard: {
-    width: 28,
-    height: 28,
-    borderRadius: RADIUS.sm,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.bgMuted,
-    marginTop: 2,
-  },
-  empty: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    textAlign: "center",
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    title: {
+      fontSize: 13,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+    },
+    meta: {
+      fontSize: 11,
+      color: c.textMuted,
+      marginTop: 2,
+    },
+    error: {
+      fontSize: 11,
+      color: c.danger,
+      marginTop: 4,
+    },
+    discard: {
+      width: 28,
+      height: 28,
+      borderRadius: RADIUS.sm,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: c.bgMuted,
+      marginTop: 2,
+    },
+    empty: {
+      alignItems: "center",
+      paddingVertical: 40,
+      gap: 8,
+    },
+    emptyText: {
+      fontSize: 13,
+      color: c.textMuted,
+      textAlign: "center",
+    },
+  });

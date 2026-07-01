@@ -12,7 +12,8 @@ import { Loader } from "@/components/Loader";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useFeedHerd, useManufactureHerdFeed } from "@/src/hooks/mutations";
 import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
@@ -24,6 +25,8 @@ type Stage = "manufacture" | "feed";
 const kg = (n: number) => `${Number(n || 0).toLocaleString()} kg`;
 
 export default function AnimalFeed() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { data: herds = [], isLoading, error, refetch } = useHerds();
   const employeeName = useAuthStore((s) => s.employeeName);
 
@@ -219,21 +222,22 @@ export default function AnimalFeed() {
   );
 }
 
-const s = StyleSheet.create({
-  tabs: {
-    flexDirection: "row",
-    backgroundColor: COLORS.bgMuted,
-    borderRadius: RADIUS.md,
-    padding: 3,
-    marginBottom: 12,
-  },
-  tab: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: RADIUS.sm },
-  tabActive: { backgroundColor: COLORS.bg },
-  tabText: { fontSize: 12, color: COLORS.textMuted, fontFamily: FONT_FAMILY.semibold },
-  tabTextActive: { color: COLORS.text },
-  card: { backgroundColor: COLORS.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
-  cardLbl: { fontSize: 11, color: COLORS.textMuted },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: COLORS.text, marginTop: 3 },
-  cardSub: { fontSize: 11, color: COLORS.textMuted, marginTop: 5 },
-  box: { backgroundColor: COLORS.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    tabs: {
+      flexDirection: "row",
+      backgroundColor: c.bgMuted,
+      borderRadius: RADIUS.md,
+      padding: 3,
+      marginBottom: 12,
+    },
+    tab: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: RADIUS.sm },
+    tabActive: { backgroundColor: c.bg },
+    tabText: { fontSize: 12, color: c.textMuted, fontFamily: FONT_FAMILY.semibold },
+    tabTextActive: { color: c.text },
+    card: { backgroundColor: c.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
+    cardLbl: { fontSize: 11, color: c.textMuted },
+    cardTitle: { fontSize: 15, fontWeight: "600", color: c.text, marginTop: 3 },
+    cardSub: { fontSize: 11, color: c.textMuted, marginTop: 5 },
+    box: { backgroundColor: c.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 12 },
+  });
