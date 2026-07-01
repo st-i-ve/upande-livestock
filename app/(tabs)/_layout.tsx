@@ -72,8 +72,8 @@ export default function TabLayout() {
         name="animals"
         options={{
           title: "Animals",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "paw" : "paw-outline"} size={ICON_SIZE} color={color} />
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="cow" size={ICON_SIZE} color={color} />
           ),
         }}
       />
