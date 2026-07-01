@@ -26,6 +26,9 @@ import { queryClient } from "@/src/services/queryClient";
 // synthesise bold from a regular file, so a Text style with weight 600 must
 // explicitly set fontFamily to Poppins_600SemiBold or the renderer falls
 // back to the system font.
+// Weight → Poppins face. Bold is intentionally toned down: heavy weights
+// (700+/"bold") resolve to the SemiBold face so the UI reads calmer, with
+// emphasis carried by SemiBold rather than a heavy Bold.
 const POPPINS_BY_WEIGHT: Record<string, string> = {
   "100": FONT_FAMILY.regular,
   "200": FONT_FAMILY.regular,
@@ -33,11 +36,11 @@ const POPPINS_BY_WEIGHT: Record<string, string> = {
   "400": FONT_FAMILY.regular,
   "500": FONT_FAMILY.medium,
   "600": FONT_FAMILY.semibold,
-  "700": FONT_FAMILY.bold,
-  "800": FONT_FAMILY.bold,
-  "900": FONT_FAMILY.bold,
+  "700": FONT_FAMILY.semibold,
+  "800": FONT_FAMILY.semibold,
+  "900": FONT_FAMILY.semibold,
   normal: FONT_FAMILY.regular,
-  bold: FONT_FAMILY.bold,
+  bold: FONT_FAMILY.semibold,
 };
 
 type FlatTextStyle = { fontFamily?: string; fontWeight?: string | number; fontSize?: number };
@@ -49,19 +52,19 @@ function resolvePoppinsFamily(flat: FlatTextStyle | undefined): string {
   return FONT_FAMILY.regular;
 }
 
-// Uniform type scale — every explicit font size across the app snaps to one of
-// these five tiers so all screens share a single type rhythm. Sizes >= 30 pass
-// through unchanged (intentional display text like the login title); Text with
-// no explicit size is left alone so nested-Text inheritance still works.
-//   caption 13 · body 15 · heading 17 · title 20 · display 28
+// Uniform type scale — every explicit font size snaps to one of four tight
+// tiers so the app reads calm and consistent with minimal size variation.
+// Sizes >= 30 pass through unchanged (intentional display text like the login
+// title); Text with no explicit size is left alone so nested-Text inheritance
+// still works.
+//   caption 12 · body 14 · heading 16 · display 22
 function snapFontSize(size: number | undefined): number | undefined {
   if (typeof size !== "number") return undefined;
   if (size >= 30) return size;
-  if (size <= 12) return 13;
-  if (size <= 14) return 15;
-  if (size <= 17) return 17;
-  if (size <= 20) return 20;
-  return 28;
+  if (size <= 12) return 12;
+  if (size <= 15) return 14;
+  if (size <= 20) return 16;
+  return 22;
 }
 
 // Wrap Text.render so every <Text> picks the correct Poppins face from its

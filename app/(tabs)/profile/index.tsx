@@ -1,8 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
@@ -62,18 +62,12 @@ export default function Profile() {
   const displayName = fullname || APP.user;
   const subtitle = email || APP.farm;
 
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/(auth)/login");
-        },
-      },
-    ]);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
+  const doLogout = async () => {
+    setConfirmLogout(false);
+    await logout();
+    router.replace("/(auth)/login");
   };
 
   return (
@@ -135,13 +129,24 @@ export default function Profile() {
 
           <View style={s.divider} />
 
-          <Row icon="logout" label="Logout" onPress={handleLogout} destructive />
+          <Row icon="logout" label="Logout" onPress={() => setConfirmLogout(true)} destructive />
         </View>
 
         <Pressable style={s.versionContainer}>
           <Text style={s.versionText}>Version {APP.version}</Text>
         </Pressable>
       </ScrollView>
+
+      <ConfirmModal
+        visible={confirmLogout}
+        title="Log out?"
+        message="Are you sure you want to log out?"
+        confirmLabel="Log out"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={doLogout}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </SafeAreaView>
   );
 }
