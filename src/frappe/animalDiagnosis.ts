@@ -8,12 +8,20 @@ export type DiagnosisAction =
   | "Referred to Vet"
   | "No action — normal";
 
+/** One row of the Animal Diagnosis `system_checks` child table. */
+export type SystemCheckInput = {
+  bodySystem: string;
+  finding: string;
+  severity?: "Mild" | "Moderate" | "Severe";
+};
+
 export type CreateAnimalDiagnosisInput = {
   animal: string;
   operator: string;
   company: string;
   diagnosisDate?: string;
   reasonForCheck?: string;
+  systemChecks?: SystemCheckInput[];
   appearance?: "Bright & Alert" | "Dull" | "Depressed" | "Down / Recumbent";
   bcs?: number;
   lamenessScore?: number;
@@ -93,6 +101,13 @@ export const createAnimalDiagnosis = async (
     action_taken: input.actionTaken,
   };
   if (input.reasonForCheck) body.reason_for_check = input.reasonForCheck;
+  if (input.systemChecks?.length) {
+    body.system_checks = input.systemChecks.map((c) => ({
+      body_system: c.bodySystem,
+      finding: c.finding,
+      severity: c.severity,
+    }));
+  }
   if (input.appearance) body.appearance = input.appearance;
   if (input.bcs != null) body.bcs = input.bcs;
   if (input.lamenessScore != null) body.lameness_score = input.lamenessScore;

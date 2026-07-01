@@ -23,7 +23,6 @@ export default function Service() {
   const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
-  const [sireCatalog, setSireCatalog] = useState<string>("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +46,6 @@ export default function Service() {
           eventDate: todayISO(),
           serviceType: type,
           semenItem: straw || undefined,
-          sire: sireCatalog || undefined,
           remarks: remarks || undefined,
         });
         if (r.queued) queued += 1;
@@ -103,15 +101,6 @@ export default function Service() {
           searchField="item_name"
           filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
           icon="test-tube"
-        />
-      </Field>
-      <Field label="Sire (catalog · optional)">
-        <FrappeSearchPicker
-          doctype="Sire Catalog"
-          value={sireCatalog || null}
-          onChange={(name) => setSireCatalog(name)}
-          fields={["name"]}
-          icon="cow"
         />
       </Field>
       <Field label="Remarks">
