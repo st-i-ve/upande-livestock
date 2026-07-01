@@ -21,6 +21,7 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from "react-native-reanimated";
 import { TextInput } from "react-native-paper";
@@ -65,8 +66,10 @@ export default function LoginScreen() {
   const [url, setUrl] = useState(instanceUrl);
   const hasInstance = !!url.trim();
 
-  // Reveal progress: 0 = URL hidden (ring shown), 1 = URL shown (ring gone).
+  // Reveal progress: 0 = URL hidden, 1 = URL field shown.
   const reveal = useSharedValue(0);
+  // Continuous breathing pulse for the status-dot glow.
+  const pulse = useSharedValue(0);
   const urlInputRef = useRef<RNTextInput | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedRef = useRef(false);
@@ -120,6 +123,15 @@ export default function LoginScreen() {
 
   useEffect(() => clearHideTimer, []);
 
+  useEffect(() => {
+    // Loop the glow between dim and bright forever (yoyo).
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [pulse]);
+
   const handleLogin = async () => {
     if (loading) return;
     setError(null);
@@ -160,6 +172,11 @@ export default function LoginScreen() {
     height: reveal.value * URL_FIELD_HEIGHT,
     opacity: reveal.value,
   }));
+  // Glow breathes: dims + shrinks, then brightens + grows.
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.15 + pulse.value * 0.45,
+    transform: [{ scale: 0.8 + pulse.value * 0.4 }],
+  }));
 
   return (
     <ImageBackground
@@ -198,7 +215,9 @@ export default function LoginScreen() {
 
                   {/* Instance status: glowing green when a link is set, amber otherwise. */}
                   <View style={s.statusRow}>
-                    <View style={[s.statusGlow, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }]} />
+                    <Animated.View
+                      style={[s.statusGlow, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }, glowStyle]}
+                    />
                     <View
                       style={[
                         s.statusDot,
@@ -318,7 +337,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     header: { alignItems: "center", marginBottom: 40 },
     logoBox: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
     // Instance status dot with a soft glow, sitting just below the logo.
-    statusRow: { height: 14, alignItems: "center", justifyContent: "center", marginTop: -8 },
+    statusRow: { height: 14, alignItems: "center", justifyContent: "center", marginTop: 16, marginBottom: 4 },
     statusGlow: {
       position: "absolute",
       width: 22,
