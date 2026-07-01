@@ -1,13 +1,9 @@
-import { useColorScheme } from "react-native";
-
 import { DARK, LIGHT, type Palette } from "@/constants/theme";
+import { useScheme } from "@/src/theme/themeStore";
 
-// Resolve the active palette from the OS colour scheme. Same key shape as the
-// static COLORS export, so migrating a component is: replace
-// `import { COLORS } from "@/constants/theme"` with
-// `const COLORS = useColors()` inside the component body, and move any
-// colour-dependent StyleSheet.create into the body (or split colour styles out).
+// Resolve the active palette from the effective colour scheme (OS or the
+// manual override set on the profile screen). Same key shape as the static
+// COLORS export.
 export function useColors(): Palette {
-  const scheme = useColorScheme();
-  return scheme === "dark" ? DARK : LIGHT;
+  return useScheme() === "dark" ? DARK : LIGHT;
 }

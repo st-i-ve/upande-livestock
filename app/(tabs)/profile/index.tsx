@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
@@ -114,6 +115,7 @@ export default function Profile() {
             label="Livestock settings"
             onPress={() => router.push("/(tabs)/profile/settings")}
           />
+          <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
           <Row
             icon="cloud-upload-outline"
             label={online === false ? "Offline · pending submissions" : "Pending submissions"}
