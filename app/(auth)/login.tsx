@@ -193,14 +193,18 @@ export default function LoginScreen() {
                   <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
                     <View style={s.logoBox}>
                       {dark ? <View style={s.disc} /> : null}
-                      <Animated.View
-                        pointerEvents="none"
-                        style={[
-                          s.ring,
-                          { borderColor: c.text, borderStyle: hasInstance ? "solid" : "dotted" },
-                          ringStyle,
-                        ]}
-                      />
+                      <Animated.View pointerEvents="none" style={[s.ring, ringStyle]}>
+                        {hasInstance ? (
+                          <View style={[s.solidRing, { borderColor: c.text }]} />
+                        ) : (
+                          <>
+                            <View style={[s.arcTop, { borderColor: c.text }]} />
+                            <View style={[s.arcBottom, { borderColor: c.text }]} />
+                            <View style={[s.dot, s.dotLeft, { backgroundColor: c.text }]} />
+                            <View style={[s.dot, s.dotRight, { backgroundColor: c.text }]} />
+                          </>
+                        )}
+                      </Animated.View>
                       <Image
                         source={require("../../assets/images/upande_logo_no_bg.png")}
                         style={s.logo}
@@ -304,6 +308,11 @@ export default function LoginScreen() {
 const RING = 220;
 const DISC = 190;
 const LOGO = 168;
+const STROKE = 3;
+const DOT = 10;
+// Vertical offset that pulls the two arcs apart, opening a gap at each side
+// (9 o'clock / 3 o'clock) for the dots to sit in.
+const ARC_GAP = 7;
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
@@ -313,13 +322,40 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     content: { width: FIELD_WIDTH, alignSelf: "center" },
     header: { alignItems: "center", marginBottom: 40 },
     logoBox: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
-    ring: {
+    ring: { position: "absolute", width: RING, height: RING },
+    // Instance set: a complete solid ring.
+    solidRing: {
       position: "absolute",
       width: RING,
       height: RING,
       borderRadius: RING / 2,
-      borderWidth: 3,
+      borderWidth: STROKE,
     },
+    // No instance: two semicircular arcs, offset to leave a gap on each side.
+    arcTop: {
+      position: "absolute",
+      top: -ARC_GAP,
+      width: RING,
+      height: RING / 2,
+      borderTopLeftRadius: RING / 2,
+      borderTopRightRadius: RING / 2,
+      borderWidth: STROKE,
+      borderBottomWidth: 0,
+    },
+    arcBottom: {
+      position: "absolute",
+      bottom: -ARC_GAP,
+      width: RING,
+      height: RING / 2,
+      borderBottomLeftRadius: RING / 2,
+      borderBottomRightRadius: RING / 2,
+      borderWidth: STROKE,
+      borderTopWidth: 0,
+    },
+    // Circular dots centred in the side gaps between the two arcs.
+    dot: { position: "absolute", width: DOT, height: DOT, borderRadius: DOT / 2, top: RING / 2 - DOT / 2 },
+    dotLeft: { left: -DOT / 2 + 2 },
+    dotRight: { right: -DOT / 2 + 2 },
     disc: {
       position: "absolute",
       width: DISC,
