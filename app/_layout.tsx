@@ -119,7 +119,7 @@ export default function RootLayout() {
                 screenOptions={{
                   headerShown: false,
                   contentStyle: { backgroundColor: palette.bg },
-                  animation: "slide_from_right",
+                  animation: "fade",
                 }}
               >
                 <Stack.Screen name="(auth)" />

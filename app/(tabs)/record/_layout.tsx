@@ -10,7 +10,7 @@ export default function RecordStackLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: c.bg },
-        animation: "slide_from_right",
+        animation: "fade",
       }}
     />
   );
