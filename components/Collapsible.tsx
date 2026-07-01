@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
+import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -64,7 +65,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       paddingVertical: 14,
     },
     main: { flex: 1, minWidth: 0 },
-    title: { fontSize: 16, fontWeight: "600", color: c.text },
+    title: { fontSize: 16, fontFamily: FONT_FAMILY.medium, color: c.text },
     meta: { fontSize: 13, color: c.textMuted, marginLeft: 8 },
     content: { marginLeft: 24, paddingBottom: 6 },
   });

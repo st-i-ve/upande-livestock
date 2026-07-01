@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FONT } from "@/constants/theme";
+import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 
 export function Screen({
@@ -38,7 +38,7 @@ export function Screen({
       <View style={s.appbar}>
         {showBack ? (
           <Pressable onPress={() => router.back()} hitSlop={10} style={s.iconBtn}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={c.text} />
+            <MaterialCommunityIcons name="chevron-left" size={28} color={c.text} />
           </Pressable>
         ) : null}
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -80,8 +80,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       backgroundColor: c.bg,
     },
     iconBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-    title: { fontSize: FONT.page.size, fontWeight: FONT.page.weight, color: c.text },
-    subtitle: { fontSize: 13, color: c.textMuted, marginTop: 1 },
+    title: { fontSize: 22, fontFamily: FONT_FAMILY.semibold, color: c.text },
+    subtitle: { fontSize: 13, fontFamily: FONT_FAMILY.regular, color: c.textMuted, marginTop: 1 },
     body: { padding: 14 },
     footer: {
       padding: 14, backgroundColor: c.bg,

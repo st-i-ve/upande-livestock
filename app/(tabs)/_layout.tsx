@@ -5,6 +5,7 @@ import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 
 const ICON_SIZE = 26;
@@ -13,9 +14,9 @@ const CIRCLE_DIAMETER = 46;
 const CIRCLE_LIFT = 14;
 
 const labelStyle = {
-  fontSize: 11,
-  fontWeight: "500" as const,
-  letterSpacing: 0.4,
+  fontSize: 12,
+  fontFamily: FONT_FAMILY.medium,
+  letterSpacing: 0.3,
   marginTop: 2,
 };
 
@@ -50,6 +51,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         animation: "shift",
+        sceneStyle: { backgroundColor: c.bg },
         tabBarActiveTintColor: c.text,
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: {
@@ -143,9 +145,9 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     },
     recordCircleSelected: {},
     recordLabel: {
-      fontSize: 11,
-      fontWeight: "500",
-      letterSpacing: 0.4,
+      fontSize: 12,
+      fontFamily: FONT_FAMILY.medium,
+      letterSpacing: 0.3,
       color: c.textMuted,
       marginTop: 2,
     },
