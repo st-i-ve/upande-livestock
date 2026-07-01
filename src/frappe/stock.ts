@@ -55,3 +55,34 @@ export const getStockBins = async (params: {
   });
   return rows.map(mapBin);
 };
+
+/**
+ * FIFO valuation rate for an item at a warehouse (from its Bin balance).
+ * Used to show the operator the cost of drugs before a batch issue. Falls
+ * back to the item's own valuation_rate when there's no Bin row, then 0.
+ */
+export const getItemValuationRate = async (
+  itemCode: string,
+  warehouse?: string,
+): Promise<number> => {
+  if (!itemCode) return 0;
+  if (warehouse) {
+    const bins = await listDocuments<{ valuation_rate: number }>({
+      doctype: "Bin",
+      fields: ["valuation_rate"],
+      filters: [
+        ["item_code", "=", itemCode],
+        ["warehouse", "=", warehouse],
+      ],
+      limit: 1,
+    });
+    if (bins[0]?.valuation_rate) return Number(bins[0].valuation_rate);
+  }
+  const item = await listDocuments<{ valuation_rate: number }>({
+    doctype: "Item",
+    fields: ["valuation_rate"],
+    filters: [["name", "=", itemCode]],
+    limit: 1,
+  });
+  return Number(item[0]?.valuation_rate ?? 0);
+};

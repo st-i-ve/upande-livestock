@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
@@ -19,6 +20,7 @@ import {
   AnimalEventType,
 } from "@/src/frappe/animalEvent";
 import { BatchDrugRow } from "@/src/frappe/batchDrugIssue";
+import { getItemValuationRate } from "@/src/frappe/stock";
 import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
@@ -91,6 +93,29 @@ export default function GenericEvent() {
     () => drugs.filter((d) => d.itemCode.trim() && Number(d.qty) > 0),
     [drugs],
   );
+
+  // FIFO cost preview — valuation rate per drug × qty, so the operator sees
+  // what the vaccination/deworming will cost before submitting.
+  const drugCostQuery = useQuery({
+    queryKey: [
+      "drugCost",
+      filledDrugRows
+        .map((d) => `${d.itemCode.trim()}@${d.sourceWarehouse || defaultDrugWarehouse}:${d.qty}`)
+        .join("|"),
+    ],
+    enabled: !!spec?.needsDrugs && filledDrugRows.length > 0,
+    queryFn: async () => {
+      let total = 0;
+      for (const d of filledDrugRows) {
+        const rate = await getItemValuationRate(
+          d.itemCode.trim(),
+          d.sourceWarehouse || defaultDrugWarehouse,
+        );
+        total += rate * Number(d.qty);
+      }
+      return total;
+    },
+  });
 
   const handleSubmit = async () => {
     setError(null);
@@ -216,6 +241,7 @@ export default function GenericEvent() {
         batchId,
         remarks: `${spec.title} · ${selected.length} animals · ${todayISO()}`,
         company,
+        employee: operator || undefined,
       };
 
       try {
@@ -351,6 +377,16 @@ export default function GenericEvent() {
           <KV
             k="Stock Entry"
             v={filledDrugRows.length > 0 ? `1 Material Issue for ${selected.length || "—"} animals` : "—"}
+          />
+          <KV
+            k="Est. drug cost (FIFO)"
+            v={
+              filledDrugRows.length === 0
+                ? "—"
+                : drugCostQuery.isLoading
+                  ? "…"
+                  : `KES ${Math.round(drugCostQuery.data ?? 0).toLocaleString()}`
+            }
           />
           <KV
             k="Vet Expense JE"
