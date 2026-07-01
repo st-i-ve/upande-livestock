@@ -144,7 +144,7 @@ export function AnimalPickerSheet({
   const allSelected = list.length > 0 && list.every((a) => selected.has(a.id));
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onShow={reset}>
+    <Modal visible={visible} transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={onClose} onShow={reset}>
       <Pressable style={s.backdrop} onPress={onClose}>
         <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={s.handle} />
@@ -260,7 +260,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     borderTopRightRadius: 18,
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 24,
+    paddingBottom: 36,
     maxHeight: "85%",
     minHeight: "55%",
   },
