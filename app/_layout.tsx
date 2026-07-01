@@ -40,24 +40,43 @@ const POPPINS_BY_WEIGHT: Record<string, string> = {
   bold: FONT_FAMILY.bold,
 };
 
-function resolvePoppinsFamily(style: any): string {
-  const flat = StyleSheet.flatten(style) as { fontFamily?: string; fontWeight?: string | number } | undefined;
+type FlatTextStyle = { fontFamily?: string; fontWeight?: string | number; fontSize?: number };
+
+function resolvePoppinsFamily(flat: FlatTextStyle | undefined): string {
   if (flat?.fontFamily) return flat.fontFamily;
   const w = flat?.fontWeight;
   if (w !== undefined && w !== null) return POPPINS_BY_WEIGHT[String(w)] ?? FONT_FAMILY.regular;
   return FONT_FAMILY.regular;
 }
 
+// Uniform type scale — every explicit font size across the app snaps to one of
+// these five tiers so all screens share a single type rhythm. Sizes >= 30 pass
+// through unchanged (intentional display text like the login title); Text with
+// no explicit size is left alone so nested-Text inheritance still works.
+//   caption 13 · body 15 · heading 17 · title 20 · display 28
+function snapFontSize(size: number | undefined): number | undefined {
+  if (typeof size !== "number") return undefined;
+  if (size >= 30) return size;
+  if (size <= 12) return 13;
+  if (size <= 14) return 15;
+  if (size <= 17) return 17;
+  if (size <= 20) return 20;
+  return 28;
+}
+
 // Wrap Text.render so every <Text> picks the correct Poppins face from its
-// fontWeight automatically. Callers can still override by passing fontFamily.
+// fontWeight and snaps to the uniform size scale. Callers can still override
+// fontFamily; sizes are normalised regardless to keep the app consistent.
 const OriginalRender = (Text as any).render;
 if (OriginalRender && !(Text as any).__poppinsPatched) {
   (Text as any).render = function patchedRender(this: any, ...args: any[]) {
     const element = OriginalRender.apply(this, args);
     if (!element) return element;
-    const family = resolvePoppinsFamily(element.props?.style);
+    const flat = StyleSheet.flatten(element.props?.style) as FlatTextStyle | undefined;
+    const family = resolvePoppinsFamily(flat);
+    const size = snapFontSize(flat?.fontSize);
     return React.cloneElement(element, {
-      style: [{ fontFamily: family }, element.props?.style],
+      style: [{ fontFamily: family }, element.props?.style, size != null ? { fontSize: size } : null],
     });
   };
   (Text as any).__poppinsPatched = true;
