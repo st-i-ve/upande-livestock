@@ -362,6 +362,27 @@ export default function Diagnosis() {
             .filter(Boolean)
             .join(" · ");
 
+          // Structured system checks — one row per abnormal finding, mapped to
+          // the Animal Diagnosis System Check body systems. Normal readings are
+          // omitted so the child table only records what stood out.
+          const systemChecks: { bodySystem: string; finding: string }[] = [];
+          const addCheck = (bodySystem: string, finding: string) =>
+            systemChecks.push({ bodySystem, finding });
+          if (behavior !== "Active") addCheck("Nervous / Behaviour", `Behavior: ${behavior}`);
+          if (eyes !== "Clear") addCheck("Eyes / Ocular", eyes);
+          if (nose !== "Moist (normal)") addCheck("Nose / Nasal", nose);
+          if (mouth !== "Normal") addCheck("Mouth / Oral", mouth);
+          Array.from(skin)
+            .filter((v) => v !== "Healthy")
+            .forEach((v) => addCheck("Skin / Coat", v));
+          if (dung !== "Normal") addCheck("Digestive / Rumen", `Dung: ${dung}`);
+          if (loco !== "Normal movement") addCheck("Feet / Hooves", loco);
+          if (reproDischarge !== "None") addCheck("Urogenital", `Discharge: ${reproDischarge}`);
+          if (flags.Coughing) addCheck("Respiratory", "Coughing");
+          if (flags.Sneezing) addCheck("Respiratory", "Sneezing");
+          if (flags.Swelling) addCheck("Lymph nodes", "Swelling");
+          if (flags["Wounds/Injuries"]) addCheck("Skin / Coat", "Wounds / injuries");
+
           let succeeded = 0;
           let queued = 0;
           for (const a of selected) {
@@ -372,6 +393,7 @@ export default function Diagnosis() {
                 company,
                 diagnosisDate: todayISO(),
                 actionTaken: action,
+                systemChecks: systemChecks.length ? systemChecks : undefined,
                 bcs: bcs ? Number(bcs) : undefined,
                 temperatureC: temp ? Number(temp) : undefined,
                 heartRate: hr ? Number(hr) : undefined,
