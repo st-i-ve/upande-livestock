@@ -1,15 +1,16 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 type Tone = "info" | "success" | "warning" | "danger";
 
-const TONES: Record<Tone, { color: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
-  info:    { color: COLORS.info,    icon: "information-outline" },
-  success: { color: COLORS.success, icon: "check-circle-outline" },
-  warning: { color: COLORS.warning, icon: "alert-outline" },
-  danger:  { color: COLORS.danger,  icon: "alert-octagon-outline" },
+const ICONS: Record<Tone, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  info: "information-outline",
+  success: "check-circle-outline",
+  warning: "alert-outline",
+  danger: "alert-octagon-outline",
 };
 
 export function Banner({
@@ -21,24 +22,28 @@ export function Banner({
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   children: React.ReactNode;
 }) {
-  const t = TONES[tone];
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
+  const color =
+    tone === "danger" ? c.danger : tone === "warning" ? c.warning : tone === "success" ? c.success : c.info;
   return (
-    <View style={[s.box, { backgroundColor: `${t.color}14` }]}>
-      <MaterialCommunityIcons name={icon || t.icon} size={16} color={t.color} style={{ marginTop: 1 }} />
+    <View style={[s.box, { backgroundColor: `${color}14` }]}>
+      <MaterialCommunityIcons name={icon || ICONS[tone]} size={16} color={color} style={{ marginTop: 1 }} />
       <Text style={s.text}>{children}</Text>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  box: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: RADIUS.sm,
-    marginBottom: 12,
-  },
-  text: { flex: 1, fontSize: 13, lineHeight: 18, color: COLORS.text },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    box: {
+      flexDirection: "row",
+      gap: 8,
+      alignItems: "flex-start",
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: RADIUS.sm,
+      marginBottom: 12,
+    },
+    text: { flex: 1, fontSize: 13, lineHeight: 18, color: c.text },
+  });

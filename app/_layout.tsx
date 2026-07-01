@@ -5,16 +5,19 @@ import {
   Poppins_700Bold,
   useFonts,
 } from "@expo-google-fonts/poppins";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
-import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { getPaperTheme } from "@/constants/paperTheme";
+import { DARK, FONT_FAMILY, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { startAutoDrain } from "@/src/offline/autoDrain";
 import { queryClient } from "@/src/services/queryClient";
@@ -92,7 +95,16 @@ function AuthGate() {
   return null;
 }
 
+// Render Paper's icons with @expo/vector-icons (which bundles the
+// MaterialCommunityIcons glyphs the app already uses), so Paper doesn't require
+// react-native-vector-icons font linking.
+const paperSettings = {
+  icon: (props: any) => <MaterialCommunityIcons {...props} />,
+};
+
 export default function RootLayout() {
+  const scheme = useColorScheme();
+  const palette = scheme === "dark" ? DARK : LIGHT;
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -102,8 +114,8 @@ export default function RootLayout() {
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.bg }}>
-        <ActivityIndicator size="large" color={COLORS.text} />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.bg }}>
+        <ActivityIndicator size="large" color={palette.text} />
       </View>
     );
   }
@@ -112,18 +124,20 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <AuthGate />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: COLORS.bg },
-              animation: "slide_from_right",
-            }}
-          >
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <StatusBar style="dark" />
+          <PaperProvider theme={getPaperTheme(scheme)} settings={paperSettings}>
+            <AuthGate />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: palette.bg },
+                animation: "slide_from_right",
+              }}
+            >
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+            <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+          </PaperProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>

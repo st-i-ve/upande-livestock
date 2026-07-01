@@ -2,7 +2,8 @@
 // Distinguish sections by icons and layout, not colour. `danger` is the only
 // colour with real meaning; reserve it for actual errors.
 
-export const COLORS = {
+// Light palette — the original monochrome tokens.
+export const LIGHT = {
   // Surfaces
   bg: "#FFFFFF",
   bgMuted: "#F5F5F5",
@@ -26,6 +27,32 @@ export const COLORS = {
   brand: "#000000",
 } as const;
 
+export type Palette = { [K in keyof typeof LIGHT]: string };
+
+// Dark palette — the monochrome system inverted (Scout-style). Interactive
+// accents flip to white; `danger` stays red but brightened for dark surfaces.
+export const DARK: Palette = {
+  bg: "#080808",
+  bgMuted: "#161616",
+  bgSubtle: "#101010",
+  text: "#FFFFFF",
+  textMuted: "#A0A0A0",
+  textSubtle: "#6E6E6E",
+  border: "#2A2A2A",
+  borderSubtle: "#1C1C1C",
+  primary: "#FFFFFF",
+  info: "#FFFFFF",
+  success: "#FFFFFF",
+  warning: "#9CA3AF",
+  danger: "#E5484D",
+  brand: "#FFFFFF",
+};
+
+// Backwards-compatible static export. Screens not yet migrated to useColors()
+// import this and render in light mode. Migrating a screen = swap this import
+// for the useColors() hook. See src/hooks/useColors.ts.
+export const COLORS = LIGHT;
+
 export const RADIUS = { sm: 6, md: 8, lg: 12, xl: 14 } as const;
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
 
@@ -39,14 +66,15 @@ export const FONT_FAMILY = {
   bold: "Poppins_700Bold",
 } as const;
 
+// Type scale bumped toward the Scout reference — larger, more legible sizes.
 export const FONT = {
-  page: { size: 16, weight: "600" as const },
-  card: { size: 14, weight: "600" as const },
-  body: { size: 13, weight: "400" as const },
-  meta: { size: 11, weight: "400" as const },
-  label: { size: 11, weight: "500" as const },
-  metric: { size: 22, weight: "700" as const },
-  section: { size: 11, weight: "600" as const },
+  page: { size: 20, weight: "600" as const },
+  card: { size: 16, weight: "600" as const },
+  body: { size: 16, weight: "400" as const },
+  meta: { size: 13, weight: "400" as const },
+  label: { size: 13, weight: "500" as const },
+  metric: { size: 28, weight: "700" as const },
+  section: { size: 13, weight: "600" as const },
 } as const;
 
 export const APP = {
