@@ -1,20 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 export type AvatarTone = "calf" | "bull" | "dry" | "warning" | "danger" | "default";
-
-// Monochrome system: avatars are neutral grey by default. `danger` is the only
-// meaningful tone. Other legacy tones map to the same neutral style.
-const TONES: Record<AvatarTone, { bg: string; fg: string }> = {
-  default: { bg: COLORS.bgMuted, fg: COLORS.text },
-  calf:    { bg: COLORS.bgMuted, fg: COLORS.text },
-  bull:    { bg: COLORS.bgMuted, fg: COLORS.text },
-  dry:     { bg: COLORS.bgMuted, fg: COLORS.textMuted },
-  warning: { bg: COLORS.bgMuted, fg: COLORS.warning },
-  danger:  { bg: "transparent",  fg: COLORS.danger },
-};
 
 export function Avatar({
   text,
@@ -27,7 +16,18 @@ export function Avatar({
   tone?: AvatarTone;
   size?: number;
 }) {
-  const t = TONES[tone];
+  const c = useColors();
+  // Monochrome system: avatars are neutral by default. `danger` is the only
+  // meaningful tone. Other legacy tones map to the neutral style.
+  const tones: Record<AvatarTone, { bg: string; fg: string }> = {
+    default: { bg: c.bgMuted, fg: c.text },
+    calf:    { bg: c.bgMuted, fg: c.text },
+    bull:    { bg: c.bgMuted, fg: c.text },
+    dry:     { bg: c.bgMuted, fg: c.textMuted },
+    warning: { bg: c.bgMuted, fg: c.warning },
+    danger:  { bg: "transparent", fg: c.danger },
+  };
+  const t = tones[tone];
   return (
     <View
       style={[
@@ -37,7 +37,7 @@ export function Avatar({
           width: size,
           height: size,
           borderRadius: size / 2,
-          borderColor: tone === "danger" ? COLORS.danger : COLORS.borderSubtle,
+          borderColor: tone === "danger" ? c.danger : c.borderSubtle,
         },
       ]}
     >

@@ -1,10 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { COLORS, FONT } from "@/constants/theme";
+import { FONT } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 export function Screen({
   title,
@@ -25,6 +26,8 @@ export function Screen({
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();
   const nav = useNavigation();
   const canGoBack = nav.canGoBack();
@@ -35,7 +38,7 @@ export function Screen({
       <View style={s.appbar}>
         {showBack ? (
           <Pressable onPress={() => router.back()} hitSlop={10} style={s.iconBtn}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.text} />
+            <MaterialCommunityIcons name="arrow-left" size={22} color={c.text} />
           </Pressable>
         ) : null}
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -49,7 +52,7 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           refreshControl={
             onRefresh ? (
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.text} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.text} />
             ) : undefined
           }
         >
@@ -63,24 +66,25 @@ export function Screen({
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  appbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-    backgroundColor: COLORS.bg,
-  },
-  iconBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: FONT.page.size, fontWeight: FONT.page.weight, color: COLORS.text },
-  subtitle: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
-  body: { padding: 14 },
-  footer: {
-    padding: 14, backgroundColor: COLORS.bg,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSubtle,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    appbar: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+      backgroundColor: c.bg,
+    },
+    iconBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+    title: { fontSize: FONT.page.size, fontWeight: FONT.page.weight, color: c.text },
+    subtitle: { fontSize: 13, color: c.textMuted, marginTop: 1 },
+    body: { padding: 14 },
+    footer: {
+      padding: 14, backgroundColor: c.bg,
+      borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.borderSubtle,
+    },
+  });

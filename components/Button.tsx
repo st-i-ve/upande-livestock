@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
-import { COLORS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 type Variant = "primary" | "outline" | "danger" | "link";
 
@@ -22,6 +22,9 @@ export function Button({
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   style?: ViewStyle;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
+
   const base = variant === "primary" ? s.primary
     : variant === "outline" ? s.outline
     : variant === "danger" ? s.danger
@@ -30,6 +33,7 @@ export function Button({
     : variant === "outline" ? s.outlineText
     : variant === "danger" ? s.dangerText
     : s.linkText;
+  const onFill = variant === "primary" ? c.bg : "#fff";
 
   return (
     <Pressable
@@ -43,9 +47,9 @@ export function Button({
     >
       <View style={s.row}>
         {loading ? (
-          <ActivityIndicator size="small" color={variant === "primary" || variant === "danger" ? "#fff" : COLORS.text} />
+          <ActivityIndicator size="small" color={variant === "primary" || variant === "danger" ? onFill : c.text} />
         ) : icon ? (
-          <MaterialCommunityIcons name={icon} size={16} color={(variant === "primary" || variant === "danger") ? "#fff" : COLORS.text} />
+          <MaterialCommunityIcons name={icon} size={18} color={(variant === "primary" || variant === "danger") ? onFill : c.text} />
         ) : null}
         <Text style={text}>{label}</Text>
       </View>
@@ -53,19 +57,20 @@ export function Button({
   );
 }
 
-const s = StyleSheet.create({
-  btn: {
-    paddingVertical: 11, paddingHorizontal: 20,
-    borderRadius: 999, alignItems: "center", justifyContent: "center",
-    marginTop: 6,
-  },
-  row: { flexDirection: "row", alignItems: "center", gap: 6 },
-  primary: { backgroundColor: COLORS.primary },
-  primaryText: { color: COLORS.bg, fontSize: 13, fontWeight: "600" },
-  outline: { backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.border },
-  outlineText: { color: COLORS.text, fontSize: 13, fontWeight: "500" },
-  danger: { backgroundColor: "#A32D2D" },
-  dangerText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  link: { paddingVertical: 6, marginTop: 0 },
-  linkText: { color: COLORS.text, fontSize: 12, fontWeight: "600", textDecorationLine: "underline" },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    btn: {
+      paddingVertical: 13, paddingHorizontal: 20,
+      borderRadius: 999, alignItems: "center", justifyContent: "center",
+      marginTop: 6,
+    },
+    row: { flexDirection: "row", alignItems: "center", gap: 6 },
+    primary: { backgroundColor: c.primary },
+    primaryText: { color: c.bg, fontSize: 16, fontWeight: "600" },
+    outline: { backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth, borderColor: c.border },
+    outlineText: { color: c.text, fontSize: 16, fontWeight: "500" },
+    danger: { backgroundColor: c.danger },
+    dangerText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+    link: { paddingVertical: 6, marginTop: 0 },
+    linkText: { color: c.text, fontSize: 14, fontWeight: "600", textDecorationLine: "underline" },
+  });
