@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Dimensions,
+  Easing,
   Image,
   ImageBackground,
   Keyboard,
@@ -11,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput as RNTextInput,
   useColorScheme,
   TouchableWithoutFeedback,
   View,
@@ -30,6 +33,10 @@ import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 const FIELD_WIDTH = Math.min(Math.round(Dimensions.get("window").width * 0.8), 400);
 // How long the logo must be held to reveal the hidden instance-URL field.
 const REVEAL_HOLD_MS = 3000;
+// The URL field collapses back into the logo after this long with no activity.
+const IDLE_HIDE_MS = 5000;
+// Fully-expanded height of the URL field row (input + spacing below).
+const URL_FIELD_HEIGHT = 72;
 
 export default function LoginScreen() {
   const c = useColors();
@@ -43,7 +50,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The instance URL is an advanced setting, hidden until the logo is held.
-  const [showUrl, setShowUrl] = useState(false);
+  const [urlRevealed, setUrlRevealed] = useState(false);
 
   const instanceUrl = useAuthStore((st) => st.instanceUrl);
   const storedEmail = useAuthStore((st) => st.email);
@@ -51,6 +58,13 @@ export default function LoginScreen() {
 
   // Editable mirror of the stored URL. Persists via the login flow.
   const [url, setUrl] = useState(instanceUrl);
+  const hasInstance = !!url.trim();
+
+  // Reveal animation: 0 = URL hidden (ring shown), 1 = URL shown (ring gone).
+  const reveal = useRef(new Animated.Value(0)).current;
+  const urlInputRef = useRef<RNTextInput | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusedRef = useRef(false);
 
   useEffect(() => {
     if (storedEmail && !email) setEmail(storedEmail);
@@ -60,12 +74,57 @@ export default function LoginScreen() {
     if (instanceUrl && !url) setUrl(instanceUrl);
   }, [instanceUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const clearHideTimer = () => {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  };
+
+  const hideUrl = () => {
+    clearHideTimer();
+    urlInputRef.current?.blur();
+    setUrlRevealed(false);
+    Animated.timing(reveal, {
+      toValue: 0,
+      duration: 260,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // Collapse after a period of inactivity, but only while the field is not
+  // actively focused (a live cursor counts as activity).
+  const armHideTimer = () => {
+    clearHideTimer();
+    hideTimer.current = setTimeout(() => {
+      if (!focusedRef.current) hideUrl();
+    }, IDLE_HIDE_MS);
+  };
+
+  const revealUrl = () => {
+    if (urlRevealed) return;
+    setUrlRevealed(true);
+    Animated.timing(reveal, {
+      toValue: 1,
+      duration: 340,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) urlInputRef.current?.focus();
+    });
+    // Fallback: if focus never lands, still collapse after the idle window.
+    armHideTimer();
+  };
+
+  useEffect(() => clearHideTimer, []);
+
   const handleLogin = async () => {
     if (loading) return;
     setError(null);
     if (!url.trim()) {
       // Surface the hidden field so the user can supply the missing URL.
-      setShowUrl(true);
+      revealUrl();
       setError("Enter the Frappe instance URL.");
       return;
     }
@@ -95,13 +154,10 @@ export default function LoginScreen() {
 
   const banner = BANNER_COLORS[dark ? "dark" : "light"].error;
 
-  const logoImage = (
-    <Image
-      source={require("../../assets/images/upande_logo_no_bg.png")}
-      style={s.logo}
-      resizeMode="contain"
-    />
-  );
+  // Ring shrinks into the logo and fades as the URL field rolls open.
+  const ringScale = reveal.interpolate({ inputRange: [0, 1], outputRange: [1, 0.5] });
+  const ringOpacity = reveal.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const urlHeight = reveal.interpolate({ inputRange: [0, 1], outputRange: [0, URL_FIELD_HEIGHT] });
 
   return (
     <ImageBackground
@@ -127,17 +183,37 @@ export default function LoginScreen() {
             >
               <View style={s.content}>
                 <View style={s.header}>
-                  <Pressable
-                    delayLongPress={REVEAL_HOLD_MS}
-                    onLongPress={() => setShowUrl(true)}
-                  >
-                    {dark ? <View style={s.logoCircle}>{logoImage}</View> : logoImage}
+                  <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
+                    <View style={s.logoBox}>
+                      {dark ? <View style={s.disc} /> : null}
+                      <Animated.View
+                        pointerEvents="none"
+                        style={[
+                          s.ring,
+                          {
+                            borderColor: c.text,
+                            borderStyle: hasInstance ? "solid" : "dotted",
+                            opacity: ringOpacity,
+                            transform: [{ scale: ringScale }],
+                          },
+                        ]}
+                      />
+                      <Image
+                        source={require("../../assets/images/upande_logo_no_bg.png")}
+                        style={s.logo}
+                        resizeMode="contain"
+                      />
+                    </View>
                   </Pressable>
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
 
-                {showUrl ? (
+                <Animated.View
+                  pointerEvents={urlRevealed ? "auto" : "none"}
+                  style={{ height: urlHeight, opacity: reveal, overflow: "hidden" }}
+                >
                   <TextInput
+                    ref={urlInputRef as any}
                     mode="outlined"
                     label="Frappe site URL"
                     value={url}
@@ -147,12 +223,20 @@ export default function LoginScreen() {
                     autoCorrect={false}
                     keyboardType="url"
                     returnKeyType="next"
+                    onFocus={() => {
+                      focusedRef.current = true;
+                      clearHideTimer();
+                    }}
+                    onBlur={() => {
+                      focusedRef.current = false;
+                      armHideTimer();
+                    }}
                     outlineStyle={s.outline}
                     textColor={c.text}
                     theme={inputTheme}
-                    style={s.input}
+                    style={s.urlInput}
                   />
-                ) : null}
+                </Animated.View>
 
                 <TextInput
                   mode="outlined"
@@ -214,6 +298,10 @@ export default function LoginScreen() {
   );
 }
 
+const RING = 220;
+const DISC = 190;
+const LOGO = 168;
+
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     background: { flex: 1, backgroundColor: c.bg },
@@ -221,16 +309,22 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
     content: { width: FIELD_WIDTH, alignSelf: "center" },
     header: { alignItems: "center", marginBottom: 40 },
-    logo: { width: 200, height: 200 },
-    logoCircle: {
-      width: 220,
-      height: 220,
-      borderRadius: 110,
-      backgroundColor: "#ffffff",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 15,
+    logoBox: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
+    ring: {
+      position: "absolute",
+      width: RING,
+      height: RING,
+      borderRadius: RING / 2,
+      borderWidth: 3,
     },
+    disc: {
+      position: "absolute",
+      width: DISC,
+      height: DISC,
+      borderRadius: DISC / 2,
+      backgroundColor: "#ffffff",
+    },
+    logo: { width: LOGO, height: LOGO },
     title: {
       color: c.text,
       letterSpacing: 1,
@@ -238,6 +332,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       lineHeight: 48,
       marginTop: 6,
     },
+    urlInput: { marginBottom: 16, backgroundColor: c.bg },
     input: { marginBottom: 14, backgroundColor: c.bg },
     outline: { borderRadius: 50 },
     banner: {
