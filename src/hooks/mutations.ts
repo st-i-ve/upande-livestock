@@ -27,10 +27,7 @@ import {
   CreateMilkRecordingInput,
   createMilkRecording,
 } from "@/src/frappe/milkRecording";
-import {
-  CreateFeedingWorkOrderInput,
-  createFeedingWorkOrder,
-} from "@/src/frappe/workOrder";
+import { feedHerd, manufactureHerdFeed } from "@/src/frappe/feeding";
 import {
   BatchDrugIssueInput,
   submitBatchDrugIssue,
@@ -110,8 +107,6 @@ const labelCase = (i: CreateAnimalHealthCaseInput): string =>
   `Health case · ${i.animal}`;
 const labelCaseUpdate = (i: UpdateAnimalHealthCaseInput): string =>
   `Case close · ${i.name} · ${i.caseStatus}`;
-const labelWorkOrder = (i: CreateFeedingWorkOrderInput): string =>
-  `TMR feed · ${i.herd}`;
 const labelBatchDrug = (i: BatchDrugIssueInput): string =>
   `Batch drug issue · ${i.eventNames.length} animals`;
 
@@ -180,11 +175,22 @@ export const useCreateAnimalHealthCase = () => {
   });
 };
 
-export const useCreateFeedingWorkOrder = () => {
+// Animal feeding is a two-stage, server-orchestrated flow (Work Order + stock
+// entries, then Material Issue) that needs a live connection and current stock
+// — so these run directly rather than through the offline queue.
+export const useManufactureHerdFeed = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateFeedingWorkOrderInput) =>
-      tryDirectOrEnqueue("FeedingWorkOrder", input, createFeedingWorkOrder, labelWorkOrder(input)),
+    mutationFn: (herd: string) => manufactureHerdFeed(herd),
+    onSuccess: () => invalidateAll(qc),
+  });
+};
+
+export const useFeedHerd = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { herd: string; qty: number; employee?: string }) =>
+      feedHerd(input.herd, input.qty, input.employee),
     onSuccess: () => invalidateAll(qc),
   });
 };
