@@ -7,9 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/src/hooks/useColors";
 
-const ICON_SIZE = 27;
+const ICON_SIZE = 31;
 const BAR_CONTENT_HEIGHT = 58;
-const CIRCLE_DIAMETER = 48;
+const CIRCLE_DIAMETER = 50;
 const CIRCLE_LIFT = 10;
 
 function RecordTabButton(props: BottomTabBarButtonProps) {
@@ -27,7 +27,7 @@ function RecordTabButton(props: BottomTabBarButtonProps) {
       style={s.recordCell}
     >
       <View style={[s.recordCircle, selected && s.recordCircleSelected]}>
-        <MaterialCommunityIcons name="plus" size={24} color={c.bg} />
+        <MaterialCommunityIcons name="plus" size={26} color={c.bg} />
       </View>
     </Pressable>
   );
@@ -72,8 +72,8 @@ export default function TabLayout() {
         name="animals"
         options={{
           title: "Animals",
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="cow" size={ICON_SIZE} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons name={focused ? "paw" : "paw-outline"} size={ICON_SIZE} color={color} />
           ),
         }}
       />
