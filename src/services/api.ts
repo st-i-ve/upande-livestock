@@ -61,12 +61,46 @@ export const setUnauthorizedHandler = (fn: (() => void) | null) => {
   onUnauthorized = fn;
 };
 
-const isUnauthorized = (err: AxiosError): boolean => {
-  const status = err.response?.status;
-  if (status === 401 || status === 403) return true;
+// Frappe returns 401 when the session is genuinely gone, but it also returns
+// 403 for two very different situations that must NOT be conflated:
+//   (a) an authentication/CSRF failure (session dead) — should log out, and
+//   (b) a plain PermissionError where a *valid* session simply lacks rights on
+//       one doctype — must keep the session and surface the error instead.
+// Treating every 403 as (a) is what booted logged-in users to the login screen.
+const AUTH_EXC = /CSRFTokenError|AuthenticationError|SessionExpired|InvalidAuthorizationToken/i;
+
+/** A response error that unambiguously means the session is no longer valid. */
+const isAuthFailure = (err: AxiosError): boolean => {
+  if (err.response?.status === 401) return true;
   const data = err.response?.data as any;
   const exc = String(data?.exc ?? data?.exception ?? "");
-  return /CSRFTokenError|AuthenticationError|SessionExpired/i.test(exc);
+  return AUTH_EXC.test(exc);
+};
+
+/**
+ * Confirms whether the stored session is still valid by asking Frappe who we
+ * are. Returns false only if the session has actually expired (server answers
+ * "Guest") or the probe itself is rejected. Uses a bare axios call so it never
+ * re-enters the response interceptor and cannot recurse.
+ */
+const isSessionAlive = async (): Promise<boolean> => {
+  try {
+    const baseUrl = await storage.getItem(STORAGE_KEYS.INSTANCE_URL);
+    if (!baseUrl) return false;
+    const cookie = await storage.getItem(STORAGE_KEYS.COOKIE);
+    const sid = await storage.getItem(STORAGE_KEYS.SID);
+    const headers: Record<string, string> = {};
+    if (cookie) headers["Cookie"] = cookie;
+    if (sid) headers["sid"] = sid;
+    const res = await axios.get(
+      `${normalizeBaseUrl(baseUrl)}/api/method/frappe.auth.get_logged_user`,
+      { headers, timeout: 10_000 },
+    );
+    const user = res.data?.message;
+    return !!user && user !== "Guest";
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -139,15 +173,29 @@ export const getClient = async (): Promise<AxiosInstance> => {
 
   client.interceptors.response.use(
     (response) => response,
-    (error) => {
-      if (isUnauthorized(error as AxiosError) && onUnauthorized) {
+    async (error) => {
+      const err = error as AxiosError;
+      const fireUnauthorized = () => {
+        if (!onUnauthorized) return;
         try {
           onUnauthorized();
         } catch (e) {
           console.warn("[api] onUnauthorized handler threw", e);
         }
+      };
+      if (onUnauthorized) {
+        if (isAuthFailure(err)) {
+          // Session is definitively gone (401 or an auth/CSRF exception).
+          fireUnauthorized();
+        } else if (err.response?.status === 403) {
+          // A bare 403 is ambiguous: a permission gap on one doctype (keep the
+          // session) vs. an expired session surfacing as Guest+PermissionError.
+          // Probe who we are — only log out if the session is actually dead.
+          const alive = await isSessionAlive();
+          if (!alive) fireUnauthorized();
+        }
       }
-      return Promise.reject(error);
+      return Promise.reject(err);
     },
   );
 
