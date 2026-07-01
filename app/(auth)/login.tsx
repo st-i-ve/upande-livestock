@@ -1,11 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Dimensions,
   Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +25,12 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { extractFrappeError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 
+// Login form fields never grow past 80% of the screen width so they stay
+// comfortable to read on tablets and large phones.
+const FIELD_WIDTH = Math.min(Math.round(Dimensions.get("window").width * 0.8), 400);
+// How long the logo must be held to reveal the hidden instance-URL field.
+const REVEAL_HOLD_MS = 3000;
+
 export default function LoginScreen() {
   const c = useColors();
   const scheme = useColorScheme();
@@ -34,6 +42,8 @@ export default function LoginScreen() {
   const [obscure, setObscure] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The instance URL is an advanced setting, hidden until the logo is held.
+  const [showUrl, setShowUrl] = useState(false);
 
   const instanceUrl = useAuthStore((st) => st.instanceUrl);
   const storedEmail = useAuthStore((st) => st.email);
@@ -54,6 +64,8 @@ export default function LoginScreen() {
     if (loading) return;
     setError(null);
     if (!url.trim()) {
+      // Surface the hidden field so the user can supply the missing URL.
+      setShowUrl(true);
       setError("Enter the Frappe instance URL.");
       return;
     }
@@ -83,6 +95,14 @@ export default function LoginScreen() {
 
   const banner = BANNER_COLORS[dark ? "dark" : "light"].error;
 
+  const logoImage = (
+    <Image
+      source={require("../../assets/images/upande_logo_no_bg.png")}
+      style={s.logo}
+      resizeMode="contain"
+    />
+  );
+
   return (
     <ImageBackground
       source={
@@ -107,33 +127,32 @@ export default function LoginScreen() {
             >
               <View style={s.content}>
                 <View style={s.header}>
-                  <Image
-                    source={
-                      dark
-                        ? require("../../assets/images/upande_logo_no_bg_d.png")
-                        : require("../../assets/images/upande_logo_no_bg.png")
-                    }
-                    style={s.logo}
-                    resizeMode="contain"
-                  />
+                  <Pressable
+                    delayLongPress={REVEAL_HOLD_MS}
+                    onLongPress={() => setShowUrl(true)}
+                  >
+                    {dark ? <View style={s.logoCircle}>{logoImage}</View> : logoImage}
+                  </Pressable>
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
 
-                <TextInput
-                  mode="outlined"
-                  label="Frappe site URL"
-                  value={url}
-                  onChangeText={setUrl}
-                  placeholder={INSTANCE_URL_PLACEHOLDER}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  returnKeyType="next"
-                  outlineStyle={s.outline}
-                  textColor={c.text}
-                  theme={inputTheme}
-                  style={s.input}
-                />
+                {showUrl ? (
+                  <TextInput
+                    mode="outlined"
+                    label="Frappe site URL"
+                    value={url}
+                    onChangeText={setUrl}
+                    placeholder={INSTANCE_URL_PLACEHOLDER}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    returnKeyType="next"
+                    outlineStyle={s.outline}
+                    textColor={c.text}
+                    theme={inputTheme}
+                    style={s.input}
+                  />
+                ) : null}
 
                 <TextInput
                   mode="outlined"
@@ -200,9 +219,18 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     background: { flex: 1, backgroundColor: c.bg },
     container: { flex: 1 },
     scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
-    content: { width: "100%", maxWidth: 400, alignSelf: "center" },
+    content: { width: FIELD_WIDTH, alignSelf: "center" },
     header: { alignItems: "center", marginBottom: 40 },
     logo: { width: 200, height: 200 },
+    logoCircle: {
+      width: 220,
+      height: 220,
+      borderRadius: 110,
+      backgroundColor: "#ffffff",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 15,
+    },
     title: {
       color: c.text,
       letterSpacing: 1,
