@@ -23,6 +23,9 @@ export type BatchDrugIssueInput = {
   remarks: string;
   /** Frappe Company for the Stock Entry and JE. */
   company: string;
+  /** Employee (operator) the drug issue is attributed to. Required by the
+   *  site's Material Issue validation (custom_employee_data must have one). */
+  employee?: string;
 };
 
 export type BatchDrugIssueResult = {
@@ -49,7 +52,7 @@ export async function submitBatchDrugIssue(
   const baseRemarks = buildRemarks(input);
 
   if (input.drugRows.length > 0) {
-    const se = await frappeCreateAndSubmit<{ name: string }>("Stock Entry", {
+    const doc: Record<string, any> = {
       stock_entry_type: "Material Issue",
       company: input.company,
       posting_date: todayISO(),
@@ -60,7 +63,15 @@ export async function submitBatchDrugIssue(
         uom: d.uom,
         s_warehouse: d.sourceWarehouse,
       })),
-    });
+    };
+    // The site validates every Material Issue against custom_employee_data
+    // (PPE issuance rule). Attribute the issue to the operating employee so
+    // the drug issue submits; drugs are not PPE items so no assignment is made.
+    if (input.employee) {
+      doc.custom_employee = input.employee;
+      doc.custom_employee_data = [{ employee: input.employee }];
+    }
+    const se = await frappeCreateAndSubmit<{ name: string }>("Stock Entry", doc);
     result.stockEntry = { name: se.name };
   }
 
