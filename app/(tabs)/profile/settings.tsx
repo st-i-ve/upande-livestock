@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
@@ -9,7 +9,8 @@ import { ErrorState } from "@/components/ErrorState";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Loader } from "@/components/Loader";
 import { Screen } from "@/components/Screen";
-import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { FONT_FAMILY } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { LivestockSettingsDoc } from "@/src/frappe/livestockSettings";
 import {
   useLivestockSettings,
@@ -18,6 +19,8 @@ import {
 import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
@@ -41,6 +44,8 @@ function LabeledInput({
   hint?: string;
   placeholder?: string;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.field}>
       <Text style={s.fieldLabel}>{label}</Text>
@@ -49,7 +54,7 @@ function LabeledInput({
         onChangeText={onChangeText}
         keyboardType={keyboardType}
         placeholder={placeholder}
-        placeholderTextColor={COLORS.textSubtle}
+        placeholderTextColor={c.textSubtle}
         style={s.input}
       />
       {hint ? <Text style={s.fieldHint}>{hint}</Text> : null}
@@ -78,6 +83,8 @@ function LinkField({
   searchField?: string;
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.field}>
       <Text style={s.fieldLabel}>{label}</Text>
@@ -390,49 +397,50 @@ export default function Settings() {
   );
 }
 
-const s = StyleSheet.create({
-  sectionHeader: {
-    marginTop: 4,
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-    letterSpacing: -0.2,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    marginTop: 3,
-  },
-  field: {
-    marginBottom: 14,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.medium,
-    marginBottom: 7,
-    letterSpacing: 0.2,
-  },
-  fieldHint: {
-    fontSize: 11,
-    color: COLORS.textSubtle,
-    fontFamily: FONT_FAMILY.regular,
-    marginTop: 6,
-  },
-  input: {
-    width: "100%",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.regular,
-    backgroundColor: COLORS.bg,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    sectionHeader: {
+      marginTop: 4,
+      marginBottom: 14,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+      letterSpacing: -0.2,
+    },
+    sectionSubtitle: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      marginTop: 3,
+    },
+    field: {
+      marginBottom: 14,
+    },
+    fieldLabel: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.medium,
+      marginBottom: 7,
+      letterSpacing: 0.2,
+    },
+    fieldHint: {
+      fontSize: 11,
+      color: c.textSubtle,
+      fontFamily: FONT_FAMILY.regular,
+      marginTop: 6,
+    },
+    input: {
+      width: "100%",
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      color: c.text,
+      fontFamily: FONT_FAMILY.regular,
+      backgroundColor: c.bg,
+    },
+  });

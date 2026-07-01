@@ -10,7 +10,8 @@ import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { APP, COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import type { MilkSession } from "@/src/frappe/milkRecording";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
@@ -27,6 +28,8 @@ type PerHerd = { total: string; discard: string; colostrum: string };
 const EMPTY: PerHerd = { total: "", discard: "", colostrum: "" };
 
 export default function Milk() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const employeeName = useAuthStore((s) => s.employeeName);
   const { data: herds = [] } = useHerds();
 
@@ -198,7 +201,7 @@ export default function Milk() {
         </View>
         <Pressable
           onPress={() => setAllCol((v) => !v)}
-          style={[s.toggle, allCol && { backgroundColor: COLORS.text }]}
+          style={[s.toggle, allCol && { backgroundColor: c.text }]}
         >
           <View style={[s.knob, allCol && { transform: [{ translateX: 16 }] }]} />
         </Pressable>
@@ -282,28 +285,29 @@ export default function Milk() {
   );
 }
 
-const s = StyleSheet.create({
-  toggleRow: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: COLORS.bgMuted, borderRadius: RADIUS.md, marginBottom: 8,
-  },
-  toggleTitle: { fontSize: 12, fontWeight: "600", color: COLORS.text },
-  toggleSub: { fontSize: 10, color: COLORS.textMuted, marginTop: 2 },
-  toggle: { width: 36, height: 20, borderRadius: 999, backgroundColor: COLORS.border, justifyContent: "center" },
-  knob: { width: 16, height: 16, borderRadius: 8, backgroundColor: COLORS.bg, marginLeft: 2 },
-  herdCard: {
-    backgroundColor: COLORS.bgMuted,
-    borderRadius: RADIUS.md,
-    padding: 12,
-    marginBottom: 10,
-  },
-  herdCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: 8,
-  },
-  herdName: { fontSize: 13, color: COLORS.text, fontFamily: FONT_FAMILY.semibold, flex: 1, minWidth: 0 },
-  herdMeta: { fontSize: 11, color: COLORS.textMuted, fontVariant: ["tabular-nums"] },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    toggleRow: {
+      flexDirection: "row", alignItems: "center",
+      paddingHorizontal: 12, paddingVertical: 10,
+      backgroundColor: c.bgMuted, borderRadius: RADIUS.md, marginBottom: 8,
+    },
+    toggleTitle: { fontSize: 12, fontWeight: "600", color: c.text },
+    toggleSub: { fontSize: 10, color: c.textMuted, marginTop: 2 },
+    toggle: { width: 36, height: 20, borderRadius: 999, backgroundColor: c.border, justifyContent: "center" },
+    knob: { width: 16, height: 16, borderRadius: 8, backgroundColor: c.bg, marginLeft: 2 },
+    herdCard: {
+      backgroundColor: c.bgMuted,
+      borderRadius: RADIUS.md,
+      padding: 12,
+      marginBottom: 10,
+    },
+    herdCardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      marginBottom: 8,
+    },
+    herdName: { fontSize: 13, color: c.text, fontFamily: FONT_FAMILY.semibold, flex: 1, minWidth: 0 },
+    herdMeta: { fontSize: 11, color: c.textMuted, fontVariant: ["tabular-nums"] },
+  });

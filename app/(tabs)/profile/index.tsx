@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Alert,
   Pressable,
@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
-import { APP, COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { usePendingCount } from "@/src/hooks/useQueueStatus";
@@ -26,24 +27,30 @@ type RowProps = {
 };
 
 function Row({ icon, label, onPress, destructive, right }: RowProps) {
-  const color = destructive ? COLORS.danger : COLORS.text;
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
+  const color = destructive ? c.danger : c.text;
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [s.row, pressed && { backgroundColor: COLORS.bgMuted }]}
+      style={({ pressed }) => [s.row, pressed && { backgroundColor: c.bgMuted }]}
     >
       <MaterialCommunityIcons name={icon} size={22} color={color} />
       <Text style={[s.rowLabel, { color }]} numberOfLines={1}>{label}</Text>
-      {right ?? <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.textSubtle} />}
+      {right ?? <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />}
     </Pressable>
   );
 }
 
 function Subheader({ children }: { children: React.ReactNode }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return <Text style={s.subheader}>{children}</Text>;
 }
 
 export default function Profile() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
   const employeeName = useAuthStore((s) => s.employeeName);
@@ -139,133 +146,134 @@ export default function Profile() {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  appbar: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: COLORS.bg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  appbarTitle: {
-    fontSize: 20,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-  },
-  scroll: { paddingBottom: 24 },
-  userSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.text,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: COLORS.bg,
-    fontSize: 32,
-    fontFamily: FONT_FAMILY.bold,
-  },
-  name: {
-    fontSize: 22,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.bold,
-  },
-  caption: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.medium,
-    marginTop: 2,
-  },
-  menuWrapper: {
-    marginHorizontal: 16,
-    marginTop: 4,
-    borderRadius: RADIUS.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    overflow: "hidden",
-    paddingVertical: 6,
-  },
-  subheader: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.medium,
-    letterSpacing: 0.4,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  rowLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: FONT_FAMILY.regular,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.borderSubtle,
-    marginVertical: 4,
-    marginHorizontal: 12,
-  },
-  versionContainer: {
-    padding: 20,
-    alignItems: "center",
-    marginTop: 12,
-  },
-  versionText: {
-    color: COLORS.textSubtle,
-    fontSize: 12,
-    fontFamily: FONT_FAMILY.regular,
-  },
-  badge: {
-    minWidth: 22,
-    height: 22,
-    paddingHorizontal: 6,
-    borderRadius: 11,
-    backgroundColor: COLORS.danger,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 6,
-  },
-  badgeText: {
-    color: COLORS.bg,
-    fontSize: 11,
-    fontFamily: FONT_FAMILY.semibold,
-  },
-  empWrapper: {
-    marginHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 16,
-    borderRadius: RADIUS.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    overflow: "hidden",
-    paddingBottom: 12,
-  },
-  empBody: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  empHint: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    lineHeight: 15,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    appbar: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: c.bg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    appbarTitle: {
+      fontSize: 20,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+    },
+    scroll: { paddingBottom: 24 },
+    userSection: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 24,
+      paddingTop: 20,
+      paddingBottom: 24,
+    },
+    avatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: c.text,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: {
+      color: c.bg,
+      fontSize: 32,
+      fontFamily: FONT_FAMILY.bold,
+    },
+    name: {
+      fontSize: 22,
+      color: c.text,
+      fontFamily: FONT_FAMILY.bold,
+    },
+    caption: {
+      fontSize: 13,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.medium,
+      marginTop: 2,
+    },
+    menuWrapper: {
+      marginHorizontal: 16,
+      marginTop: 4,
+      borderRadius: RADIUS.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.bg,
+      overflow: "hidden",
+      paddingVertical: 6,
+    },
+    subheader: {
+      fontSize: 11,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.medium,
+      letterSpacing: 0.4,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 4,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+    },
+    rowLabel: {
+      flex: 1,
+      fontSize: 14,
+      fontFamily: FONT_FAMILY.regular,
+    },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.borderSubtle,
+      marginVertical: 4,
+      marginHorizontal: 12,
+    },
+    versionContainer: {
+      padding: 20,
+      alignItems: "center",
+      marginTop: 12,
+    },
+    versionText: {
+      color: c.textSubtle,
+      fontSize: 12,
+      fontFamily: FONT_FAMILY.regular,
+    },
+    badge: {
+      minWidth: 22,
+      height: 22,
+      paddingHorizontal: 6,
+      borderRadius: 11,
+      backgroundColor: c.danger,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 6,
+    },
+    badgeText: {
+      color: c.bg,
+      fontSize: 11,
+      fontFamily: FONT_FAMILY.semibold,
+    },
+    empWrapper: {
+      marginHorizontal: 16,
+      marginTop: 4,
+      marginBottom: 16,
+      borderRadius: RADIUS.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.bg,
+      overflow: "hidden",
+      paddingBottom: 12,
+    },
+    empBody: {
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    empHint: {
+      fontSize: 11,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      lineHeight: 15,
+    },
+  });

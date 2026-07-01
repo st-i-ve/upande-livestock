@@ -1,11 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 type Item = { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; href: string };
 
@@ -41,6 +41,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
 ];
 
 export default function Record() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <Screen title="Record an event" subtitle="Pick what you observed or did">
       {SECTIONS.map((sec) => (
@@ -50,11 +52,11 @@ export default function Record() {
             <Pressable
               key={it.href + it.label}
               onPress={() => router.push(it.href as any)}
-              style={({ pressed }) => [s.item, pressed && { backgroundColor: COLORS.bgMuted }]}
+              style={({ pressed }) => [s.item, pressed && { backgroundColor: c.bgMuted }]}
             >
-              <MaterialCommunityIcons name={it.icon} size={18} color={COLORS.textMuted} />
+              <MaterialCommunityIcons name={it.icon} size={18} color={c.textMuted} />
               <Text style={s.text}>{it.label}</Text>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.textSubtle} />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
             </Pressable>
           ))}
         </View>
@@ -63,14 +65,15 @@ export default function Record() {
   );
 }
 
-const s = StyleSheet.create({
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  text: { flex: 1, fontSize: 13, color: COLORS.text },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    item: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    text: { flex: 1, fontSize: 13, color: c.text },
+  });

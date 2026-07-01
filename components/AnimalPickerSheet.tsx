@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
 import { useAnimals } from "@/src/hooks/useAnimals";
+import { useColors } from "@/src/hooks/useColors";
 import { avatarToneFor, initials, pillFor } from "@/services/utils";
 import type { Animal } from "@/types";
 
@@ -38,6 +39,8 @@ export function AnimalPickerSheet({
   /** Seed the picker with prior choices so reopens preserve selection. */
   initialSelectedIds?: string[];
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const [view, setView] = useState<"all" | "herd">("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -121,11 +124,11 @@ export function AnimalPickerSheet({
     return (
       <Pressable
         onPress={() => toggle(a.id)}
-        style={({ pressed }) => [s.item, indent && { paddingLeft: 24 }, pressed && { backgroundColor: COLORS.bgMuted }]}
+        style={({ pressed }) => [s.item, indent && { paddingLeft: 24 }, pressed && { backgroundColor: c.bgMuted }]}
       >
         {mode === "multi" ? (
-          <View style={[s.cb, isSel && { backgroundColor: COLORS.text, borderColor: COLORS.text }]}>
-            {isSel ? <MaterialCommunityIcons name="check" size={13} color={COLORS.bg} /> : null}
+          <View style={[s.cb, isSel && { backgroundColor: c.text, borderColor: c.text }]}>
+            {isSel ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
           </View>
         ) : null}
         <Avatar text={initials(a.name)} tone={avatarToneFor(a)} size={30} />
@@ -148,7 +151,7 @@ export function AnimalPickerSheet({
           <View style={s.header}>
             <Text style={s.title}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={8}>
-              <MaterialCommunityIcons name="close" size={20} color={COLORS.text} />
+              <MaterialCommunityIcons name="close" size={20} color={c.text} />
             </Pressable>
           </View>
           <View style={s.tabs}>
@@ -160,24 +163,24 @@ export function AnimalPickerSheet({
             </Pressable>
           </View>
           <View style={s.searchRow}>
-            <MaterialCommunityIcons name="magnify" size={16} color={COLORS.textSubtle} />
+            <MaterialCommunityIcons name="magnify" size={16} color={c.textSubtle} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Tag or name"
-              placeholderTextColor={COLORS.textSubtle}
+              placeholderTextColor={c.textSubtle}
               style={s.searchInput}
             />
           </View>
 
           {isLoading && list.length === 0 ? (
             <View style={s.empty}>
-              <ActivityIndicator color={COLORS.text} />
+              <ActivityIndicator color={c.text} />
               <Text style={s.emptyText}>Loading animals…</Text>
             </View>
           ) : list.length === 0 ? (
             <View style={s.empty}>
-              <MaterialCommunityIcons name="magnify-close" size={32} color={COLORS.textSubtle} />
+              <MaterialCommunityIcons name="magnify-close" size={32} color={c.textSubtle} />
               <Text style={s.emptyText}>No animals match</Text>
               {emptyAction ? (
                 <Button label={emptyAction.label} variant="outline" icon="plus" onPress={() => { onClose(); emptyAction.onPress(); }} />
@@ -191,8 +194,8 @@ export function AnimalPickerSheet({
               ListHeaderComponent={
                 mode === "multi" ? (
                   <Pressable onPress={toggleAll} style={s.item}>
-                    <View style={[s.cb, allSelected && { backgroundColor: COLORS.text, borderColor: COLORS.text }]}>
-                      {allSelected ? <MaterialCommunityIcons name="check" size={13} color={COLORS.bg} /> : null}
+                    <View style={[s.cb, allSelected && { backgroundColor: c.text, borderColor: c.text }]}>
+                      {allSelected ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
                     </View>
                     <Text style={[s.itemName, { fontWeight: "700" }]}>Select all ({list.length})</Text>
                   </Pressable>
@@ -214,16 +217,16 @@ export function AnimalPickerSheet({
                       {mode === "multi" ? (
                         <View style={[
                           s.cb,
-                          (allSel || someSel) && { backgroundColor: COLORS.text, borderColor: COLORS.text },
+                          (allSel || someSel) && { backgroundColor: c.text, borderColor: c.text },
                         ]}>
                           {allSel ? (
-                            <MaterialCommunityIcons name="check" size={13} color={COLORS.bg} />
+                            <MaterialCommunityIcons name="check" size={13} color={c.bg} />
                           ) : someSel ? (
-                            <MaterialCommunityIcons name="minus" size={13} color={COLORS.bg} />
+                            <MaterialCommunityIcons name="minus" size={13} color={c.bg} />
                           ) : null}
                         </View>
                       ) : null}
-                      <MaterialCommunityIcons name="fence" size={16} color={COLORS.textMuted} />
+                      <MaterialCommunityIcons name="fence" size={16} color={c.textMuted} />
                       <Text style={s.groupTitle}>{item.herd}</Text>
                       <Text style={s.groupCount}>{item.count} head</Text>
                     </Pressable>
@@ -248,10 +251,11 @@ export function AnimalPickerSheet({
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: c.bg,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     paddingHorizontal: 14,
@@ -260,14 +264,14 @@ const s = StyleSheet.create({
     maxHeight: "85%",
     minHeight: "55%",
   },
-  handle: { width: 36, height: 4, backgroundColor: COLORS.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  handle: { width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  title: { fontSize: 14, fontWeight: "600", color: COLORS.text },
-  tabs: { flexDirection: "row", backgroundColor: COLORS.bgMuted, borderRadius: RADIUS.md, padding: 3, marginBottom: 10 },
+  title: { fontSize: 14, fontWeight: "600", color: c.text },
+  tabs: { flexDirection: "row", backgroundColor: c.bgMuted, borderRadius: RADIUS.md, padding: 3, marginBottom: 10 },
   tab: { flex: 1, paddingVertical: 6, borderRadius: 6, alignItems: "center" },
-  tabActive: { backgroundColor: COLORS.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.borderSubtle },
-  tabText: { fontSize: 11, color: COLORS.textMuted },
-  tabTextActive: { color: COLORS.text, fontWeight: "600" },
+  tabActive: { backgroundColor: c.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.borderSubtle },
+  tabText: { fontSize: 11, color: c.textMuted },
+  tabTextActive: { color: c.text, fontWeight: "600" },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -275,51 +279,51 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
+    borderColor: c.border,
     borderRadius: RADIUS.md,
     marginBottom: 8,
   },
-  searchInput: { flex: 1, color: COLORS.text, fontSize: 13, padding: 0 },
+  searchInput: { flex: 1, color: c.text, fontSize: 13, padding: 0 },
   empty: { paddingVertical: 30, alignItems: "center", gap: 8 },
-  emptyText: { color: COLORS.textSubtle, fontSize: 12 },
+  emptyText: { color: c.textSubtle, fontSize: 12 },
   item: {
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
+    borderBottomColor: c.borderSubtle,
   },
   cb: {
     width: 18, height: 18, borderRadius: 4,
-    borderWidth: 1.5, borderColor: COLORS.border,
+    borderWidth: 1.5, borderColor: c.border,
     alignItems: "center", justifyContent: "center",
   },
-  itemName: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  itemMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
+  itemName: { fontSize: 13, fontWeight: "600", color: c.text },
+  itemMeta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
   groupHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
     paddingVertical: 10,
-    backgroundColor: COLORS.bgMuted,
+    backgroundColor: c.bgMuted,
     paddingHorizontal: 6,
     marginTop: 6,
     borderRadius: RADIUS.sm,
   },
-  groupTitle: { flex: 1, fontSize: 12, fontWeight: "700", color: COLORS.text },
-  groupCount: { fontSize: 11, color: COLORS.textMuted },
+  groupTitle: { flex: 1, fontSize: 12, fontWeight: "700", color: c.text },
+  groupCount: { fontSize: 11, color: c.textMuted },
   bar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.bgMuted,
+    backgroundColor: c.bgMuted,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.borderSubtle,
+    borderTopColor: c.borderSubtle,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: RADIUS.md,
     marginTop: 10,
   },
-  barText: { color: COLORS.text, fontSize: 12 },
+  barText: { color: c.text, fontSize: 12 },
 });

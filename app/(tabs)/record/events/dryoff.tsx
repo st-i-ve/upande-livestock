@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -10,7 +10,8 @@ import { Field, FieldRow, Input } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
@@ -29,6 +30,8 @@ type DCTRow = {
 };
 
 export default function Dryoff() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: herds = [] } = useHerds();
@@ -230,16 +233,17 @@ export default function Dryoff() {
   );
 }
 
-const s = StyleSheet.create({
-  row: {
-    backgroundColor: COLORS.bgMuted,
-    padding: 11,
-    borderRadius: RADIUS.md,
-    marginBottom: 7,
-  },
-  empty: {
-    color: COLORS.textSubtle,
-    fontSize: 12,
-    paddingVertical: 4,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    row: {
+      backgroundColor: c.bgMuted,
+      padding: 11,
+      borderRadius: RADIUS.md,
+      marginBottom: 7,
+    },
+    empty: {
+      color: c.textSubtle,
+      fontSize: 12,
+      paddingVertical: 4,
+    },
+  });

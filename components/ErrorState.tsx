@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { COLORS, FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 export function ErrorState({
   text,
@@ -11,9 +12,11 @@ export function ErrorState({
   text: string;
   onRetry?: () => void;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.box}>
-      <MaterialCommunityIcons name="alert-circle-outline" size={28} color={COLORS.danger} />
+      <MaterialCommunityIcons name="alert-circle-outline" size={28} color={c.danger} />
       <Text style={s.title}>Something went wrong</Text>
       <Text style={s.msg} numberOfLines={4}>
         {text}
@@ -30,7 +33,8 @@ export function ErrorState({
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
   box: {
     alignItems: "center",
     paddingVertical: 32,
@@ -39,12 +43,12 @@ const s = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    color: COLORS.text,
+    color: c.text,
     fontFamily: FONT_FAMILY.semibold,
   },
   msg: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: c.textMuted,
     textAlign: "center",
     lineHeight: 16,
   },
@@ -54,11 +58,11 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: RADIUS.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
+    borderColor: c.border,
   },
   btnLabel: {
     fontSize: 12,
-    color: COLORS.text,
+    color: c.text,
     fontFamily: FONT_FAMILY.medium,
   },
 });
