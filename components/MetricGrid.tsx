@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 export type Metric = { label: string; value: string | number; sub?: string; color?: string; small?: boolean };
 
 export function MetricGrid({ items }: { items: Metric[] }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.grid}>
       {items.map((m, i) => (
@@ -18,18 +21,19 @@ export function MetricGrid({ items }: { items: Metric[] }) {
   );
 }
 
-const s = StyleSheet.create({
-  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4, marginBottom: 12 },
-  cell: {
-    width: "50%",
-    paddingHorizontal: 4,
-    marginBottom: 8,
-  },
-  label: { fontSize: 11, color: COLORS.textMuted },
-  value: {
-    fontSize: 22, fontWeight: "700", color: COLORS.text,
-    marginTop: 2, fontVariant: ["tabular-nums"],
-    backgroundColor: COLORS.bgMuted, padding: 10, borderRadius: RADIUS.md, overflow: "hidden",
-  },
-  sub: { fontSize: 10, color: COLORS.textMuted, marginTop: 2 },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4, marginBottom: 12 },
+    cell: {
+      width: "50%",
+      paddingHorizontal: 4,
+      marginBottom: 8,
+    },
+    label: { fontSize: 11, color: c.textMuted },
+    value: {
+      fontSize: 22, fontWeight: "700", color: c.text,
+      marginTop: 2, fontVariant: ["tabular-nums"],
+      backgroundColor: c.bgMuted, padding: 10, borderRadius: RADIUS.md, overflow: "hidden",
+    },
+    sub: { fontSize: 10, color: c.textMuted, marginTop: 2 },
+  });

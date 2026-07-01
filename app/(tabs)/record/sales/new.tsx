@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -8,12 +8,15 @@ import { Button } from "@/components/Button";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useCreateAnimalDisposal } from "@/src/hooks/mutations";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 export default function SaleNew() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const [selected, setSelected] = useState<Animal[]>([]);
   const [price, setPrice] = useState("");
   const [buyer, setBuyer] = useState("");
@@ -119,11 +122,12 @@ export default function SaleNew() {
   );
 }
 
-const s = StyleSheet.create({
-  box: {
-    backgroundColor: COLORS.bgMuted,
-    padding: 12,
-    borderRadius: RADIUS.md,
-    marginBottom: 12,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    box: {
+      backgroundColor: c.bgMuted,
+      padding: 12,
+      borderRadius: RADIUS.md,
+      marginBottom: 12,
+    },
+  });

@@ -13,8 +13,8 @@ import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { COLORS } from "@/constants/theme";
 import { ageDays, initials } from "@/services/utils";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
   CalfFeedType,
@@ -50,6 +50,8 @@ const recommendedFor = (calf: Animal) => {
 };
 
 export default function CalfFeed() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
@@ -206,8 +208,9 @@ export default function CalfFeed() {
   );
 }
 
-const s = StyleSheet.create({
-  head: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
-  name: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  meta: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    head: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+    name: { fontSize: 13, fontWeight: "600", color: c.text },
+    meta: { fontSize: 11, color: c.textMuted, marginTop: 2 },
+  });

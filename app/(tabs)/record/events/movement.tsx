@@ -12,7 +12,8 @@ import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import type { Animal } from "@/types";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useHerds } from "@/src/hooks/useHerds";
@@ -22,6 +23,8 @@ import { extractFrappeError, todayISO } from "@/src/services/api";
 const REASONS = ["Routine age-out", "Repro status", "Other"] as const;
 
 export default function Movement() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: herds = [] } = useHerds();
@@ -123,7 +126,7 @@ export default function Movement() {
                   <Text style={s.selMeta} numberOfLines={1}>{a.herd}</Text>
                 </View>
                 <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
-                  <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+                  <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
                 </Pressable>
               </View>
             ))}
@@ -166,24 +169,25 @@ export default function Movement() {
   );
 }
 
-const s = StyleSheet.create({
-  box: {
-    backgroundColor: COLORS.bgMuted,
-    borderRadius: RADIUS.md,
-    padding: 4,
-    marginBottom: 12,
-  },
-  selRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  selName: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  selId: { fontFamily: "monospace", fontSize: 11, fontWeight: "400", color: COLORS.textSubtle },
-  selMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
-  remove: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    box: {
+      backgroundColor: c.bgMuted,
+      borderRadius: RADIUS.md,
+      padding: 4,
+      marginBottom: 12,
+    },
+    selRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    selName: { fontSize: 13, fontWeight: "600", color: c.text },
+    selId: { fontFamily: "monospace", fontSize: 11, fontWeight: "400", color: c.textSubtle },
+    selMeta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
+    remove: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
+  });

@@ -13,7 +13,8 @@ import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { HandlersPicker } from "@/components/HandlersPicker";
 import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
   AnimalEventInput,
@@ -52,6 +53,8 @@ const SPECS: Record<string, Spec> = {
 };
 
 export default function GenericEvent() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { type } = useLocalSearchParams<{ type: string }>();
   const spec = SPECS[type || ""];
 
@@ -440,6 +443,8 @@ function DrugRows({
   onChange: (rows: DrugRow[]) => void;
   defaultWarehouse: string;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const add = () =>
     onChange([
       ...rows,
@@ -526,23 +531,24 @@ function DrugRows({
   );
 }
 
-const s = StyleSheet.create({
-  drugBox: {
-    backgroundColor: COLORS.bgMuted,
-    padding: 11,
-    borderRadius: RADIUS.md,
-    marginBottom: 7,
-  },
-  drugEmpty: {
-    color: COLORS.textSubtle,
-    fontSize: 12,
-    paddingVertical: 4,
-  },
-  summary: {
-    backgroundColor: COLORS.bgMuted,
-    padding: 11,
-    borderRadius: RADIUS.md,
-    marginBottom: 10,
-    gap: 4,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    drugBox: {
+      backgroundColor: c.bgMuted,
+      padding: 11,
+      borderRadius: RADIUS.md,
+      marginBottom: 7,
+    },
+    drugEmpty: {
+      color: c.textSubtle,
+      fontSize: 12,
+      paddingVertical: 4,
+    },
+    summary: {
+      backgroundColor: c.bgMuted,
+      padding: 11,
+      borderRadius: RADIUS.md,
+      marginBottom: 10,
+      gap: 4,
+    },
+  });

@@ -11,11 +11,14 @@ import { Loader } from "@/components/Loader";
 import { MetricGrid } from "@/components/MetricGrid";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
-import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { FONT_FAMILY } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { useSales } from "@/src/hooks/useDisposals";
 import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
@@ -85,21 +88,22 @@ export default function SalesList() {
   );
 }
 
-const s = StyleSheet.create({
-  sectionHeader: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-    letterSpacing: -0.2,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    marginTop: 3,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    sectionHeader: {
+      marginTop: 4,
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+      letterSpacing: -0.2,
+    },
+    sectionSubtitle: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      marginTop: 3,
+    },
+  });

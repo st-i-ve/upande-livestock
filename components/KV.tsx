@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 export function KV({
   k,
@@ -11,6 +11,8 @@ export function KV({
   v: React.ReactNode;
   vColor?: string;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.row}>
       <Text style={s.k}>{k}</Text>
@@ -23,14 +25,15 @@ export function KV({
   );
 }
 
-const s = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 7,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  k: { color: COLORS.textMuted, fontSize: 12 },
-  v: { color: COLORS.text, fontSize: 12, fontWeight: "600", textAlign: "right" },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 7,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    k: { color: c.textMuted, fontSize: 12 },
+    v: { color: c.text, fontSize: 12, fontWeight: "600", textAlign: "right" },
+  });

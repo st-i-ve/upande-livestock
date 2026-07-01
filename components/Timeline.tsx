@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { COLORS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 
 export type TimelineEvent = { date: string; title: string; desc?: string };
 
 export function Timeline({ events }: { events: TimelineEvent[] }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View>
       {events.map((e, i) => (
@@ -24,13 +26,14 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
   );
 }
 
-const s = StyleSheet.create({
-  item: { flexDirection: "row", paddingBottom: 12 },
-  dotCol: { width: 18, alignItems: "center", paddingTop: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.text },
-  line: { width: 1, flex: 1, backgroundColor: COLORS.borderSubtle, marginTop: 4 },
-  body: { flex: 1, paddingLeft: 6 },
-  date: { fontSize: 10, color: COLORS.textSubtle, marginBottom: 1 },
-  title: { fontSize: 12, fontWeight: "600", color: COLORS.text },
-  desc: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    item: { flexDirection: "row", paddingBottom: 12 },
+    dotCol: { width: 18, alignItems: "center", paddingTop: 4 },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.text },
+    line: { width: 1, flex: 1, backgroundColor: c.borderSubtle, marginTop: 4 },
+    body: { flex: 1, paddingLeft: 6 },
+    date: { fontSize: 10, color: c.textSubtle, marginBottom: 1 },
+    title: { fontSize: 12, fontWeight: "600", color: c.text },
+    desc: { fontSize: 11, color: c.textMuted, marginTop: 1 },
+  });

@@ -11,12 +11,15 @@ import { Loader } from "@/components/Loader";
 import { MetricGrid } from "@/components/MetricGrid";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useHerd } from "@/src/hooks/useHerd";
 
 export default function HerdDetail() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
@@ -125,24 +128,25 @@ export default function HerdDetail() {
   );
 }
 
-const s = StyleSheet.create({
-  bom: {
-    backgroundColor: COLORS.bgMuted,
-    padding: 12,
-    borderRadius: RADIUS.md,
-    marginBottom: 14,
-  },
-  bomTitle: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  bomSub: { fontSize: 11, color: COLORS.textMuted, marginTop: 3 },
-  rationList: { marginTop: 10, gap: 6 },
-  rationRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  rationName: { flex: 1, fontSize: 12, color: COLORS.text },
-  rationPct: { fontSize: 12, color: COLORS.textMuted, fontVariant: ["tabular-nums"] },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    bom: {
+      backgroundColor: c.bgMuted,
+      padding: 12,
+      borderRadius: RADIUS.md,
+      marginBottom: 14,
+    },
+    bomTitle: { fontSize: 13, fontWeight: "600", color: c.text },
+    bomSub: { fontSize: 11, color: c.textMuted, marginTop: 3 },
+    rationList: { marginTop: 10, gap: 6 },
+    rationRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 4,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    rationName: { flex: 1, fontSize: 12, color: c.text },
+    rationPct: { fontSize: 12, color: c.textMuted, fontVariant: ["tabular-nums"] },
+  });

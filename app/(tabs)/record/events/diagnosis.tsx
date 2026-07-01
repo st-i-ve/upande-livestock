@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -13,7 +13,8 @@ import { Picker } from "@/components/Picker";
 import { ScoreRow } from "@/components/ScoreRow";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { APP, COLORS, RADIUS } from "@/constants/theme";
+import { APP, RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import type { DiagnosisAction } from "@/src/frappe/animalDiagnosis";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useCreateAnimalDiagnosis } from "@/src/hooks/mutations";
@@ -40,6 +41,8 @@ const CONDITIONS = [
 type CustomField = { id: number; label: string; value: string };
 
 export default function Diagnosis() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const defaultOperator = useAuthStore((s) => s.employeeName);
   const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
@@ -292,23 +295,23 @@ export default function Diagnosis() {
           Anything not covered above? Add a custom field — it will be stored on this exam record.
         </Text>
       ) : null}
-      {customs.map((c) => (
-        <View key={c.id} style={s.customRow}>
+      {customs.map((cf) => (
+        <View key={cf.id} style={s.customRow}>
           <View style={{ flex: 1 }}>
             <Input
               placeholder="Field name (e.g. Vulva temperature)"
-              value={c.label}
-              onChangeText={(label) => updateCustom(c.id, { label })}
+              value={cf.label}
+              onChangeText={(label) => updateCustom(cf.id, { label })}
             />
             <View style={{ height: 6 }} />
             <Input
               placeholder="Value or observation"
-              value={c.value}
-              onChangeText={(value) => updateCustom(c.id, { value })}
+              value={cf.value}
+              onChangeText={(value) => updateCustom(cf.id, { value })}
             />
           </View>
-          <Pressable onPress={() => removeCustom(c.id)} hitSlop={8} style={s.customRemove}>
-            <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+          <Pressable onPress={() => removeCustom(cf.id)} hitSlop={8} style={s.customRemove}>
+            <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
           </Pressable>
         </View>
       ))}
@@ -430,35 +433,36 @@ export default function Diagnosis() {
   );
 }
 
-const s = StyleSheet.create({
-  flagRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSubtle,
-  },
-  flagLabel: { flex: 1, fontSize: 13, color: COLORS.text },
-  customHint: {
-    backgroundColor: COLORS.bgMuted,
-    color: COLORS.textMuted,
-    fontSize: 12,
-    padding: 12,
-    borderRadius: RADIUS.md,
-    marginBottom: 8,
-    lineHeight: 17,
-  },
-  customRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    marginBottom: 10,
-  },
-  customRemove: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 6,
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    flagRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    flagLabel: { flex: 1, fontSize: 13, color: c.text },
+    customHint: {
+      backgroundColor: c.bgMuted,
+      color: c.textMuted,
+      fontSize: 12,
+      padding: 12,
+      borderRadius: RADIUS.md,
+      marginBottom: 8,
+      lineHeight: 17,
+    },
+    customRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      marginBottom: 10,
+    },
+    customRemove: {
+      width: 28,
+      height: 28,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 6,
+    },
+  });

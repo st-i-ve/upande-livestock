@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
-import { COLORS, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import type { Animal } from "@/types";
 
 import { AnimalPickerSheet, type PickerMode } from "./AnimalPickerSheet";
@@ -26,6 +27,8 @@ export function AnimalPickerButton({
   onPickMulti?: (list: Animal[]) => void;
   value?: Animal | Animal[] | null;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState<string | null>(() => deriveLabel(mode, value));
 
@@ -38,8 +41,8 @@ export function AnimalPickerButton({
   return (
     <>
       <Pressable onPress={() => setOpen(true)} style={s.btn}>
-        <MaterialCommunityIcons name="magnify" size={16} color={COLORS.textMuted} />
-        <Text style={[s.text, label ? { color: COLORS.text } : null]} numberOfLines={1}>
+        <MaterialCommunityIcons name="magnify" size={16} color={c.textMuted} />
+        <Text style={[s.text, label ? { color: c.text } : null]} numberOfLines={1}>
           {label || placeholder}
         </Text>
       </Pressable>
@@ -72,17 +75,18 @@ function deriveLabel(mode: PickerMode, value: Animal | Animal[] | null | undefin
   return null;
 }
 
-const s = StyleSheet.create({
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    paddingHorizontal: 11,
-    paddingVertical: 11,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.bg,
-  },
-  text: { flex: 1, fontSize: 13, color: COLORS.textMuted },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    btn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      paddingHorizontal: 11,
+      paddingVertical: 11,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.bg,
+    },
+    text: { flex: 1, fontSize: 13, color: c.textMuted },
+  });

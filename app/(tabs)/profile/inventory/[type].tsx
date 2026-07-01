@@ -12,13 +12,16 @@ import { MetricGrid } from "@/components/MetricGrid";
 import { Pill } from "@/components/Pill";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
-import { COLORS, FONT_FAMILY } from "@/constants/theme";
+import { FONT_FAMILY } from "@/constants/theme";
+import { useColors } from "@/src/hooks/useColors";
 import { StockBinRow } from "@/src/frappe/stock";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { useStockBins } from "@/src/hooks/useStockBins";
 import { extractFrappeError } from "@/src/services/api";
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={s.sectionHeader}>
       <Text style={s.sectionTitle}>{title}</Text>
@@ -115,6 +118,8 @@ function StockList({
 }
 
 export default function Inventory() {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { type } = useLocalSearchParams<{ type: string }>();
   const meta = TITLES[type ?? ""];
   const { data: settings } = useLivestockSettings();
@@ -152,7 +157,7 @@ export default function Inventory() {
     return (
       <Screen title="Inventory" back>
         <View style={s.empty}>
-          <MaterialCommunityIcons name="package-variant-closed" size={48} color={COLORS.textSubtle} />
+          <MaterialCommunityIcons name="package-variant-closed" size={48} color={c.textSubtle} />
           <Text style={s.emptyText}>Unknown inventory category &quot;{type}&quot;.</Text>
         </View>
       </Screen>
@@ -178,33 +183,34 @@ export default function Inventory() {
   );
 }
 
-const s = StyleSheet.create({
-  sectionHeader: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    color: COLORS.text,
-    fontFamily: FONT_FAMILY.semibold,
-    letterSpacing: -0.2,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    marginTop: 3,
-  },
-  empty: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontFamily: FONT_FAMILY.regular,
-    textAlign: "center",
-  },
-});
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    sectionHeader: {
+      marginTop: 4,
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      color: c.text,
+      fontFamily: FONT_FAMILY.semibold,
+      letterSpacing: -0.2,
+    },
+    sectionSubtitle: {
+      fontSize: 12,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      marginTop: 3,
+    },
+    empty: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 60,
+      gap: 12,
+    },
+    emptyText: {
+      fontSize: 13,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.regular,
+      textAlign: "center",
+    },
+  });
