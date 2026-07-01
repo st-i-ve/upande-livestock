@@ -22,7 +22,7 @@ export function Picker<T extends string>({
         <Text style={s.value} numberOfLines={1}>{value}</Text>
         <MaterialCommunityIcons name="chevron-down" size={18} color={c.textMuted} />
       </Pressable>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
             {options.map((o) => (
@@ -62,7 +62,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderTopLeftRadius: 18,
       borderTopRightRadius: 18,
       paddingVertical: 8,
-      paddingBottom: 24,
+      paddingBottom: 36,
     },
     option: {
       flexDirection: "row",

@@ -43,7 +43,8 @@
       "Bash(npx eslint *)",
       "Bash(grep -Ei \"tabs\\\\\\\\\\\\\\\\\\(index|record|herds|alerts\\)|alerts.*cases|useColors|useMemo\")",
       "Bash(echo \"grep exit: $?\")",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(node -e \"const g=require\\('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json'\\); console.log\\(Object.keys\\(g\\).filter\\(k=>/cow|cattle|bull|ox|horse|barn|sheep|goat|farm|milk|food-drumstick/.test\\(k\\)\\).join\\('\\\\n'\\)\\)\")"
     ]
   }
 }
