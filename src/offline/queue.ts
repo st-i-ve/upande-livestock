@@ -17,7 +17,6 @@ export type PendingMutationType =
   | "CalfFeeding"
   | "AnimalDiagnosis"
   | "AnimalHealthCase"
-  | "FeedingWorkOrder"
   | "BatchDrugIssue"
   | "AnimalHealthCaseUpdate";
 
