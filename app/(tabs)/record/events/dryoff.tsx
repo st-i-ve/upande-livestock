@@ -14,6 +14,8 @@ import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
+import { findStoreShortage } from "@/src/frappe/stock";
+import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
@@ -71,6 +73,14 @@ export default function Dryoff() {
 
   const mutation = useCreateAnimalEvent();
 
+  // Live on-hand stock per DCT row, so the operator sees the store level.
+  const availQuery = useStoreQtyMap(
+    dctRows.map((r) => ({
+      itemCode: r.itemCode.trim(),
+      warehouse: r.sourceWarehouse || defaultDrugWarehouse,
+    })),
+  );
+
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
@@ -92,6 +102,16 @@ export default function Dryoff() {
         "Pick a source warehouse on every DCT row (or set Drug warehouse in Livestock Settings).",
       );
     }
+
+    // Block over-issue before creating the Material Issue.
+    const shortage = await findStoreShortage(
+      drugIssues.map((d) => ({
+        itemCode: d.itemCode,
+        warehouse: d.sourceWarehouse as string,
+        qtyNeeded: d.qty,
+      })),
+    );
+    if (shortage) return setError(shortage);
 
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
@@ -168,7 +188,7 @@ export default function Dryoff() {
                 doctype="Item"
                 value={r.itemCode || null}
                 onChange={(name, row) =>
-                  updateDct(r.id, { itemCode: name, uom: r.uom || row?.stock_uom || "" })
+                  updateDct(r.id, { itemCode: name, uom: row?.stock_uom || "" })
                 }
                 fields={["name", "item_name", "item_code", "stock_uom"]}
                 displayField="item_name"
@@ -200,13 +220,29 @@ export default function Dryoff() {
                 />
               </Field>
               <Field label="UOM" style={{ flex: 1 }}>
-                <Input
-                  value={r.uom}
-                  onChangeText={(t) => updateDct(r.id, { uom: t })}
-                  placeholder="ECH"
-                />
+                <Input value={r.uom} editable={false} placeholder="—" />
               </Field>
             </FieldRow>
+            {r.itemCode.trim() && (r.sourceWarehouse || defaultDrugWarehouse)
+              ? (() => {
+                  const wh = r.sourceWarehouse || defaultDrugWarehouse;
+                  const avail = availQuery.data?.[storeQtyKey(r.itemCode.trim(), wh)];
+                  const short = avail != null && Number(r.qty) > avail;
+                  return (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        marginBottom: 8,
+                        color: short ? c.danger : c.textMuted,
+                      }}
+                    >
+                      {availQuery.isLoading || avail == null
+                        ? `Checking stock in ${wh}…`
+                        : `Available in ${wh}: ${avail}${r.uom ? " " + r.uom : ""}${short ? " — not enough" : ""}`}
+                    </Text>
+                  );
+                })()
+              : null}
             <Field label="Withdrawal days">
               <Input
                 value={r.withdrawalDays}

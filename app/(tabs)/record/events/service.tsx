@@ -11,8 +11,10 @@ import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { useAuthStore } from "@/src/auth/authStore";
+import { findStoreShortage } from "@/src/frappe/stock";
 import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
+import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -32,6 +34,15 @@ export default function Service() {
   const batchMutation = useBatchDrugIssue();
   const { data: company } = useDefaultCompany();
 
+  // Live straws-on-hand at the chosen store, shown while picking.
+  const semenAvailQuery = useStoreQtyMap(
+    straw && semenWarehouse ? [{ itemCode: straw, warehouse: semenWarehouse }] : [],
+  );
+  const semenAvail =
+    straw && semenWarehouse
+      ? semenAvailQuery.data?.[storeQtyKey(straw, semenWarehouse)]
+      : undefined;
+
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
@@ -43,6 +54,13 @@ export default function Service() {
     }
     if (willIssueSemen && !company) {
       return setError("Default company not loaded yet. Try again in a moment.");
+    }
+    // Block over-issue: one straw per cow is issued from the store.
+    if (willIssueSemen) {
+      const shortage = await findStoreShortage([
+        { itemCode: straw, warehouse: semenWarehouse, qtyNeeded: selected.length },
+      ]);
+      if (shortage) return setError(shortage);
     }
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
@@ -151,7 +169,14 @@ export default function Service() {
       {type === "A.I." && straw ? (
         <Field
           label="Semen store"
-          help={`One straw per cow (${selected.length || 0}) is issued from here as a Material Issue.`}
+          help={
+            `One straw per cow (${selected.length || 0}) is issued from here as a Material Issue.` +
+            (semenWarehouse
+              ? semenAvailQuery.isLoading || semenAvail == null
+                ? " Checking stock…"
+                : ` Available: ${semenAvail} straw(s)${selected.length > semenAvail ? " — not enough" : ""}`
+              : "")
+          }
         >
           <FrappeSearchPicker
             doctype="Warehouse"

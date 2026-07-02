@@ -19,6 +19,8 @@ import type {
   HealthTreatmentInput,
 } from "@/src/frappe/animalHealthCase";
 import { getItemSnapshot } from "@/src/frappe/item";
+import { findStoreShortage } from "@/src/frappe/stock";
+import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { useCreateAnimalHealthCase } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
@@ -68,6 +70,14 @@ export default function CaseNew() {
         return acc + q * r;
       }, 0),
     [treatments],
+  );
+
+  // Live on-hand stock per treatment row, so the operator sees the store level.
+  const availQuery = useStoreQtyMap(
+    treatments.map((t) => ({
+      itemCode: t.itemCode,
+      warehouse: t.sourceWarehouse || defaultDrugWarehouse,
+    })),
   );
 
   const addTreatment = () =>
@@ -146,6 +156,17 @@ export default function CaseNew() {
         treatmentDate: todayISO(),
       });
     }
+
+    // Block over-issue: every treatment row issues stock on submit.
+    const shortage = await findStoreShortage(
+      builtTreatments.map((t) => ({
+        itemCode: t.itemCode,
+        warehouse: t.sourceWarehouse,
+        qtyNeeded: t.qty,
+        label: t.itemName,
+      })),
+    );
+    if (shortage) return setError(shortage);
 
     if (operator !== defaultOperator) await setStoredOperator(operator);
 
@@ -257,13 +278,29 @@ export default function CaseNew() {
                 />
               </Field>
               <Field label="UOM" style={{ flex: 1 }}>
-                <Input
-                  value={t.uom}
-                  onChangeText={(v) => updateTreatment(t.id, { uom: v })}
-                  placeholder="ml"
-                />
+                <Input value={t.uom} editable={false} placeholder="—" />
               </Field>
             </FieldRow>
+            {t.itemCode && (t.sourceWarehouse || defaultDrugWarehouse)
+              ? (() => {
+                  const wh = t.sourceWarehouse || defaultDrugWarehouse;
+                  const avail = availQuery.data?.[storeQtyKey(t.itemCode, wh)];
+                  const short = avail != null && Number(t.qty) > avail;
+                  return (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        marginBottom: 8,
+                        color: short ? c.danger : c.textMuted,
+                      }}
+                    >
+                      {availQuery.isLoading || avail == null
+                        ? `Checking stock in ${wh}…`
+                        : `Available in ${wh}: ${avail}${t.uom ? " " + t.uom : ""}${short ? " — not enough" : ""}`}
+                    </Text>
+                  );
+                })()
+              : null}
             <FieldRow>
               <Field
                 label="Rate (KES)"
