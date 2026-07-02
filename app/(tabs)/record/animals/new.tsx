@@ -1,7 +1,6 @@
-import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -51,6 +50,26 @@ export default function NewAnimal() {
 
   const mutation = useCreateAnimal();
 
+  const resetForm = () => {
+    setTagNumber("");
+    setBurnName("");
+    setSex("Female");
+    setOrigin("Purchased");
+    setReproStatus("Heifer");
+    setCurrentHerd("");
+    setDob("");
+    setAcquisitionDate(todayISO());
+    setBirthWeight("");
+    setBreed("");
+    setPurchaseValue("");
+    setIsCapitalised(true);
+    setInsuredValue("");
+    setCoatColour("");
+    setSireName("");
+    setRemarks("");
+    setError(null);
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!tagNumber.trim()) return setError("Tag / book number is required.");
@@ -77,17 +96,17 @@ export default function NewAnimal() {
         reproStatus,
         remarks: remarks || undefined,
       });
-      appAlert(
-        r.queued ? "Queued offline" : "Animal created",
-        r.queued
+      recordSuccess({
+        title: r.queued ? "Queued offline" : "Animal created",
+        message: r.queued
           ? `Saved locally. Will sync when online.`
           : `${burnName.trim()} (${tagNumber.trim()}) added to ${currentHerd}.${
               origin === "Purchased" && isCapitalised && purchaseValue
                 ? "\nCapitalisation JE posted on submit."
                 : ""
             }`,
-      );
-      router.replace(`/(tabs)/record/success?name=New animal`);
+        onAnother: resetForm,
+      });
     } catch (err) {
       setError(extractFrappeError(err));
     }

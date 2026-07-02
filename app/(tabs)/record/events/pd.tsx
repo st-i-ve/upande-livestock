@@ -1,7 +1,6 @@
-import { router } from "expo-router";
 import React, { useState } from "react";
 import {  } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -30,6 +29,13 @@ export default function PD() {
 
   const mutation = useCreateAnimalEvent();
   const { data: servedIds, isLoading: filterLoading } = useServicedPendingPd();
+
+  const resetForm = () => {
+    setSelected([]);
+    setResult("Confirmed");
+    setRemarks("");
+    setError(null);
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -62,11 +68,11 @@ export default function PD() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} marked ${result}`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    appAlert(
-      "PD recorded",
-      `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
-    );
-    router.replace("/(tabs)/record/success?name=Pregnancy diagnosis");
+    recordSuccess({
+      title: "PD recorded",
+      message: `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
+      onAnother: resetForm,
+    });
   };
 
   return (

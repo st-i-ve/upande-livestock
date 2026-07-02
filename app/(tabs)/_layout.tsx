@@ -82,6 +82,11 @@ export default function TabLayout() {
         options={{
           tabBarLabel: () => null,
           tabBarButton: (props) => <RecordTabButton {...props} />,
+          // The Record tab is a create-flow hub: index → form → success.
+          // Reset its nested stack to the menu whenever we leave the tab so
+          // tapping + always starts fresh, instead of restoring the last
+          // form / success screen the user just finished.
+          popToTopOnBlur: true,
         }}
       />
       <Tabs.Screen

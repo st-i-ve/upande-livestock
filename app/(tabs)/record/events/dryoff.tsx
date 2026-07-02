@@ -1,7 +1,6 @@
-import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -82,6 +81,15 @@ export default function Dryoff() {
     })),
   );
 
+  // Reset the form after a successful submit so "Record another" starts clean.
+  // Keeps the operator sticky; the destination herd re-defaults via the effect.
+  const resetForm = () => {
+    setSelected([]);
+    setToHerd("");
+    setDctRows([]);
+    setError(null);
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
@@ -141,8 +149,7 @@ export default function Dryoff() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    appAlert("Drying off recorded", parts.join(" · "));
-    router.replace("/(tabs)/record/success?name=Drying off");
+    recordSuccess({ title: "Drying off recorded", message: parts.join(" · "), onAnother: resetForm });
   };
 
   return (

@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {  } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -68,6 +68,19 @@ export default function Calving() {
 
   const mutation = useCreateAnimalEvent();
 
+  const resetForm = () => {
+    setDam(null);
+    setOutcome("Live Birth");
+    setSex("Female");
+    setCalfBook("");
+    setCalfName("");
+    setBirthWt("");
+    setCoatColour("");
+    setToHerd("");
+    setCalfTargetHerd("");
+    setError(null);
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError("Pick the operator before submitting.");
@@ -93,15 +106,15 @@ export default function Calving() {
         birthWeightKg: birthWt ? Number(birthWt) : undefined,
         coatColour: coatColour || undefined,
       });
-      appAlert(
-        r.queued ? "Queued offline" : "Calving recorded",
-        r.queued
+      recordSuccess({
+        title: r.queued ? "Queued offline" : "Calving recorded",
+        message: r.queued
           ? `${dam.name} saved locally. Will sync when online.`
           : outcome === "Live Birth"
             ? `${dam.name} calved. Calf ${calfName} (${calfBook}) created.`
             : `${dam.name} marked as calved (${outcome}).`,
-      );
-      router.replace("/(tabs)/record/success?name=Calving");
+        onAnother: resetForm,
+      });
     } catch (err) {
       setError(extractFrappeError(err));
     }

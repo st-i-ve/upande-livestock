@@ -1,7 +1,6 @@
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Avatar } from "@/components/Avatar";
@@ -69,6 +68,19 @@ export default function CalfFeed() {
 
   const mutation = useCreateCalfFeeding();
 
+  // Reset user-entered fields for "Record another". Operator is sticky (comes
+  // from the auth store / default operator) so it is left as-is.
+  const resetForm = () => {
+    setCalf(null);
+    setSession("AM");
+    setFeedType("Whole Milk");
+    setItem("");
+    setWh("");
+    setQty("");
+    setRemarks("");
+    setError(null);
+  };
+
   const rec = useMemo(() => (calf ? recommendedFor(calf) : null), [calf]);
   const days = calf?.dob ? ageDays(calf.dob) : null;
 
@@ -101,13 +113,13 @@ export default function CalfFeed() {
         operator,
         remarks: remarks || undefined,
       });
-      appAlert(
-        r.queued ? "Queued offline" : "Calf feeding recorded",
-        r.queued
+      recordSuccess({
+        title: r.queued ? "Queued offline" : "Calf feeding recorded",
+        message: r.queued
           ? `Saved locally. Will sync when online.`
           : `${qty} kg ${feedType} fed to ${calf.name}.`,
-      );
-      router.replace("/(tabs)/record/success?name=Calf feeding");
+        onAnother: resetForm,
+      });
     } catch (err) {
       setError(extractFrappeError(err));
     }
