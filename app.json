@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.stivewithani.upandelivestock"
     },
     "web": {
       "output": "static",
@@ -52,6 +53,12 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "runtimeVersion": "1.0.0-kaitetdairyfrappe16"
+    "runtimeVersion": "1.0.0-kaitetdairyfrappe16",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0640a515-d7f3-4710-a550-8cf6b8934b7e"
+      }
+    }
   }
 }
