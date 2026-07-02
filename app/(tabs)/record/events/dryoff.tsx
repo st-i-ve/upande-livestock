@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -140,7 +141,7 @@ export default function Dryoff() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert("Drying off recorded", parts.join(" · "));
+    appAlert("Drying off recorded", parts.join(" · "));
     router.replace("/(tabs)/record/success?name=Drying off");
   };
 

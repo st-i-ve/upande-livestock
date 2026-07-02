@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert } from "react-native";
+import {  } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -123,7 +124,7 @@ export default function Service() {
           : `semen issue FAILED: ${semenError}`,
       );
     }
-    Alert.alert("Service recorded", parts.join(" · "));
+    appAlert("Service recorded", parts.join(" · "));
     router.replace("/(tabs)/record/success?name=Service");
   };
 

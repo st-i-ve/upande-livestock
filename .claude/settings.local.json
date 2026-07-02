@@ -44,7 +44,12 @@
       "Bash(grep -Ei \"tabs\\\\\\\\\\\\\\\\\\(index|record|herds|alerts\\)|alerts.*cases|useColors|useMemo\")",
       "Bash(echo \"grep exit: $?\")",
       "mcp__ide__getDiagnostics",
-      "Bash(node -e \"const g=require\\('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json'\\); console.log\\(Object.keys\\(g\\).filter\\(k=>/cow|cattle|bull|ox|horse|barn|sheep|goat|farm|milk|food-drumstick/.test\\(k\\)\\).join\\('\\\\n'\\)\\)\")"
+      "Bash(node -e \"const g=require\\('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json'\\); console.log\\(Object.keys\\(g\\).filter\\(k=>/cow|cattle|bull|ox|horse|barn|sheep|goat|farm|milk|food-drumstick/.test\\(k\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('eas.json','utf8'\\)\\);console.log\\('valid'\\)\")",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter 'sed \"/^Co-Authored-By: Claude/d\"' -- --branches)",
+      "Bash(node \"C:/Users/Stive/AppData/Local/Temp/claude/C--Users-Stive-Documents-code-flutter-upande-livestock-1/86d9a437-bebb-4588-9d60-21bc474b6189/scratchpad/fixAlertImports.js\")",
+      "Bash(node \"C:/Users/Stive/AppData/Local/Temp/claude/C--Users-Stive-Documents-code-flutter-upande-livestock-1/86d9a437-bebb-4588-9d60-21bc474b6189/scratchpad/fixAlert2.js\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('app.json','utf8'\\)\\);JSON.parse\\(require\\('fs'\\).readFileSync\\('eas.json','utf8'\\)\\);console.log\\('app.json + eas.json valid'\\)\")"
     ]
   }
 }

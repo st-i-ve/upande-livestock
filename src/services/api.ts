@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
 
+import { cleanErrorMessage } from "./errorMessage";
 import { STORAGE_KEYS, storage } from "./storage";
 
 const normalizeBaseUrl = (url: string) => url.trim().replace(/\/+$/, "");
@@ -111,6 +112,7 @@ const isSessionAlive = async (): Promise<boolean> => {
 export const extractFrappeError = (err: unknown): string => {
   const e = err as AxiosError;
   const data = e?.response?.data as any;
+  let raw: string | undefined;
   if (data?._server_messages) {
     try {
       const outer = JSON.parse(data._server_messages);
@@ -118,19 +120,20 @@ export const extractFrappeError = (err: unknown): string => {
       for (const item of arr) {
         try {
           const inner = typeof item === "string" ? JSON.parse(item) : item;
-          if (inner?.message) return String(inner.message);
+          if (inner?.message) { raw = String(inner.message); break; }
         } catch {
-          if (typeof item === "string") return item;
+          if (typeof item === "string") { raw = item; break; }
         }
       }
     } catch {
       // fall through
     }
   }
-  if (data?.exception) return String(data.exception);
-  if (data?.message) return String(data.message);
-  if (e?.message) return e.message;
-  return "Something went wrong.";
+  if (!raw && data?.exception) raw = String(data.exception);
+  if (!raw && data?.message) raw = String(data.message);
+  if (!raw && e?.message) raw = e.message;
+  // Translate to friendly text: strip Frappe HTML markup, decode entities.
+  return cleanErrorMessage(raw);
 };
 
 export const getWorkingUrl = async (inputUrl: string): Promise<string | null> => {

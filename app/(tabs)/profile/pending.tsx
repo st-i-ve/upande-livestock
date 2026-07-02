@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { Avatar } from "@/components/Avatar";
 import { Banner } from "@/components/Banner";
@@ -8,6 +9,7 @@ import { Button } from "@/components/Button";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { cleanErrorMessage } from "@/src/services/errorMessage";
 import { useColors } from "@/src/hooks/useColors";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { usePendingQueue } from "@/src/hooks/useQueueStatus";
@@ -39,7 +41,7 @@ export default function Pending() {
   const online = useNetworkStatus();
 
   const handleDiscard = (id: string, label: string) => {
-    Alert.alert(
+    appAlert(
       "Discard submission?",
       `Remove "${label}" from the queue without sending it to Frappe?`,
       [
@@ -74,7 +76,7 @@ export default function Pending() {
       {queue.length === 0 ? (
         <View style={s.empty}>
           <MaterialCommunityIcons name="check-all" size={40} color={c.textSubtle} />
-          <Text style={s.emptyText}>Nothing pending. You're all caught up.</Text>
+          <Text style={s.emptyText}>{"Nothing pending. You're all caught up."}</Text>
         </View>
       ) : (
         <>
@@ -88,7 +90,17 @@ export default function Pending() {
                   {m.type} · queued {formatTime(m.createdAt)}
                   {m.attempts > 0 ? ` · ${m.attempts} attempt${m.attempts === 1 ? "" : "s"}` : ""}
                 </Text>
-                {m.lastError ? <Text style={s.error} numberOfLines={2}>{m.lastError}</Text> : null}
+                {m.lastError ? (
+                  <Pressable
+                    onPress={() =>
+                      appAlert(m.label || "Submission error", m.lastError ?? undefined, [{ text: "Close" }])
+                    }
+                    hitSlop={6}
+                  >
+                    <Text style={s.error} numberOfLines={2}>{cleanErrorMessage(m.lastError)}</Text>
+                    <Text style={s.errorHint}>Tap to view full error</Text>
+                  </Pressable>
+                ) : null}
               </View>
               <Pressable
                 onPress={() => handleDiscard(m.id, m.label)}
@@ -129,6 +141,12 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       fontSize: 11,
       color: c.danger,
       marginTop: 4,
+    },
+    errorHint: {
+      fontSize: 11,
+      color: c.textSubtle,
+      marginTop: 2,
+      textDecorationLine: "underline",
     },
     discard: {
       width: 28,

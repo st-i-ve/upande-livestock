@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert } from "react-native";
+import {  } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { Avatar } from "@/components/Avatar";
 import { Banner } from "@/components/Banner";
@@ -30,12 +31,12 @@ export default function HerdsList() {
 
   const handleAgeTransitions = async () => {
     if (!operator) {
-      Alert.alert("Sign-in required", "We need your employee ID to record the Movement events. Sign out and back in.");
+      appAlert("Sign-in required", "We need your employee ID to record the Movement events. Sign out and back in.");
       return;
     }
     const moves = computePendingHerdMoves(animals, settings);
     if (moves.length === 0) {
-      Alert.alert("No moves needed", "Every animal is already in the right age-bucket herd.");
+      appAlert("No moves needed", "Every animal is already in the right age-bucket herd.");
       return;
     }
     const preview = moves
@@ -44,7 +45,7 @@ export default function HerdsList() {
       .join("\n");
     const more = moves.length > 10 ? `\n…and ${moves.length - 10} more.` : "";
 
-    Alert.alert(
+    appAlert(
       `Move ${moves.length} animal${moves.length === 1 ? "" : "s"}?`,
       `${preview}${more}\n\nThis submits one Movement event per animal.`,
       [
@@ -58,7 +59,7 @@ export default function HerdsList() {
               const results = await applyHerdMoves(moves, operator);
               const ok = results.filter((r) => r.ok).length;
               const failed = results.length - ok;
-              Alert.alert(
+              appAlert(
                 "Age transitions complete",
                 `${ok} moved${failed ? ` · ${failed} failed` : ""}.`,
               );

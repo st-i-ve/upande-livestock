@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Avatar } from "@/components/Avatar";
@@ -100,7 +101,7 @@ export default function CalfFeed() {
         operator,
         remarks: remarks || undefined,
       });
-      Alert.alert(
+      appAlert(
         r.queued ? "Queued offline" : "Calf feeding recorded",
         r.queued
           ? `Saved locally. Will sync when online.`

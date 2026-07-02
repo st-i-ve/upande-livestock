@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -150,7 +151,7 @@ export default function Milk() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} recording${succeeded === 1 ? "" : "s"} submitted`);
     if (queued) parts.push(`${queued} queued offline`);
-    Alert.alert("Milk recording done", `${parts.join(" · ")}\n${submitted.join("\n")}`);
+    appAlert("Milk recording done", `${parts.join(" · ")}\n${submitted.join("\n")}`);
     router.replace("/(tabs)/record/success?name=Milk recording");
   };
 

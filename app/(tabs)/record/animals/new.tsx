@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -76,7 +77,7 @@ export default function NewAnimal() {
         reproStatus,
         remarks: remarks || undefined,
       });
-      Alert.alert(
+      appAlert(
         r.queued ? "Queued offline" : "Animal created",
         r.queued
           ? `Saved locally. Will sync when online.`
