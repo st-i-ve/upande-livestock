@@ -19,6 +19,7 @@ import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
+import { AppAlertHost } from "@/components/AppAlertHost";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
@@ -125,6 +126,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(tabs)" />
               </Stack>
+              <AppAlertHost />
               <StatusBar style={dark ? "light" : "dark"} />
             </ThemeProvider>
           </PaperProvider>

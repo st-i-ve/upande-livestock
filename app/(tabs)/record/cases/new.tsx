@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -198,7 +199,7 @@ export default function CaseNew() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} case${succeeded === 1 ? "" : "s"} opened`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert(
+    appAlert(
       "Health cases opened",
       `${parts.join(" · ")}${builtTreatments.length ? `\n${builtTreatments.length} treatment${builtTreatments.length === 1 ? "" : "s"} per case.` : ""}`,
     );

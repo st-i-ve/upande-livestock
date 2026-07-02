@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AttachmentPicker } from "@/components/AttachmentPicker";
 import { Banner } from "@/components/Banner";
@@ -83,7 +84,7 @@ export default function CaseDetail() {
       }
     }
 
-    Alert.alert(
+    appAlert(
       "Case closed",
       attachErrors.length
         ? `Case marked ${outcome}. Some attachments failed:\n${attachErrors.join("\n")}`

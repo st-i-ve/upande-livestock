@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert } from "react-native";
+import {  } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -61,7 +62,7 @@ export default function PD() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} marked ${result}`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert(
+    appAlert(
       "PD recorded",
       `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
     );

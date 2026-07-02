@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -136,7 +137,7 @@ export default function Settings() {
     setSaveError(null);
     const patch = diff();
     if (Object.keys(patch).length === 0) {
-      Alert.alert("No changes", "Nothing to save.");
+      appAlert("No changes", "Nothing to save.");
       return;
     }
     // Coerce numeric fields.
@@ -149,7 +150,7 @@ export default function Settings() {
     try {
       await mutation.mutateAsync(patch);
       setOriginal({ ...original, ...patch });
-      Alert.alert("Saved", `${Object.keys(patch).length} field${Object.keys(patch).length === 1 ? "" : "s"} updated.`);
+      appAlert("Saved", `${Object.keys(patch).length} field${Object.keys(patch).length === 1 ? "" : "s"} updated.`);
     } catch (err) {
       setSaveError(extractFrappeError(err));
     }

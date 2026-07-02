@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert } from "react-native";
+import {  } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -92,7 +93,7 @@ export default function Calving() {
         birthWeightKg: birthWt ? Number(birthWt) : undefined,
         coatColour: coatColour || undefined,
       });
-      Alert.alert(
+      appAlert(
         r.queued ? "Queued offline" : "Calving recorded",
         r.queued
           ? `${dam.name} saved locally. Will sync when online.`

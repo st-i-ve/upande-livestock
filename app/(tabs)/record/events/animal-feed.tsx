@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -55,7 +56,7 @@ export default function AnimalFeed() {
     try {
       const r = await manufacture.mutateAsync(herdName);
       await info.refetch();
-      Alert.alert(
+      appAlert(
         "Feed manufactured",
         `${r.produced_qty.toLocaleString()} ${r.uom} of ${r.production_item} made into ${r.store}.\n` +
           `Work Order ${r.work_order}.\nNow switch to Feed to issue it to the herd.`,
@@ -80,7 +81,7 @@ export default function AnimalFeed() {
       });
       await info.refetch();
       setFeedKg("");
-      Alert.alert(
+      appAlert(
         "Herd fed",
         `Issued ${r.issued_qty.toLocaleString()} ${r.uom} of ${r.production_item} from ${r.store}.\n` +
           `Material Issue ${r.stock_entry}.`,

@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -65,7 +66,7 @@ export default function SaleNew() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} sold to ${buyer.trim()}`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert(
+    appAlert(
       "Sale recorded",
       `${parts.join(" · ")}\n${succeeded > 0 ? `Sales Invoice + Payment Entry + write-off JE posted per animal.` : ""}`,
     );

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { AttachmentPicker } from "@/components/AttachmentPicker";
@@ -156,7 +157,7 @@ export default function CullNew() {
         : succeeded > 0
           ? "Write-off JE posted per animal."
           : "";
-    Alert.alert(
+    appAlert(
       "Disposal recorded",
       [
         parts.join(" · "),

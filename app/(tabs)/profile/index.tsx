@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { CheckForUpdates } from "@/components/CheckForUpdates";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -116,6 +117,7 @@ export default function Profile() {
             onPress={() => router.push("/(tabs)/profile/settings")}
           />
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
+          <CheckForUpdates />
           <Row
             icon="cloud-upload-outline"
             label={online === false ? "Offline · pending submissions" : "Pending submissions"}

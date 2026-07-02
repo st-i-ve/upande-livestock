@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -418,7 +419,7 @@ export default function Diagnosis() {
           const parts: string[] = [];
           if (succeeded) parts.push(`${succeeded} diagnosed`);
           if (queued) parts.push(`${queued} queued (offline)`);
-          Alert.alert(
+          appAlert(
             "Diagnosis submitted",
             `${parts.join(" · ")}${action === "Escalated to Case" && succeeded > 0 ? "\nA draft Animal Health Case has been created per animal." : ""}`,
           );

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -273,13 +274,13 @@ export default function GenericEvent() {
     if (queuedEvents) eventParts.push(`${queuedEvents} queued (offline)`);
 
     if (batchOutcome === "failed") {
-      Alert.alert(
+      appAlert(
         `${spec.title} — partial`,
         `${eventParts.join(" · ") || "Events recorded"}, but the drug issue failed: ${batchError}\n\nEvents: ${eventNames.join(", ") || "(none — were they queued?)"}\nTop up the source warehouse and create the Material Issue from desktop.`,
       );
     } else {
       const extra = batchOutcome === "ok" ? "\nBatch drug issue submitted." : "";
-      Alert.alert(`${spec.title} recorded`, `${eventParts.join(" · ")}${extra}`);
+      appAlert(`${spec.title} recorded`, `${eventParts.join(" · ")}${extra}`);
     }
     router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
   };
