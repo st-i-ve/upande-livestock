@@ -21,8 +21,9 @@ import {
   AnimalEventType,
 } from "@/src/frappe/animalEvent";
 import { BatchDrugRow } from "@/src/frappe/batchDrugIssue";
-import { getItemValuationRate } from "@/src/frappe/stock";
+import { findStoreShortage, getItemValuationRate } from "@/src/frappe/stock";
 import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError, todayISO } from "@/src/services/api";
@@ -148,6 +149,15 @@ export default function GenericEvent() {
           "Pick a source warehouse on every drug row (or set Drug warehouse in Livestock Settings to apply a default).",
         );
       }
+      // Block over-issue before creating the Material Issue.
+      const shortage = await findStoreShortage(
+        filledDrugRows.map((d) => ({
+          itemCode: d.itemCode.trim(),
+          warehouse: d.sourceWarehouse || defaultDrugWarehouse,
+          qtyNeeded: Number(d.qty),
+        })),
+      );
+      if (shortage) return setError(shortage);
     }
 
     if (operator && operator !== defaultOperator) await setStoredOperator(operator);
@@ -461,6 +471,14 @@ function DrugRows({
     onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const remove = (id: number) => onChange(rows.filter((r) => r.id !== id));
 
+  // Live on-hand stock per row, so the operator sees what's in the store.
+  const availQuery = useStoreQtyMap(
+    rows.map((r) => ({
+      itemCode: r.itemCode.trim(),
+      warehouse: r.sourceWarehouse || defaultWarehouse,
+    })),
+  );
+
   return (
     <Field
       label="Drugs / vaccines (optional)"
@@ -480,7 +498,7 @@ function DrugRows({
               doctype="Item"
               value={r.itemCode || null}
               onChange={(name, row) =>
-                update(r.id, { itemCode: name, uom: r.uom || row?.stock_uom || "" })
+                update(r.id, { itemCode: name, uom: row?.stock_uom || "" })
               }
               fields={["name", "item_name", "item_code", "stock_uom"]}
               displayField="item_name"
@@ -512,9 +530,30 @@ function DrugRows({
               />
             </Field>
             <Field label="UOM" style={{ flex: 1 }}>
-              <Input value={r.uom} onChangeText={(t) => update(r.id, { uom: t })} placeholder="ml" />
+              <Input value={r.uom} editable={false} placeholder="—" />
             </Field>
           </FieldRow>
+          {r.itemCode.trim() && (r.sourceWarehouse || defaultWarehouse)
+            ? (() => {
+                const wh = r.sourceWarehouse || defaultWarehouse;
+                const avail = availQuery.data?.[storeQtyKey(r.itemCode.trim(), wh)];
+                const short = avail != null && Number(r.qty) > avail;
+                return (
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      marginTop: -4,
+                      marginBottom: 8,
+                      color: short ? c.danger : c.textMuted,
+                    }}
+                  >
+                    {availQuery.isLoading || avail == null
+                      ? `Checking stock in ${wh}…`
+                      : `Available in ${wh}: ${avail}${r.uom ? " " + r.uom : ""}${short ? " — not enough" : ""}`}
+                  </Text>
+                );
+              })()
+            : null}
           <Field label="Withdrawal days">
             <Input
               value={r.withdrawalDays}
