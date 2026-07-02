@@ -1,7 +1,7 @@
-import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -47,6 +47,15 @@ export default function AnimalFeed() {
   const manufacture = useManufactureHerdFeed();
   const feed = useFeedHerd();
 
+  // Reset user-entered fields for "Record another". Operator/employee context
+  // comes from the auth store and is left untouched.
+  const resetForm = () => {
+    setHerdName("");
+    setStage("manufacture");
+    setFeedKg("");
+    setSubmitError(null);
+  };
+
   const available = info.data?.availableInStore ?? 0;
   const feedKgNum = Number(feedKg) || 0;
 
@@ -81,12 +90,13 @@ export default function AnimalFeed() {
       });
       await info.refetch();
       setFeedKg("");
-      appAlert(
-        "Herd fed",
-        `Issued ${r.issued_qty.toLocaleString()} ${r.uom} of ${r.production_item} from ${r.store}.\n` +
+      recordSuccess({
+        title: "Herd fed",
+        message:
+          `Issued ${r.issued_qty.toLocaleString()} ${r.uom} of ${r.production_item} from ${r.store}.\n` +
           `Material Issue ${r.stock_entry}.`,
-      );
-      router.replace("/(tabs)/record/success?name=Animal feeding");
+        onAnother: resetForm,
+      });
     } catch (err) {
       setSubmitError(extractFrappeError(err));
     }

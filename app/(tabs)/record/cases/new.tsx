@@ -1,7 +1,5 @@
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -25,6 +23,7 @@ import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { useCreateAnimalHealthCase } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -61,6 +60,17 @@ export default function CaseNew() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalHealthCase();
+
+  // Clear the entity-specific entry so the operator can open another case
+  // right away. Sticky context (operator, drug warehouse) is kept.
+  const resetForm = () => {
+    setSelected([]);
+    setCondition("");
+    setSeverity("Moderate");
+    setNotes("");
+    setTreatments([]);
+    setError(null);
+  };
 
   // Sum cost for the form summary tile.
   const totalCost = useMemo(
@@ -199,11 +209,11 @@ export default function CaseNew() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} case${succeeded === 1 ? "" : "s"} opened`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    appAlert(
-      "Health cases opened",
-      `${parts.join(" · ")}${builtTreatments.length ? `\n${builtTreatments.length} treatment${builtTreatments.length === 1 ? "" : "s"} per case.` : ""}`,
-    );
-    router.replace("/(tabs)/record/success?name=Health case");
+    recordSuccess({
+      title: "Health cases opened",
+      message: `${parts.join(" · ")}${builtTreatments.length ? `\n${builtTreatments.length} treatment${builtTreatments.length === 1 ? "" : "s"} per case.` : ""}`,
+      onAnother: resetForm,
+    });
   };
 
   return (

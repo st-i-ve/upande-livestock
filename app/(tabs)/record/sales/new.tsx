@@ -1,7 +1,6 @@
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -26,6 +25,15 @@ export default function SaleNew() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalDisposal();
+
+  const resetForm = () => {
+    setSelected([]);
+    setPrice("");
+    setBuyer("");
+    setPhone("");
+    setReason("");
+    setError(null);
+  };
 
   const p = Number(price) || 0;
   const totalProceeds = p * selected.length;
@@ -66,11 +74,11 @@ export default function SaleNew() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} sold to ${buyer.trim()}`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    appAlert(
-      "Sale recorded",
-      `${parts.join(" · ")}\n${succeeded > 0 ? `Sales Invoice + Payment Entry + write-off JE posted per animal.` : ""}`,
-    );
-    router.replace("/(tabs)/record/success?name=Sale");
+    recordSuccess({
+      title: "Sale recorded",
+      message: `${parts.join(" · ")}\n${succeeded > 0 ? `Sales Invoice + Payment Entry + write-off JE posted per animal.` : ""}`,
+      onAnother: resetForm,
+    });
   };
 
   return (

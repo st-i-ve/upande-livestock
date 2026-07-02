@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -121,6 +121,23 @@ export default function GenericEvent() {
       return total;
     },
   });
+
+  // Reset the form after a successful submit so "Record another" starts clean.
+  // Keeps the operator sticky; clears every per-event input back to its initial.
+  const resetForm = () => {
+    setVetName("");
+    setHandlerIds([]);
+    setSelected([]);
+    setWeight("");
+    setBcs("");
+    setActivityCost("");
+    setMethod("Hot iron");
+    setFeet("All four");
+    setHeatSigns("");
+    setDrugs([]);
+    setRemarks("");
+    setError(null);
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -274,15 +291,19 @@ export default function GenericEvent() {
     if (queuedEvents) eventParts.push(`${queuedEvents} queued (offline)`);
 
     if (batchOutcome === "failed") {
-      appAlert(
-        `${spec.title} — partial`,
-        `${eventParts.join(" · ") || "Events recorded"}, but the drug issue failed: ${batchError}\n\nEvents: ${eventNames.join(", ") || "(none — were they queued?)"}\nTop up the source warehouse and create the Material Issue from desktop.`,
-      );
+      recordSuccess({
+        title: `${spec.title} — partial`,
+        message: `${eventParts.join(" · ") || "Events recorded"}, but the drug issue failed: ${batchError}\n\nEvents: ${eventNames.join(", ") || "(none — were they queued?)"}\nTop up the source warehouse and create the Material Issue from desktop.`,
+        onAnother: resetForm,
+      });
     } else {
       const extra = batchOutcome === "ok" ? "\nBatch drug issue submitted." : "";
-      appAlert(`${spec.title} recorded`, `${eventParts.join(" · ")}${extra}`);
+      recordSuccess({
+        title: `${spec.title} recorded`,
+        message: `${eventParts.join(" · ")}${extra}`,
+        onAnother: resetForm,
+      });
     }
-    router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
   };
 
   return (

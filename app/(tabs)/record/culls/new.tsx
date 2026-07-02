@@ -1,7 +1,7 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { AttachmentPicker } from "@/components/AttachmentPicker";
@@ -51,6 +51,20 @@ export default function CullNew() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalDisposal();
+
+  const resetForm = () => {
+    setSelected([]);
+    setType(TYPES[0]);
+    setSalvage("");
+    setReason("");
+    setWitness("");
+    setInsuranceClaim("");
+    setGiftedTo("");
+    setGiftDestination("");
+    setPostMortemFiles([]);
+    setError(null);
+  };
+
   const sVal = Number(salvage) || 0;
 
   const isDeath = type.startsWith("Died");
@@ -157,15 +171,15 @@ export default function CullNew() {
         : succeeded > 0
           ? "Write-off JE posted per animal."
           : "";
-    appAlert(
-      "Disposal recorded",
-      [
+    recordSuccess({
+      title: "Disposal recorded",
+      message: [
         parts.join(" · "),
         tail,
         attachErrors.length ? `Some attachments failed:\n${attachErrors.join("\n")}` : "",
       ].filter(Boolean).join("\n"),
-    );
-    router.replace("/(tabs)/record/success?name=Cull / death / gift");
+      onAnother: resetForm,
+    });
   };
 
   return (

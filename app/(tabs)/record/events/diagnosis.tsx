@@ -1,8 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -103,6 +102,38 @@ export default function Diagnosis() {
     setCustoms((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   const removeCustom = (id: number) =>
     setCustoms((prev) => prev.filter((c) => c.id !== id));
+
+  // Reset every user-entered field back to its initial value so "Record another"
+  // starts from a clean exam. Sticky context (operator, examiner identity, date)
+  // is intentionally kept.
+  const resetForm = () => {
+    setSelected([]);
+    setSubmitError(null);
+    setWeight("");
+    setTemp("");
+    setHr("");
+    setResp("");
+    setBcs("");
+    setFollowUp("");
+    setVetName("");
+    setVetConfirmed(false);
+    setFreeRemarks("");
+    setAppetite("Normal");
+    setBehavior("Active");
+    setEyes("Clear");
+    setNose("Moist (normal)");
+    setMouth("Normal");
+    setDung("Normal");
+    setLoco("Normal movement");
+    setReproDischarge("None");
+    setHeatSigns("No");
+    setDiagnosis("Healthy");
+    setCondition("(specify)");
+    setIsolation("No");
+    setSkin(new Set(["Healthy"]));
+    setFlags({ Fever: false, Coughing: false, Sneezing: false, Swelling: false, "Wounds/Injuries": false });
+    setCustoms([]);
+  };
 
   return (
     <Screen title="Animal diagnosis" subtitle="Full health examination" back>
@@ -419,15 +450,14 @@ export default function Diagnosis() {
           const parts: string[] = [];
           if (succeeded) parts.push(`${succeeded} diagnosed`);
           if (queued) parts.push(`${queued} queued (offline)`);
-          appAlert(
-            "Diagnosis submitted",
-            `${parts.join(" · ")}${action === "Escalated to Case" && succeeded > 0 ? "\nA draft Animal Health Case has been created per animal." : ""}`,
-          );
-          router.replace(
-            action === "Escalated to Case"
-              ? "/(tabs)/record/success?name=Diagnosis (escalated to case)"
-              : "/(tabs)/record/success?name=Animal diagnosis",
-          );
+          recordSuccess({
+            title:
+              action === "Escalated to Case"
+                ? "Diagnosis (escalated to case) submitted"
+                : "Animal diagnosis submitted",
+            message: `${parts.join(" · ")}${action === "Escalated to Case" && succeeded > 0 ? "\nA draft Animal Health Case has been created per animal." : ""}`,
+            onAnother: resetForm,
+          });
         }}
       />
     </Screen>

@@ -1,7 +1,5 @@
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -17,6 +15,7 @@ import { useAuthStore } from "@/src/auth/authStore";
 import type { MilkSession } from "@/src/frappe/milkRecording";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 import {
   extractFrappeError,
   todayISO,
@@ -96,6 +95,15 @@ export default function Milk() {
 
   const mutation = useCreateMilkRecording();
 
+  // Clear the entry so the operator can record another session right away.
+  const resetForm = () => {
+    setSelected([]);
+    setSession(SESSIONS[0]);
+    setYields({});
+    setAllCol(false);
+    setError(null);
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (selected.length === 0) return setError("Pick at least one cow.");
@@ -151,8 +159,11 @@ export default function Milk() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} recording${succeeded === 1 ? "" : "s"} submitted`);
     if (queued) parts.push(`${queued} queued offline`);
-    appAlert("Milk recording done", `${parts.join(" · ")}\n${submitted.join("\n")}`);
-    router.replace("/(tabs)/record/success?name=Milk recording");
+    recordSuccess({
+      title: "Milk recording done",
+      message: `${parts.join(" · ")}\n${submitted.join("\n")}`,
+      onAnother: resetForm,
+    });
   };
 
   return (

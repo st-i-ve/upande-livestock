@@ -1,7 +1,6 @@
-import { router } from "expo-router";
 import React, { useState } from "react";
 import {  } from "react-native";
-import { appAlert } from "@/src/ui/appAlert";
+import { recordSuccess } from "@/src/ui/recordSuccess";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
@@ -34,6 +33,17 @@ export default function Service() {
   const mutation = useCreateAnimalEvent();
   const batchMutation = useBatchDrugIssue();
   const { data: company } = useDefaultCompany();
+
+  // Reset the form after a successful submit so "Record another" starts clean.
+  // Keeps the operator sticky; clears the per-service selections and inputs.
+  const resetForm = () => {
+    setSelected([]);
+    setType("A.I.");
+    setStraw("");
+    setSemenWarehouse("");
+    setRemarks("");
+    setError(null);
+  };
 
   // Live straws-on-hand at the chosen store, shown while picking.
   const semenAvailQuery = useStoreQtyMap(
@@ -124,8 +134,7 @@ export default function Service() {
           : `semen issue FAILED: ${semenError}`,
       );
     }
-    appAlert("Service recorded", parts.join(" · "));
-    router.replace("/(tabs)/record/success?name=Service");
+    recordSuccess({ title: "Service recorded", message: parts.join(" · "), onAnother: resetForm });
   };
 
   return (
