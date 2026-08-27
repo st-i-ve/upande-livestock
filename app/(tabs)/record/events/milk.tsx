@@ -25,8 +25,27 @@ import type { Animal } from "@/types";
 
 const SESSIONS: MilkSession[] = ["AM — Morning", "PM — Afternoon", "Evening"];
 
-type PerHerd = { total: string; discard: string; colostrum: string };
-const EMPTY: PerHerd = { total: "", discard: "", colostrum: "" };
+// Kept in step with the Milk Recording `discard_reason` Select on the ERP side.
+// Milk poured away is a loss; recording why is the only way it can be reduced.
+const DISCARD_REASONS = [
+  "Mastitis",
+  "Antibiotic withdrawal",
+  "Colostrum",
+  "Spoiled / soured",
+  "Spilled",
+  "Failed quality test",
+  "Other",
+] as const;
+type DiscardReason = (typeof DISCARD_REASONS)[number];
+
+type PerHerd = {
+  total: string;
+  discard: string;
+  colostrum: string;
+  reason: DiscardReason | "";
+  reasonNotes: string;
+};
+const EMPTY: PerHerd = { total: "", discard: "", colostrum: "", reason: "", reasonNotes: "" };
 
 export default function Milk() {
   const c = useColors();
@@ -119,6 +138,11 @@ export default function Milk() {
     for (const h of herdsInPlay) {
       const t = Number(yields[h]?.total || 0);
       if (t <= 0) return setError(`Enter total yield for ${h}.`);
+      const d = Number(yields[h]?.discard || 0);
+      if (d > 0 && !yields[h]?.reason)
+        return setError(`Say why ${d} kg was discarded in ${h}.`);
+      if (yields[h]?.reason === "Other" && !yields[h]?.reasonNotes?.trim())
+        return setError(`Describe the discard reason for ${h}.`);
     }
 
     let succeeded = 0;
@@ -145,6 +169,9 @@ export default function Milk() {
           recordingDate: todayISO(),
           totalYieldKg: t,
           discardedKg: d || undefined,
+          discardReason: d > 0 ? (v.reason || undefined) : undefined,
+          discardReasonNotes:
+            d > 0 && v.reason === "Other" ? v.reasonNotes.trim() || undefined : undefined,
           colostrumYieldKg: !allCol && c > 0 ? c : undefined,
           isColostrum: allCol,
           pricePerKg: APP.milkPriceKES,
@@ -255,6 +282,27 @@ export default function Milk() {
                     />
                   </Field>
                 </FieldRow>
+                {Number(v.discard) > 0 ? (
+                  <Field
+                    label="Reason for discard"
+                    help="Milk poured away is a loss. Recording why is the only way it can be reduced."
+                  >
+                    <Picker
+                      value={(v.reason || "Select a reason") as DiscardReason}
+                      onChange={(r) => setYield(herd, { reason: r })}
+                      options={DISCARD_REASONS as unknown as DiscardReason[]}
+                    />
+                  </Field>
+                ) : null}
+                {Number(v.discard) > 0 && v.reason === "Other" ? (
+                  <Field label="Describe the reason">
+                    <Input
+                      value={v.reasonNotes}
+                      onChangeText={(n) => setYield(herd, { reasonNotes: n })}
+                      placeholder="What happened to the milk?"
+                    />
+                  </Field>
+                ) : null}
                 {!allCol ? (
                   <Field
                     label="Colostrum portion (kg)"

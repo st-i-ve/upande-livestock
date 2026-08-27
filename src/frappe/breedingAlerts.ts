@@ -41,7 +41,7 @@ const CALVING_TODAY_DAYS = DAYS(283);
 export async function fetchCycleEvents(): Promise<CycleEventRow[]> {
   const since = isoDateNDaysAgo(365);
   return listDocuments<CycleEventRow>({
-    doctype: "Animal Event",
+    doctype: "Livestock Event",
     fields: ["animal", "event_date", "event_type", "diagnosis_result"],
     filters: [
       ["docstatus", "=", 1],

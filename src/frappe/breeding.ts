@@ -16,7 +16,7 @@ export async function getServicedPendingPdAnimalIds(): Promise<Set<string>> {
 
   const [services, closings] = await Promise.all([
     listDocuments<{ animal: string; event_date: string }>({
-      doctype: "Animal Event",
+      doctype: "Livestock Event",
       fields: ["animal", "event_date"],
       filters: [
         ["docstatus", "=", 1],
@@ -26,7 +26,7 @@ export async function getServicedPendingPdAnimalIds(): Promise<Set<string>> {
       limit: 5000,
     }),
     listDocuments<{ animal: string; event_date: string; event_type: string }>({
-      doctype: "Animal Event",
+      doctype: "Livestock Event",
       fields: ["animal", "event_date", "event_type"],
       filters: [
         ["docstatus", "=", 1],

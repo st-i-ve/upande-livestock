@@ -129,9 +129,9 @@ export default function Inventory() {
   const args = useMemo(() => {
     switch (type) {
       case "drugs":
-        return { warehouse: settings?.custom_drug_warehouse, enabled: !!settings };
+        return { warehouse: settings?.drug_warehouse, enabled: !!settings };
       case "semen":
-        return { warehouse: settings?.custom_semen_warehouse, enabled: !!settings };
+        return { warehouse: settings?.semen_warehouse, enabled: !!settings };
       case "colostrum":
         // Colostrum is item-defined, not warehouse-defined.
         return { itemNameLike: "Colostrum", enabled: true };

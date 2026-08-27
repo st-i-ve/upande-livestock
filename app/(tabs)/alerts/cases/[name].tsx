@@ -72,7 +72,7 @@ export default function CaseDetail() {
       for (const f of postMortemFiles) {
         try {
           await attachFile({
-            doctype: "Animal Health Case",
+            doctype: "Livestock Health Case",
             docname: theCase.name,
             asset: f,
             isPrivate: true,

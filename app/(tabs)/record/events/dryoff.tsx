@@ -35,9 +35,9 @@ export default function Dryoff() {
   const s = useMemo(() => makeStyles(c), [c]);
   const { data: herds = [] } = useHerds();
   const { data: settings } = useLivestockSettings();
-  const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
+  const defaultDrugWarehouse = settings?.drug_warehouse || "";
 
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [toHerd, setToHerd] = useState<string>("");
   const [dctRows, setDctRows] = useState<DCTRow[]>([]);
@@ -80,7 +80,7 @@ export default function Dryoff() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (noOperator) return setError(missingMessage);
+    if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to dry off.");
     if (!toHerd) return setError("Pick a destination herd.");
 

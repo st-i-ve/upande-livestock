@@ -139,12 +139,20 @@ export default function Settings() {
       Alert.alert("No changes", "Nothing to save.");
       return;
     }
-    // Coerce numeric fields.
-    if (patch.custom_milk_price_per_kg !== undefined) {
-      patch.custom_milk_price_per_kg = Number(patch.custom_milk_price_per_kg);
-    }
-    if (patch.custom_default_payout_percent !== undefined) {
-      patch.custom_default_payout_percent = Number(patch.custom_default_payout_percent);
+    // Coerce the numeric fields — the inputs hand back strings.
+    const NUMERIC: (keyof LivestockSettingsDoc)[] = [
+      "bull_cull_max_days",
+      "bull_cull_warn_percent",
+      "gestation_period_days",
+      "min_calving_interval_days",
+      "min_vaccination_interval_days",
+      "min_deworming_interval_days",
+      "min_weight_recording_interval_days",
+      "min_hoof_trimming_interval_days",
+      "max_open_days",
+    ];
+    for (const k of NUMERIC) {
+      if (patch[k] !== undefined) (patch as any)[k] = Number(patch[k]);
     }
     try {
       await mutation.mutateAsync(patch);
@@ -178,7 +186,10 @@ export default function Settings() {
       subtitle="Edits go to the Frappe single doctype on save"
       back
     >
-      <SectionHeader title="Company & farm" />
+      <SectionHeader
+        title="Company"
+        subtitle="Every control here writes to a field this site declares"
+      />
       <LinkField
         label="Default company"
         doctype="Company"
@@ -186,47 +197,114 @@ export default function Settings() {
         onChange={(v) => set("custom_default_company", v)}
         icon="domain"
       />
-      <LabeledInput
-        label="Farm"
-        value={form.custom_farm || ""}
-        onChangeText={(v) => set("custom_farm", v)}
-        hint="Posted on Sales Invoice (custom_farm)"
-      />
-      <LabeledInput
-        label="Milk business unit"
-        value={form.custom_milk_business_unit || ""}
-        onChangeText={(v) => set("custom_milk_business_unit", v)}
+      <LinkField
+        label="Default credit / cash account"
+        doctype="Account"
+        value={form.custom_default_credit_account || ""}
+        onChange={(v) => set("custom_default_credit_account", v)}
+        icon="cash"
       />
 
       <Divider />
 
-      <SectionHeader title="Default herds" subtitle="Where new animals land by default" />
+      <SectionHeader
+        title="Calf routing"
+        subtitle="Where a newborn lands. Leave blank and the server routes on sex."
+      />
       <LinkField
-        label="Default heifer herd"
+        label="Female calf herd"
         doctype="Herds"
-        value={form.custom_default_heifer_herd || ""}
-        onChange={(v) => set("custom_default_heifer_herd", v)}
+        value={form.female_calf_herd || ""}
+        onChange={(v) => set("female_calf_herd", v)}
         fields={["name", "herd_name"]}
         displayField="herd_name"
         icon="fence"
       />
       <LinkField
-        label="Default bull herd"
+        label="Male calf herd"
         doctype="Herds"
-        value={form.custom_default_bull_herd || ""}
-        onChange={(v) => set("custom_default_bull_herd", v)}
+        value={form.male_calf_herd || ""}
+        onChange={(v) => set("male_calf_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
+        hint="Bull calves — the culling window starts here"
+      />
+      <LinkField
+        label="Fallback calf herd"
+        doctype="Herds"
+        value={form.default_calf_herd || ""}
+        onChange={(v) => set("default_calf_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
+        hint="Used when neither sex herd is set"
+      />
+
+      <Divider />
+
+      <SectionHeader
+        title="Lifecycle herds"
+        subtitle="Destinations the growth ladder and breeding rules move animals to"
+      />
+      <LinkField
+        label="In-calf heifer herd"
+        doctype="Herds"
+        value={form.incalf_heifer_herd || ""}
+        onChange={(v) => set("incalf_heifer_herd", v)}
         fields={["name", "herd_name"]}
         displayField="herd_name"
         icon="fence"
       />
       <LinkField
-        label="Default dry herd"
+        label="High-yield herd"
         doctype="Herds"
-        value={form.custom_default_dry_herd || ""}
-        onChange={(v) => set("custom_default_dry_herd", v)}
+        value={form.high_yield_herd || ""}
+        onChange={(v) => set("high_yield_herd", v)}
         fields={["name", "herd_name"]}
         displayField="herd_name"
         icon="fence"
+        hint="Where a fresh cow goes after calving"
+      />
+      <LinkField
+        label="Low-yield herd"
+        doctype="Herds"
+        value={form.low_yield_herd || ""}
+        onChange={(v) => set("low_yield_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
+      />
+      <LinkField
+        label="Steamer herd"
+        doctype="Herds"
+        value={form.steamer_herd || ""}
+        onChange={(v) => set("steamer_herd", v)}
+        fields={["name", "herd_name"]}
+        displayField="herd_name"
+        icon="fence"
+        hint="Dry cows steaming up to calving"
+      />
+
+      <Divider />
+
+      <SectionHeader
+        title="Bull culling"
+        subtitle="Bull calves are sold young. This is the window and the warning point."
+      />
+      <LabeledInput
+        label="Days to cull a bull calf"
+        value={String(form.bull_cull_max_days ?? "")}
+        onChangeText={(v) => set("bull_cull_max_days", v)}
+        keyboardType="numeric"
+        hint="Counted from birth"
+      />
+      <LabeledInput
+        label="Warn at percent of window"
+        value={String(form.bull_cull_warn_percent ?? "")}
+        onChangeText={(v) => set("bull_cull_warn_percent", v)}
+        keyboardType="numeric"
+        hint="e.g. 75 — warn three-quarters of the way through"
       />
 
       <Divider />
@@ -261,127 +339,110 @@ export default function Settings() {
         displayField="warehouse_name"
         searchField="warehouse_name"
         icon="warehouse"
+        hint="Discarded milk lands here with its reason"
       />
-      <LabeledInput
+      <LinkField
         label="Milking stock entry type"
+        doctype="Stock Entry Type"
         value={form.custom_milking_stock_entry_type || ""}
-        onChangeText={(v) => set("custom_milking_stock_entry_type", v)}
-        hint="e.g. Milking"
-      />
-      <LabeledInput
-        label="Milk price (KES / kg)"
-        value={String(form.custom_milk_price_per_kg ?? "")}
-        onChangeText={(v) => set("custom_milk_price_per_kg", v)}
-        keyboardType="numeric"
+        onChange={(v) => set("custom_milking_stock_entry_type", v)}
+        icon="clipboard-list-outline"
       />
 
       <Divider />
 
-      <SectionHeader title="Stock — drugs & semen" />
+      <SectionHeader title="Stores" subtitle="Where drugs, semen and feed leave from" />
       <LinkField
         label="Drug warehouse"
         doctype="Warehouse"
-        value={form.custom_drug_warehouse || ""}
-        onChange={(v) => set("custom_drug_warehouse", v)}
+        value={form.drug_warehouse || ""}
+        onChange={(v) => set("drug_warehouse", v)}
         fields={["name", "warehouse_name"]}
         displayField="warehouse_name"
+        searchField="warehouse_name"
         icon="warehouse"
+        hint="Default source for every vaccination, deworming and treatment"
       />
       <LinkField
         label="Semen warehouse"
         doctype="Warehouse"
-        value={form.custom_semen_warehouse || ""}
-        onChange={(v) => set("custom_semen_warehouse", v)}
+        value={form.semen_warehouse || ""}
+        onChange={(v) => set("semen_warehouse", v)}
         fields={["name", "warehouse_name"]}
         displayField="warehouse_name"
+        searchField="warehouse_name"
         icon="warehouse"
       />
       <LinkField
-        label="Livestock sale item"
+        label="Feed WIP warehouse"
+        doctype="Warehouse"
+        value={form.custom_feed_wip_warehouse || ""}
+        onChange={(v) => set("custom_feed_wip_warehouse", v)}
+        fields={["name", "warehouse_name"]}
+        displayField="warehouse_name"
+        searchField="warehouse_name"
+        icon="warehouse"
+      />
+      <LinkField
+        label="Default semen straw item"
         doctype="Item"
-        value={form.custom_animal_sale_item || ""}
-        onChange={(v) => set("custom_animal_sale_item", v)}
+        value={form.semen_item || ""}
+        onChange={(v) => set("semen_item", v)}
         fields={["name", "item_name", "item_code"]}
         displayField="item_name"
+        searchField="item_name"
         icon="package-variant"
       />
 
       <Divider />
 
-      <SectionHeader title="Accounting" subtitle="Frappe accounts used by server scripts" />
-      <LinkField
-        label="Animal asset account"
-        doctype="Account"
-        value={form.custom_animal_asset_account || ""}
-        onChange={(v) => set("custom_animal_asset_account", v)}
-        icon="bank"
+      <SectionHeader
+        title="Intervals the guards enforce"
+        subtitle="A repeat inside one of these windows is refused, not warned about"
       />
-      <LinkField
-        label="Default credit / cash account"
-        doctype="Account"
-        value={form.custom_default_credit_account || ""}
-        onChange={(v) => set("custom_default_credit_account", v)}
-        icon="cash"
-      />
-      <LinkField
-        label="Disposal write-off account"
-        doctype="Account"
-        value={form.custom_disposal_account || ""}
-        onChange={(v) => set("custom_disposal_account", v)}
-        icon="cash-remove"
-      />
-      <LinkField
-        label="Animal sale income account"
-        doctype="Account"
-        value={form.custom_animal_sale_income_account || ""}
-        onChange={(v) => set("custom_animal_sale_income_account", v)}
-        icon="cash-plus"
-      />
-      <LinkField
-        label="Milk income account"
-        doctype="Account"
-        value={form.custom_milk_income_account || ""}
-        onChange={(v) => set("custom_milk_income_account", v)}
-        icon="water"
-      />
-      <LinkField
-        label="Vet expense account"
-        doctype="Account"
-        value={form.custom_vet_expense_account || ""}
-        onChange={(v) => set("custom_vet_expense_account", v)}
-        icon="medical-bag"
-      />
-      <LinkField
-        label="Feed expense account"
-        doctype="Account"
-        value={form.custom_feed_expense_account || ""}
-        onChange={(v) => set("custom_feed_expense_account", v)}
-        icon="grain"
-      />
-      <LinkField
-        label="Insurance receivable account"
-        doctype="Account"
-        value={form.custom_insurance_receivable_account || ""}
-        onChange={(v) => set("custom_insurance_receivable_account", v)}
-        icon="shield-check"
-      />
-      <LinkField
-        label="Insurance income account"
-        doctype="Account"
-        value={form.custom_insurance_income_account || ""}
-        onChange={(v) => set("custom_insurance_income_account", v)}
-        icon="shield-check"
-      />
-
-      <Divider />
-
-      <SectionHeader title="Insurance defaults" />
       <LabeledInput
-        label="Default payout percent"
-        value={String(form.custom_default_payout_percent ?? "")}
-        onChangeText={(v) => set("custom_default_payout_percent", v)}
+        label="Gestation period (days)"
+        value={String(form.gestation_period_days ?? "")}
+        onChangeText={(v) => set("gestation_period_days", v)}
         keyboardType="numeric"
-        hint="Used on culls/deaths when policy doesn't override"
+        hint="Drives the expected calving date"
+      />
+      <LabeledInput
+        label="Minimum calving interval (days)"
+        value={String(form.min_calving_interval_days ?? "")}
+        onChangeText={(v) => set("min_calving_interval_days", v)}
+        keyboardType="numeric"
+      />
+      <LabeledInput
+        label="Minimum days between vaccinations"
+        value={String(form.min_vaccination_interval_days ?? "")}
+        onChangeText={(v) => set("min_vaccination_interval_days", v)}
+        keyboardType="numeric"
+      />
+      <LabeledInput
+        label="Minimum days between dewormings"
+        value={String(form.min_deworming_interval_days ?? "")}
+        onChangeText={(v) => set("min_deworming_interval_days", v)}
+        keyboardType="numeric"
+      />
+      <LabeledInput
+        label="Minimum days between weighings"
+        value={String(form.min_weight_recording_interval_days ?? "")}
+        onChangeText={(v) => set("min_weight_recording_interval_days", v)}
+        keyboardType="numeric"
+      />
+      <LabeledInput
+        label="Minimum days between hoof trims"
+        value={String(form.min_hoof_trimming_interval_days ?? "")}
+        onChangeText={(v) => set("min_hoof_trimming_interval_days", v)}
+        keyboardType="numeric"
+      />
+      <LabeledInput
+        label="Days open before a cow is flagged"
+        value={String(form.max_open_days ?? "")}
+        onChangeText={(v) => set("max_open_days", v)}
+        keyboardType="numeric"
+        hint="Days since calving with no conception"
       />
 
       {saveError ? <Banner tone="danger">{saveError}</Banner> : null}

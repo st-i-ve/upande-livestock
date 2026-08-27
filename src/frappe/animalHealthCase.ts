@@ -1,4 +1,5 @@
-import { frappeCreateAndSubmit, getClient, todayISO } from "@/src/services/api";
+import { OpsError } from "./opsError";
+import { getClient, todayISO } from "@/src/services/api";
 import { countDocuments, getDocument, listDocuments } from "./generic";
 
 export type CaseStatus =
@@ -29,6 +30,8 @@ export type HealthTreatmentInput = {
   /** Free text: "Procaine Penicillin 20 ml IM" etc. */
   description?: string;
   administeredBy?: string;
+  /** How the drug was given. The child row's own Select. */
+  route?: string;
   remarks?: string;
 };
 
@@ -52,29 +55,29 @@ export type CreateAnimalHealthCaseInput = {
 };
 
 /**
- * Maps a Treatment input to the Frappe child-row shape. We send the union
- * of field names we believe the Animal Health Treatment doctype carries
- * — unknown fields are silently ignored by Frappe on insert, so the cost
- * of being over-permissive here is zero.
+ * Maps a treatment onto the `Livestock Health Treatment` child row.
+ *
+ * The previous version sent `item_code` / `item_name` / `uom` / `rate` /
+ * `amount` — names from a doctype this backend does not have. Frappe drops
+ * unknown child keys silently, so every treatment logged from the app arrived
+ * with no drug on it. The real row names the drug in `drug_item`, carries a
+ * single `cost`, and adds the clinical detail a treatment actually needs:
+ * dosage, route and withdrawal period.
  */
 const mapTreatment = (t: HealthTreatmentInput) => {
   const qty = Number(t.qty) || 0;
   const rate = Number(t.rate ?? 0);
-  const amount = Number(t.amount ?? qty * rate) || 0;
   return {
     treatment_date: t.treatmentDate,
-    item_code: t.itemCode,
-    item_name: t.itemName,
+    drug_item: t.itemCode,
+    drug_name_text: t.itemName,
+    dosage: t.description,
     qty,
-    uom: t.uom,
-    stock_uom: t.uom,
-    rate,
-    amount,
-    source_warehouse: t.sourceWarehouse,
-    withdrawal_days: t.withdrawalDays,
-    description: t.description,
+    route: t.route,
+    withdrawal_period_days: t.withdrawalDays,
     administered_by: t.administeredBy,
-    remarks: t.remarks,
+    cost: Number(t.amount ?? qty * rate) || undefined,
+    notes: t.remarks,
   };
 };
 
@@ -121,7 +124,7 @@ export const getHealthCases = async (
     .filter(([k]) => k !== "any")
     .map(([k, v]) => [k, "=", v] as [string, string, any]);
   const rows = await listDocuments({
-    doctype: "Animal Health Case",
+    doctype: "Livestock Health Case",
     fields: HEALTH_CASE_LIST_FIELDS,
     filters: f,
     orderBy: "opened_date desc",
@@ -131,7 +134,7 @@ export const getHealthCases = async (
 };
 
 export const countOpenHealthCases = (): Promise<number> =>
-  countDocuments("Animal Health Case", [["case_status", "in", ["Open", "Under Treatment"]]]);
+  countDocuments("Livestock Health Case", [["case_status", "in", ["Open", "Under Treatment"]]]);
 
 export const createAnimalHealthCase = async (
   input: CreateAnimalHealthCaseInput,
@@ -153,7 +156,17 @@ export const createAnimalHealthCase = async (
   if (input.treatments && input.treatments.length > 0) {
     body.treatments = input.treatments.map(mapTreatment);
   }
-  return frappeCreateAndSubmit("Animal Health Case", body);
+  // create_health_case owns the doctype: it resolves company and operator and
+  // issues the treatment drugs out of the store as one entry.
+  const client = await getClient();
+  const res = await client.post(
+    "/api/method/upande_livestock.api.operations.create_health_case",
+    { payload: body },
+  );
+  const msg = res.data?.message;
+  if (!msg) throw new OpsError("create_health_case returned nothing.");
+  if (msg.error) throw new OpsError(msg.error);
+  return msg;
 };
 
 // ---------------------------------------------------------------------------
@@ -175,10 +188,13 @@ export async function updateAnimalHealthCase(
   const body: Record<string, any> = {
     case_status: input.caseStatus,
   };
-  if (input.closingNotes) body.closing_notes = input.closingNotes;
-  if (input.closingDate) body.closing_date = input.closingDate;
+  // The doctype's own names: a case closes on `closed_date` with
+  // `outcome_notes`. `closing_notes` / `closing_date` do not exist, so the
+  // reason a case was closed was being thrown away on every close.
+  if (input.closingNotes) body.outcome_notes = input.closingNotes;
+  if (input.closingDate) body.closed_date = input.closingDate;
   const res = await client.put(
-    `/api/resource/Animal Health Case/${encodeURIComponent(input.name)}`,
+    `/api/resource/Livestock Health Case/${encodeURIComponent(input.name)}`,
     body,
   );
   return res.data?.data;
@@ -207,7 +223,7 @@ export type AnimalHealthCaseDetail = {
 };
 
 export async function getAnimalHealthCase(name: string): Promise<AnimalHealthCaseDetail | null> {
-  const row = await getDocument<any>("Animal Health Case", name);
+  const row = await getDocument<any>("Livestock Health Case", name);
   if (!row) return null;
   return {
     name: row.name,
@@ -216,8 +232,8 @@ export async function getAnimalHealthCase(name: string): Promise<AnimalHealthCas
     caseStatus: row.case_status,
     severity: row.severity ?? null,
     openedDate: row.opened_date,
-    closingDate: row.closing_date ?? null,
-    closingNotes: row.closing_notes ?? null,
+    closingDate: row.closed_date ?? null,
+    closingNotes: row.outcome_notes ?? null,
     presentingSymptoms: row.presenting_symptoms ?? "",
     totalTreatmentCost: Number(row.total_treatment_cost ?? 0),
     treatments: Array.isArray(row.treatments)

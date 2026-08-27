@@ -1,4 +1,5 @@
-import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
+import { OpsError } from "./opsError";
+import { getClient, todayISO } from "@/src/services/api";
 import { listDocuments } from "./generic";
 
 export type DiagnosisAction =
@@ -41,6 +42,14 @@ export type CreateAnimalDiagnosisInput = {
   actionTaken: DiagnosisAction;
   actionNotes?: string;
   followUpDate?: string;
+  /** Drugs given at the check-up. Issued as one "Animal Health Check" entry. */
+  drugIssues?: {
+    itemCode: string;
+    qty: number;
+    uom?: string;
+    sourceWarehouse?: string;
+    withdrawalDays?: number;
+  }[];
 };
 
 /**
@@ -64,7 +73,7 @@ const DIAGNOSIS_LIST_FIELDS = [
   "animal_name",
   "diagnosis_date",
   "action_taken",
-  "suggested_diagnosis",
+  "suggested_disease",
   "follow_up_date",
   "related_case",
 ];
@@ -75,14 +84,14 @@ const mapDiagnosis = (row: any): DiagnosisListRow => ({
   animalName: row.animal_name || row.animal,
   diagnosisDate: row.diagnosis_date,
   actionTaken: row.action_taken,
-  suggestedDiagnosis: row.suggested_diagnosis ?? null,
+  suggestedDiagnosis: row.suggested_disease ?? null,
   followUpDate: row.follow_up_date ?? null,
   relatedCase: row.related_case ?? null,
 });
 
 export const getDiagnoses = async (limit = 100): Promise<DiagnosisListRow[]> => {
   const rows = await listDocuments({
-    doctype: "Animal Diagnosis",
+    doctype: "Livestock Diagnosis",
     fields: DIAGNOSIS_LIST_FIELDS,
     orderBy: "diagnosis_date desc",
     limit,
@@ -117,10 +126,32 @@ export const createAnimalDiagnosis = async (
   if (input.heartRate != null) body.heart_rate = input.heartRate;
   if (input.rumenFill) body.rumen_fill = input.rumenFill;
   if (input.differentialNotes) body.differential_notes = input.differentialNotes;
-  if (input.suggestedDiagnosis) body.suggested_diagnosis = input.suggestedDiagnosis;
+  // The field is `suggested_disease` and it Links to Livestock Disease.
+  if (input.suggestedDiagnosis) body.suggested_disease = input.suggestedDiagnosis;
   if (input.confirmedByVet) body.confirmed_by_vet = 1;
   if (input.vetName) body.vet_name = input.vetName;
   if (input.actionNotes) body.action_notes = input.actionNotes;
   if (input.followUpDate) body.follow_up_date = input.followUpDate;
-  return frappeCreateAndSubmit("Animal Diagnosis", body);
+  if (input.drugIssues?.length) {
+    body.drugs = input.drugIssues.map((d) => ({
+      item_code: d.itemCode,
+      qty: d.qty,
+      uom: d.uom,
+      source_warehouse: d.sourceWarehouse,
+      withdrawal_days: d.withdrawalDays,
+    }));
+  }
+
+  // create_check_up owns the doctype: it resolves the company and operator,
+  // enforces the guards, and posts any drug rows as one issue stamped
+  // "Animal Health Check" rather than a bare Material Issue.
+  const client = await getClient();
+  const res = await client.post(
+    "/api/method/upande_livestock.api.operations.create_check_up",
+    { payload: body },
+  );
+  const msg = res.data?.message;
+  if (!msg) throw new OpsError("create_check_up returned nothing.");
+  if (msg.error) throw new OpsError(msg.error);
+  return msg;
 };
