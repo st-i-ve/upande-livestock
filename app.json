@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "upande-livestock",
+    "name": "Kaitet Dairy",
     "slug": "upande-livestock",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -44,6 +44,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "runtimeVersion": "1.0.0-kaitetdairyfrappe16"
   }
 }
