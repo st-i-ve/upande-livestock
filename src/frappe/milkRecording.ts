@@ -12,6 +12,8 @@ export type CreateMilkRecordingInput = {
   company?: string;             // optional override
   totalYieldKg: number;
   discardedKg?: number;
+  discardReason?: string;       // required by the server when discardedKg > 0
+  discardReasonNotes?: string;  // required when the reason is "Other"
   colostrumYieldKg?: number;
   isColostrum?: boolean;
   pricePerKg?: number;
@@ -47,6 +49,9 @@ export const createMilkRecording = async (
     discarded_kg: discarded,
     net_yield_kg: netYield,
   };
+  if (discarded > 0 && input.discardReason) body.discard_reason = input.discardReason;
+  if (discarded > 0 && input.discardReasonNotes)
+    body.discard_reason_notes = input.discardReasonNotes;
   if (input.company) body.company = input.company;
   if (input.isColostrum) body.is_colostrum = 1;
   if (colostrum > 0) body.colostrum_yield_kg = colostrum;

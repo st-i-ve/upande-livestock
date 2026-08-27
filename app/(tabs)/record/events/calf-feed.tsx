@@ -53,7 +53,7 @@ export default function CalfFeed() {
   const s = useMemo(() => makeStyles(c), [c]);
   const { data: company } = useDefaultCompany();
 
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [calf, setCalf] = useState<Animal | null>(null);
   const [session, setSession] = useState<CalfFeedingSession>("AM");
   const [feedType, setFeedType] = useState<CalfFeedType>("Whole Milk");
@@ -78,7 +78,7 @@ export default function CalfFeed() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (noOperator) return setError(missingMessage);
+    if (!operator) return setError(missingMessage);
     if (!calf) return setError("Pick the calf.");
     if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     if (!qty || Number(qty) <= 0) return setError("Enter quantity fed (kg).");

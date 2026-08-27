@@ -46,7 +46,7 @@ export default function Diagnosis() {
 
   // Live picked animals + operator (replacing the stub picker that never lifted).
   const [selected, setSelected] = useState<Animal[]>([]);
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const mutation = useCreateAnimalDiagnosis();
 
@@ -320,7 +320,7 @@ export default function Diagnosis() {
         disabled={mutation.isPending || selected.length === 0}
         onPress={async () => {
           setSubmitError(null);
-          if (noOperator) return setSubmitError(missingMessage);
+          if (!operator) return setSubmitError(missingMessage);
           if (selected.length === 0) return setSubmitError("Pick at least one animal.");
           if (!company) return setSubmitError("Default company not loaded yet. Try again in a moment.");
 

@@ -19,7 +19,7 @@ import type { Animal } from "@/types";
 
 export default function Service() {
 
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
@@ -42,7 +42,7 @@ export default function Service() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (noOperator) return setError(missingMessage);
+    if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to service.");
     // For A.I. with a semen straw, we issue it from a store — need the source.
     const willIssueSemen = type === "A.I." && !!straw;

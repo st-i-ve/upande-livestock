@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -9,8 +9,8 @@ import { Chip, Chips } from "@/components/Chips";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useEligibility } from "@/src/hooks/useEligibility";
 import { useOperator } from "@/src/hooks/useOperator";
-import { useServicedPendingPd } from "@/src/hooks/useServicedPendingPd";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -18,18 +18,25 @@ type Result = "Confirmed" | "Not Pregnant" | "Aborted";
 
 export default function PD() {
 
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
-  const { data: servedIds, isLoading: filterLoading } = useServicedPendingPd();
+  // The server decides who has a service awaiting a check, using the same rule
+  // create_pregnancy_diagnosis enforces on submit. Deriving a second list here
+  // is how a picker ends up offering a cow the server then refuses.
+  const { data: eligibility, isLoading: filterLoading } = useEligibility();
+  const diagnosable = useMemo(
+    () => new Set(eligibility?.diagnosable ?? []),
+    [eligibility],
+  );
 
   const handleSubmit = async () => {
     setError(null);
-    if (noOperator) return setError(missingMessage);
+    if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow.");
 
     let succeeded = 0;
@@ -79,12 +86,12 @@ export default function PD() {
           title="Select served cows"
           placeholder={
             filterLoading
-              ? "Loading served animals…"
+              ? "Loading cows awaiting a check…"
               : selected.length
                 ? `${selected.length} selected — tap to change`
-                : "Search served cow..."
+                : "Search cow awaiting a check..."
           }
-          include={(a) => a.sex === "F" && (servedIds ? servedIds.has(a.id) : false)}
+          include={(a) => a.sex === "F" && diagnosable.has(a.id)}
           value={selected}
           onPickMulti={setSelected}
         />

@@ -1,82 +1,45 @@
 import { createAnimalEvent } from "@/src/frappe/animalEvent";
-import type { LivestockSettingsDoc } from "@/src/frappe/livestockSettings";
-import { todayISO } from "@/src/services/api";
-import type { Animal } from "@/types";
+import { getClient, todayISO } from "@/src/services/api";
 
 export type HerdMove = {
-  animal: Animal;
+  /** Animal name (the Frappe docname), which is what the event needs. */
+  animal: string;
+  /** Label for the operator — tag and burn name. */
+  label: string;
+  fromHerd: string;
   toHerd: string;
   reason: string;
+  overdue: boolean;
 };
 
 /**
- * Age-bucket transition rules (per the calving-to-service lifecycle):
- *   0-2 months  → kept in birth herd (heifer or bull, set on calving)
- *   2-4 months  → custom_weaning_herd at age 2 months
- *   4-12 months → custom_weaner_herd at age 4 months
- *   12+ months  → custom_bulling_heifer_herd at age 12 months (females only)
+ * Animals the herd structure says are due to move, as the server works it out.
  *
- * Bulls follow the same age thresholds but stay in the bull herd unless
- * the operator manually re-shuffles them.
- *
- * Repro-status transitions are handled by Frappe server scripts on
- * Service / PD events; this helper only handles age-driven moves.
+ * This used to be an age ladder held here in the client: three settings fields
+ * naming a weaning, weaner and bulling-heifer herd, with 2 / 4 / 12-month
+ * thresholds hard-coded. None of those fields exist on this backend, so the
+ * function returned nothing at all — and the rules had drifted from the real
+ * ones anyway. The ladder is now a configured, ordered table (Livestock
+ * Settings → growth_ladder) with its own days per rung, and `movement_suggestions`
+ * reads it. One ladder, defined once, in the place the farm can change it.
  */
-export function computePendingHerdMoves(
-  animals: Animal[],
-  settings: LivestockSettingsDoc | undefined,
-  today: string = todayISO(),
-): HerdMove[] {
-  if (!settings) return [];
-  const moves: HerdMove[] = [];
+export async function computePendingHerdMoves(): Promise<HerdMove[]> {
+  const client = await getClient();
+  const res = await client.post(
+    "/api/method/upande_livestock.api.operations.movement_suggestions",
+    {},
+  );
+  const msg = res.data?.message;
+  if (!msg || msg.error) throw new Error(msg?.error || "Could not read movement suggestions.");
 
-  for (const a of animals) {
-    if (!a.dob) continue;
-    const ageMonths = monthsBetween(a.dob, today);
-    if (ageMonths == null) continue;
-
-    const target = pickTargetHerd(a, ageMonths, settings);
-    if (target && target !== a.herd) {
-      moves.push({
-        animal: a,
-        toHerd: target,
-        reason: reasonFor(ageMonths, a.sex),
-      });
-    }
-  }
-  return moves;
-}
-
-function pickTargetHerd(
-  a: Animal,
-  ageMonths: number,
-  s: LivestockSettingsDoc,
-): string | null {
-  // Bulls stay in bull herd unless explicitly moved. The age buckets above
-  // are heifer-centric, so this helper is conservative on males.
-  if (a.sex === "M") return null;
-
-  if (ageMonths >= 12) return s.custom_bulling_heifer_herd || null;
-  if (ageMonths >= 4) return s.custom_weaner_herd || null;
-  if (ageMonths >= 2) return s.custom_weaning_herd || null;
-  return null;
-}
-
-function reasonFor(ageMonths: number, sex: "F" | "M"): string {
-  if (sex === "M") return `Age ${ageMonths.toFixed(1)} months`;
-  if (ageMonths >= 12) return `12+ months → bulling heifer`;
-  if (ageMonths >= 4) return `4-12 months → weaner`;
-  if (ageMonths >= 2) return `2-4 months → weaning`;
-  return `Age ${ageMonths.toFixed(1)} months`;
-}
-
-function monthsBetween(fromISO: string, toISO: string): number | null {
-  if (!fromISO) return null;
-  const a = new Date(fromISO).getTime();
-  const b = new Date(toISO).getTime();
-  if (isNaN(a) || isNaN(b)) return null;
-  const ms = b - a;
-  return ms / (1000 * 60 * 60 * 24 * 30.4375);
+  return (msg.growth ?? []).map((r: any) => ({
+    animal: r.animal,
+    label: r.label || r.animal,
+    fromHerd: r.from_herd || "",
+    toHerd: r.to_herd,
+    reason: r.reason || "",
+    overdue: !!r.overdue,
+  }));
 }
 
 /**
@@ -92,16 +55,16 @@ export async function applyHerdMoves(
     try {
       await createAnimalEvent({
         eventType: "Movement",
-        animal: m.animal.id,
-        currentHerd: m.animal.herd,
+        animal: m.animal,
+        currentHerd: m.fromHerd,
         operator,
         eventDate: todayISO(),
         toHerd: m.toHerd,
-        remarks: `Auto: ${m.reason}`,
+        remarks: `Ladder: ${m.reason}`,
       });
-      out.push({ animal: m.animal.id, ok: true });
+      out.push({ animal: m.label, ok: true });
     } catch (e: any) {
-      out.push({ animal: m.animal.id, ok: false, error: e?.message ?? String(e) });
+      out.push({ animal: m.label, ok: false, error: e?.message || "failed" });
     }
   }
   return out;

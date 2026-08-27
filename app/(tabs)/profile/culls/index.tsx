@@ -95,7 +95,7 @@ export default function CullsList() {
             key={c.name}
             left={<Avatar icon="delete" tone="danger" />}
             title={`${c.animalName} · ${c.disposalType}`}
-            meta={`${c.disposalDate} · book ${c.bookValue.toLocaleString()} written off${c.insuranceClaimAmount ? ` · insurance ${c.insuranceClaimAmount.toLocaleString()}` : ""}`}
+            meta={`${c.disposalDate} · book ${c.bookValue.toLocaleString()} written off`}
           />
         ))
       )}

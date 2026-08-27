@@ -1,8 +1,16 @@
-import { frappeCreateAndSubmit, todayISO } from "@/src/services/api";
+import { OpsError } from "./opsError";
+import { getClient, todayISO } from "@/src/services/api";
 import { listDocuments } from "./generic";
 
-// Event types the Frappe `Animal Event` DocType accepts. Verified against
-// the live DocType options on upande-kaitet2.c.frappe.cloud.
+// Event types the `Livestock Event Type` master carries in upande_livestock.
+//
+// This module used to insert into a doctype called `Animal Event` with a set of
+// `custom_*` fieldnames, taken from an older Kaitet site. Neither the doctype
+// nor those fields exist in upande_livestock — so every screen routed through
+// here failed. Each type now calls the whitelisted endpoint in
+// upande_livestock.api.operations that owns it: those endpoints hold the
+// guards, the derived dates, the per-animal fan-out and the named Stock Entry
+// types, none of which a raw client-side insert can reproduce.
 export type AnimalEventType =
   | "Movement"
   | "Service"
@@ -15,11 +23,13 @@ export type AnimalEventType =
   | "Deworming"
   | "Dehorning"
   | "Hoof Trimming"
-  | "Heat Detection";
+  | "Heat Detection"
+  | "Abortion";
 
 type CommonInput = {
   animal: string;       // Animal name (e.g. "TESTBC-001/26")
-  currentHerd: string;  // herd name at time of event
+  currentHerd: string;  // herd at the time of the event; the server reads it
+                        // off the Animal, so this is for labelling only
   operator: string;     // Employee name (e.g. "HR-EMP-01478")
   eventDate?: string;   // ISO date; defaults to today
   remarks?: string;
@@ -49,7 +59,7 @@ type EventSpecificInput =
     }
   | {
       eventType: "Calving" | "Birth";
-      calvingOutcome: "Live Birth" | "Still Birth" | "Abortion";
+      calvingOutcome: "Live Birth" | "Still Birth";
       toHerd?: string;
       calfBookNumber?: string;
       calfBurnName?: string;
@@ -58,6 +68,11 @@ type EventSpecificInput =
       birthWeightKg?: number;
       coatColour?: string;
       sire?: string;
+      /** Pregnancy Diagnosis this calving answers. The server walks it back to
+       *  the service to stamp the sire. */
+      relatedPregnancy?: string;
+      calfBreed?: string;
+      calfHealthStatus?: "Healthy" | "Weak" | "Needs Attention" | "Critical";
     }
   | {
       eventType: "Drying Off";
@@ -68,19 +83,39 @@ type EventSpecificInput =
       eventType: "Weight Recording";
       weightKg: number;
       bcs?: number;
+      weighMethod?: "Weighbridge" | "Platform Scale" | "Heart Girth Tape" | "Visual Estimate";
     }
   | {
-      eventType: "Vaccination" | "Deworming" | "Hoof Trimming";
-      /** Free-text name of the vet who performed the procedure. */
+      eventType: "Vaccination" | "Deworming" | "Hoof Trimming" | "Dehorning";
+      /** Free-text name of the vet who performed the procedure. Livestock Event
+       *  has no column for it, so it is folded into the remarks. */
       vetName: string;
-    }
-  | {
-      eventType: "Dehorning";
-      vetName: string;
-      /** Employee IDs of farmhands holding the animal. */
+      /** The whole round in one call. When set, the server books an event per
+       *  animal and one drug issue for the batch. */
+      animals?: string[];
+      /** Alternative to `animals`: every active animal in this herd. */
+      herd?: string;
+      /** Drug quantities are PER ANIMAL. */
+      drugIssues?: AnimalDrugIssueInput[];
+      sourceWarehouse?: string;
+      /** Employee IDs of farmhands holding the animal (Dehorning). */
       handlerIds?: string[];
     }
-  | { eventType: "Heat Detection" };
+  | { eventType: "Heat Detection" }
+  | {
+      /** Pregnancy loss. Its own event type, not a calving outcome — the server
+       *  rejects "Abortion" on a Calving and closes the pregnancy from here. */
+      eventType: "Abortion";
+      abortionCause:
+        | "Infectious"
+        | "Nutritional"
+        | "Traumatic"
+        | "Congenital"
+        | "Unknown"
+        | "Other";
+      abortionNotes?: string;
+      relatedPregnancy?: string;
+    };
 
 export type AnimalEventInput = CommonInput & EventSpecificInput;
 
@@ -113,26 +148,26 @@ export type EventListRow = {
 const EVENT_LIST_FIELDS = [
   "name",
   "animal",
-  "custom_animal_ref",
   "event_type",
   "event_date",
   "current_herd",
   "new_herd",
-  "custom_to_herd",
   "diagnosis_result",
-  "custom_activity_cost",
   "docstatus",
 ];
 
 const mapEvent = (row: any): EventListRow => ({
   name: row.name,
-  animal: row.custom_animal_ref || row.animal,
+  animal: row.animal,
   eventType: row.event_type,
   eventDate: row.event_date,
   currentHerd: row.current_herd ?? null,
-  newHerd: row.new_herd || row.custom_to_herd || null,
+  newHerd: row.new_herd ?? null,
   diagnosisResult: row.diagnosis_result ?? null,
-  activityCost: Number(row.custom_activity_cost ?? 0),
+  // Livestock Event carries no activity-cost column; the vet fee lives on its
+  // own Journal Entry. Reported as 0 rather than dropped, so the reports that
+  // sum this field keep their shape.
+  activityCost: 0,
 });
 
 export const getRecentEvents = async (params?: {
@@ -144,7 +179,7 @@ export const getRecentEvents = async (params?: {
   if (params?.eventType) filters.push(["event_type", "=", params.eventType]);
   if (params?.since) filters.push(["event_date", ">=", params.since]);
   const rows = await listDocuments({
-    doctype: "Animal Event",
+    doctype: "Livestock Event",
     fields: EVENT_LIST_FIELDS,
     filters,
     orderBy: "event_date desc",
@@ -153,83 +188,159 @@ export const getRecentEvents = async (params?: {
   return rows.map(mapEvent);
 };
 
+const OPS = "upande_livestock.api.operations";
+
+/** POST one whitelisted operations endpoint and unwrap its `{ok, ...}` reply. */
+const callOp = async (method: string, payload: Record<string, any>): Promise<any> => {
+  const client = await getClient();
+  const res = await client.post(`/api/method/${OPS}.${method}`, { payload });
+  const msg = res.data?.message;
+  if (!msg) throw new OpsError(`${method} returned nothing.`);
+  if (msg.error) throw new OpsError(msg.error);
+  return msg;
+};
+
+const mapDrugRows = (rows?: AnimalDrugIssueInput[]) =>
+  (rows ?? [])
+    .filter((d) => d.itemCode && Number(d.qty) > 0)
+    .map((d) => ({
+      item_code: d.itemCode,
+      // PER ANIMAL. create_husbandry_event multiplies by the animal count and
+      // posts one issue for the round — 2 ml a cow across 119 cows leaves the
+      // store as a single 238 ml line.
+      qty: Number(d.qty),
+      uom: d.uom,
+      source_warehouse: d.sourceWarehouse,
+      withdrawal_days: d.withdrawalDays,
+      milk_safe_date: d.milkSafeDate,
+    }));
+
+/** Fold detail the Livestock Event has no column for into the remarks, so the
+ *  fact is still on the record rather than silently dropped on the floor. */
+const withNote = (remarks: string | undefined, ...notes: (string | undefined)[]) =>
+  [remarks, ...notes.filter((n) => n && n.trim())].filter(Boolean).join(" · ") || undefined;
+
+/**
+ * Record one livestock event through the endpoint that owns its type.
+ *
+ * Returns whatever that endpoint returns — always `{ok: true, name, ...}`.
+ * For a live birth the reply also carries `calves[]`, each with the created
+ * `animal` name; that is what the calving screen attaches the calf photo to.
+ */
 export const createAnimalEvent = async (
   input: AnimalEventInput,
 ): Promise<any> => {
-  const base: Record<string, any> = {
-    animal: input.animal,             // Frappe accepts the Animal name here
-    custom_animal_ref: input.animal,  // explicitly set the new-module link too
-    current_herd: input.currentHerd,
-    operator: input.operator,
+  const common = {
+    animal: input.animal,
     event_date: input.eventDate || todayISO(),
-    event_type: input.eventType,
+    operator: input.operator,
+    remarks: input.remarks,
   };
-  if (input.remarks) base.remarks = input.remarks;
 
   switch (input.eventType) {
     case "Movement":
-      base.new_herd = input.toHerd;
-      base.custom_to_herd = input.toHerd;
-      break;
+      return callOp("create_movement_event", { ...common, new_herd: input.toHerd });
 
     case "Service":
-      if (input.serviceType) base.service_type = input.serviceType;
-      if (input.semenItem) base.custom_semen_item = input.semenItem;
-      if (input.sire) base.sire = input.sire;
-      base.service_date = base.event_date;
-      break;
+      return callOp("create_service_event", {
+        ...common,
+        service_type: input.serviceType,
+        service_date: common.event_date,
+        sire: input.sire,
+        semen_item: input.semenItem,
+      });
 
     case "Pregnancy Diagnosis":
-      base.diagnosis_result = input.diagnosisResult;
-      base.diagnosis_date = base.event_date;
-      if (input.relatedService) base.related_service = input.relatedService;
-      break;
+      return callOp("create_pregnancy_diagnosis", {
+        ...common,
+        diagnosis_date: common.event_date,
+        diagnosis_result: input.diagnosisResult,
+        related_service: input.relatedService,
+        diagnosis_remarks: input.remarks,
+      });
 
     case "Calving":
-    case "Birth":
-      base.custom_calving_outcome = input.calvingOutcome;
-      base.custom_calf_outcome = input.calvingOutcome;
-      if (input.toHerd) {
-        base.custom_to_herd = input.toHerd;
-      }
-      if (input.calfBookNumber) base.custom_calf_book_number = input.calfBookNumber;
-      if (input.calfBurnName) base.custom_calf_burn_name = input.calfBurnName;
-      if (input.calfGender) base.custom_calf_gender = input.calfGender;
-      if (input.calfTargetHerd) base.custom_calf_target_herd = input.calfTargetHerd;
-      if (input.birthWeightKg != null) base.custom_birth_weight_kg = input.birthWeightKg;
-      if (input.coatColour) base.custom_calf_coat_colour = input.coatColour;
-      if (input.sire) base.sire = input.sire;
-      break;
+    case "Birth": {
+      // record_birth books the Calving on the dam and creates one Animal per
+      // calf. `animal` here is the dam — the calf does not exist yet.
+      const stillborn = input.calvingOutcome !== "Live Birth";
+      return callOp("record_birth", {
+        dam: input.animal,
+        event_date: common.event_date,
+        operator: input.operator,
+        outcome: input.calvingOutcome,
+        related_pregnancy: input.relatedPregnancy,
+        remarks: withNote(
+          input.remarks,
+          input.coatColour ? `Coat: ${input.coatColour}` : undefined,
+        ),
+        calves: [
+          {
+            // _calf_row treats an empty/"STILLBORN" tag as stillborn, so a
+            // still birth needs no tag and a live birth must carry one.
+            name: stillborn ? "" : (input.calfBookNumber || "").trim(),
+            sex: input.calfGender,
+            birth_weight: input.birthWeightKg,
+            herd: input.calfTargetHerd,
+            breed: input.calfBreed,
+            health_status: input.calfHealthStatus,
+          },
+        ],
+      });
+    }
 
     case "Drying Off":
-      base.custom_to_herd = input.toHerd;
-      if (input.drugIssues?.length) {
-        base.custom_drug_issues = input.drugIssues.map(mapDrugIssue);
-      }
-      break;
+      return callOp("create_drying_off_event", {
+        ...common,
+        new_herd: input.toHerd,
+        drugs: mapDrugRows(input.drugIssues),
+      });
 
     case "Weight Recording":
-      base.custom_weight = input.weightKg;
-      if (input.bcs != null) base.custom_bcs = input.bcs;
-      break;
+      // Not a Livestock Event at all — weighings are their own doctype, which
+      // owns the previous-weight / daily-gain columns and the interval guard.
+      return callOp("create_weight_record", {
+        animal: input.animal,
+        weight_date: common.event_date,
+        measured_by: input.operator,
+        weight_kg: input.weightKg,
+        bcs: input.bcs,
+        method: input.weighMethod,
+        remarks: input.remarks,
+      });
 
     case "Vaccination":
     case "Deworming":
     case "Hoof Trimming":
-      base.custom_vet_name = input.vetName;
-      break;
-
     case "Dehorning":
-      base.custom_vet_name = input.vetName;
-      if (input.handlerIds?.length) {
-        base.custom_handlers = input.handlerIds.join(", ");
-      }
-      break;
+      // One call for the whole round: the endpoint fans out an event per animal
+      // and posts a single issue out of the drug store, stamped with the named
+      // Stock Entry Type ("Vaccination", "Deworming") rather than the bare
+      // "Material Issue".
+      return callOp("create_husbandry_event", {
+        event_type: input.eventType,
+        event_date: common.event_date,
+        operator: input.operator,
+        animals: input.animals?.length ? input.animals : [input.animal],
+        herd: input.herd,
+        drugs: mapDrugRows(input.drugIssues),
+        source_warehouse: input.sourceWarehouse,
+        remarks: withNote(
+          input.remarks,
+          input.vetName ? `Vet: ${input.vetName}` : undefined,
+          input.handlerIds?.length ? `Handlers: ${input.handlerIds.join(", ")}` : undefined,
+        ),
+      });
 
     case "Heat Detection":
-      // Observation only — no specific fields beyond base.
-      break;
-  }
+      return callOp("create_heat_event", common);
 
-  return frappeCreateAndSubmit("Animal Event", base);
+    case "Abortion":
+      return callOp("create_abortion_event", {
+        ...common,
+        abortion_cause: input.abortionCause,
+        abortion_notes: input.abortionNotes,
+        related_pregnancy: input.relatedPregnancy,
+      });
+  }
 };

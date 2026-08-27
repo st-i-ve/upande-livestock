@@ -10,6 +10,10 @@ export type AttachFileInput = {
   doctype: string;
   docname: string;
   asset: FileAsset;
+  /** Attach-type field to point at the upload, e.g. "image" on Animal. Without
+   *  it the file is attached to the doc but no field shows it, so the picture
+   *  never appears on the record. */
+  fieldname?: string;
   /** Post-mortems are sensitive — default true (private File doc). */
   isPrivate?: boolean;
 };
@@ -35,6 +39,7 @@ export async function attachFile(input: AttachFileInput): Promise<AttachFileResu
   } as any);
   form.append("doctype", input.doctype);
   form.append("docname", input.docname);
+  if (input.fieldname) form.append("fieldname", input.fieldname);
   form.append("is_private", input.isPrivate === false ? "0" : "1");
 
   const res = await client.post("/api/method/upload_file", form, {

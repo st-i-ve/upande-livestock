@@ -28,6 +28,13 @@ export default function Movement() {
   const { data: herds = [] } = useHerds();
   const { data: eligibility } = useEligibility();
 
+  const { operator, missingMessage } = useOperator();
+  const [toHerd, setToHerd] = useState<string>("");
+  const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
+  const [otherReason, setOtherReason] = useState("");
+  const [selected, setSelected] = useState<Animal[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
   // Where the herd structure says these animals should go next. The ladder is
   // ordered on the backend and this reads that order rather than guessing from
   // herd names — "2-4" looks like a rule and is a label.
@@ -36,13 +43,6 @@ export default function Movement() {
     if (from.length !== 1 || !eligibility) return null;
     return eligibility.next_herd?.[from[0]] ?? null;
   }, [selected, eligibility]);
-
-  const { operator, missing: noOperator, missingMessage } = useOperator();
-  const [toHerd, setToHerd] = useState<string>("");
-  const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
-  const [otherReason, setOtherReason] = useState("");
-  const [selected, setSelected] = useState<Animal[]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   const fromHerd = selected.length === 0
     ? "—"
@@ -65,7 +65,7 @@ export default function Movement() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (noOperator) {
+    if (!operator) {
       setError(missingMessage);
       return;
     }

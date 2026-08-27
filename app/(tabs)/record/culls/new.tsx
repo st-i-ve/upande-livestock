@@ -96,9 +96,18 @@ export default function CullNew() {
           disposalType: type,
           disposalDate: todayISO(),
           salePrice: !isGift && sVal > 0 ? sVal : undefined,
-          reasonDetails: reason.trim() || undefined,
+          // No doctype on this backend holds a claim amount — Livestock
+          // Insurance Policy carries a payout percent, not a claim. Rather
+          // than dropping the figure the operator typed, it goes on the
+          // disposal's own reason line, where finance will see it.
+          reasonDetails:
+            [
+              reason.trim(),
+              perAnimalClaim ? `Insurance claim: KES ${perAnimalClaim.toLocaleString()}` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined,
           witness: witness.trim() || undefined,
-          insuranceClaimAmount: perAnimalClaim,
           giftedTo: isGift ? giftedTo.trim() : undefined,
           giftDestination: isGift ? giftDestination.trim() : undefined,
         });
@@ -120,7 +129,7 @@ export default function CullNew() {
       for (const animal of selected) {
         try {
           const rows = await listDocuments<{ name: string }>({
-            doctype: "Animal Disposal",
+            doctype: "Livestock Disposal",
             fields: ["name"],
             filters: [["animal", "=", animal.id]],
             orderBy: "creation desc",
@@ -131,7 +140,7 @@ export default function CullNew() {
           for (const f of postMortemFiles) {
             try {
               await attachFile({
-                doctype: "Animal Disposal",
+                doctype: "Livestock Disposal",
                 docname: dispName,
                 asset: f,
                 isPrivate: true,

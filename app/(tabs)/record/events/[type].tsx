@@ -59,7 +59,7 @@ export default function GenericEvent() {
   const spec = SPECS[type || ""];
 
 
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [vetName, setVetName] = useState("");
   const [handlerIds, setHandlerIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Animal[]>([]);
@@ -75,7 +75,7 @@ export default function GenericEvent() {
 
   const { data: settings } = useLivestockSettings();
   const { data: company } = useDefaultCompany();
-  const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
+  const defaultDrugWarehouse = settings?.drug_warehouse || "";
 
   const eventMutation = useCreateAnimalEvent();
   const batchMutation = useBatchDrugIssue();
@@ -103,6 +103,9 @@ export default function GenericEvent() {
       filledDrugRows
         .map((d) => `${d.itemCode.trim()}@${d.sourceWarehouse || defaultDrugWarehouse}:${d.qty}`)
         .join("|"),
+      // Per-animal rows x headcount: without this the cached total survives a
+      // change in the selection and quotes the wrong figure.
+      selected.length,
     ],
     enabled: !!spec?.needsDrugs && filledDrugRows.length > 0,
     queryFn: async () => {
@@ -112,7 +115,7 @@ export default function GenericEvent() {
           d.itemCode.trim(),
           d.sourceWarehouse || defaultDrugWarehouse,
         );
-        total += rate * Number(d.qty);
+        total += rate * Number(d.qty) * selected.length;
       }
       return total;
     },
@@ -126,10 +129,10 @@ export default function GenericEvent() {
 
     if (spec.isVetProcedure) {
       if (!vetName.trim()) return setError("Enter the vet's name.");
-      if (noOperator) return setError(missingMessage);
+      if (!operator) return setError(missingMessage);
       if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     } else {
-      if (noOperator) return setError(missingMessage);
+      if (!operator) return setError(missingMessage);
     }
 
     if (spec.needsWeight) {
@@ -146,12 +149,14 @@ export default function GenericEvent() {
           "Pick a source warehouse on every drug row (or set Drug warehouse in Livestock Settings to apply a default).",
         );
       }
-      // Block over-issue before creating the Material Issue.
+      // Block over-issue before anything is recorded. The rows are per animal,
+      // so what actually leaves the store is qty x headcount — checking the
+      // per-animal figure would wave through a round 20x the shelf.
       const shortage = await findStoreShortage(
         filledDrugRows.map((d) => ({
           itemCode: d.itemCode.trim(),
           warehouse: d.sourceWarehouse || defaultDrugWarehouse,
-          qtyNeeded: Number(d.qty),
+          qtyNeeded: Number(d.qty) * selected.length,
         })),
       );
       if (shortage) return setError(shortage);
@@ -169,94 +174,117 @@ export default function GenericEvent() {
       .filter(Boolean)
       .join(" · ");
 
+    // ----- submit ------------------------------------------------------------
+    // Husbandry rounds go over in ONE call. create_husbandry_event books an
+    // event per animal and posts a single drug issue for the batch, stamped
+    // with the named Stock Entry Type — "Vaccination", "Deworming" — instead of
+    // the bare "Material Issue" this screen used to build client-side. Drug
+    // quantities below are therefore PER ANIMAL; the server multiplies them.
+    // A narrowed value rather than a boolean, so the payload below is typed as
+    // the husbandry variant of AnimalEventInput.
+    const husbandryType =
+      spec.eventType === "Vaccination" ||
+      spec.eventType === "Deworming" ||
+      spec.eventType === "Hoof Trimming" ||
+      spec.eventType === "Dehorning"
+        ? spec.eventType
+        : null;
+
     const eventNames: string[] = [];
     let succeededEvents = 0;
     let queuedEvents = 0;
 
-    for (const a of selected) {
-      const common = {
-        animal: a.id,
-        currentHerd: a.herd,
-        operator: operator!, // checked above
-        eventDate: todayISO(),
-        remarks: baseRemarks,
-      } as const;
-
-      const payload: AnimalEventInput = (() => {
-        switch (spec.eventType) {
-          case "Weight Recording":
-            return {
-              ...common,
-              eventType: "Weight Recording",
-              weightKg: Number(weight),
-              bcs: bcs ? Number(bcs) : undefined,
-            };
-          case "Vaccination":
-          case "Deworming":
-          case "Hoof Trimming":
-            return {
-              ...common,
-              eventType: spec.eventType,
-              vetName: vetName.trim(),
-            };
-          case "Dehorning":
-            return {
-              ...common,
-              eventType: "Dehorning",
-              vetName: vetName.trim(),
-              handlerIds: handlerIds.length ? handlerIds : undefined,
-            };
-          case "Heat Detection":
-            return { ...common, eventType: "Heat Detection" };
-          default:
-            throw new Error(`Unhandled event type ${spec.eventType}`);
-        }
-      })();
-
+    if (husbandryType) {
       try {
-        const r = await eventMutation.mutateAsync(payload);
-        if (r.queued) queuedEvents += 1;
+        const r = await eventMutation.mutateAsync({
+          eventType: husbandryType,
+          animal: selected[0].id,
+          animals: selected.map((a) => a.id),
+          currentHerd: selected[0].herd,
+          operator: operator!,
+          eventDate: todayISO(),
+          remarks: baseRemarks,
+          vetName: vetName.trim(),
+          handlerIds: handlerIds.length ? handlerIds : undefined,
+          drugIssues: filledDrugRows.map((d) => ({
+            itemCode: d.itemCode.trim(),
+            qty: Number(d.qty),
+            uom: d.uom || undefined,
+            sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse,
+            withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
+          })),
+          sourceWarehouse: defaultDrugWarehouse || undefined,
+        });
+        if (r.queued) queuedEvents = selected.length;
         else {
-          succeededEvents += 1;
-          if (r.data?.name) eventNames.push(r.data.name);
+          succeededEvents = r.data?.animals ?? selected.length;
+          if (r.data?.names?.length) eventNames.push(...r.data.names);
         }
       } catch (err) {
-        setError(
-          `${succeededEvents + queuedEvents} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
-        );
+        setError(`Nothing was recorded. ${extractFrappeError(err)}`);
         return;
+      }
+    } else {
+      for (const a of selected) {
+        const common = {
+          animal: a.id,
+          currentHerd: a.herd,
+          operator: operator!, // checked above
+          eventDate: todayISO(),
+          remarks: baseRemarks,
+        } as const;
+
+        const payload: AnimalEventInput = (() => {
+          switch (spec.eventType) {
+            case "Weight Recording":
+              return {
+                ...common,
+                eventType: "Weight Recording",
+                weightKg: Number(weight),
+                bcs: bcs ? Number(bcs) : undefined,
+              };
+            case "Heat Detection":
+              return { ...common, eventType: "Heat Detection" };
+            default:
+              throw new Error(`Unhandled event type ${spec.eventType}`);
+          }
+        })();
+
+        try {
+          const r = await eventMutation.mutateAsync(payload);
+          if (r.queued) queuedEvents += 1;
+          else {
+            succeededEvents += 1;
+            if (r.data?.name) eventNames.push(r.data.name);
+          }
+        } catch (err) {
+          setError(
+            `${succeededEvents + queuedEvents} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+          );
+          return;
+        }
       }
     }
 
-    // ----- batch drug issue (vet procedures only) ----------------------------
+    // ----- vet fee -----------------------------------------------------------
+    // The drug issue is the server's job now; only the vet fee is left here,
+    // because Livestock Event has no column for it and it posts as its own
+    // Journal Entry. drugRows is deliberately empty.
     let batchOutcome: "ok" | "skipped" | "failed" = "skipped";
     let batchError = "";
 
-    const hasBatchWork =
-      spec.isVetProcedure &&
-      (filledDrugRows.length > 0 || (activityCost && Number(activityCost) > 0));
-
-    if (hasBatchWork && company) {
-      const batchPayload = {
-        drugRows: filledDrugRows.map<BatchDrugRow>((d) => ({
-          itemCode: d.itemCode.trim(),
-          qty: Number(d.qty),
-          uom: d.uom || undefined,
-          sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse,
-          withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
-        })),
-        activityCost: activityCost ? Number(activityCost) : undefined,
-        eventNames,
-        batchId,
-        remarks: `${spec.title} · ${selected.length} animals · ${todayISO()}`,
-        company,
-        employee: operator || undefined,
-      };
-
+    if (spec.isVetProcedure && activityCost && Number(activityCost) > 0 && company) {
       try {
-        const r = await batchMutation.mutateAsync(batchPayload);
-        if (r.queued) batchOutcome = "ok"; // queued counts as ok from the operator's view
-        else batchOutcome = "ok";
+        await batchMutation.mutateAsync({
+          drugRows: [],
+          activityCost: Number(activityCost),
+          eventNames,
+          batchId,
+          remarks: `${spec.title} · ${selected.length} animals · ${todayISO()}`,
+          company,
+          employee: operator || undefined,
+        });
+        batchOutcome = "ok";
       } catch (err) {
         batchOutcome = "failed";
         batchError = extractFrappeError(err);
@@ -271,10 +299,10 @@ export default function GenericEvent() {
     if (batchOutcome === "failed") {
       Alert.alert(
         `${spec.title} — partial`,
-        `${eventParts.join(" · ") || "Events recorded"}, but the drug issue failed: ${batchError}\n\nEvents: ${eventNames.join(", ") || "(none — were they queued?)"}\nTop up the source warehouse and create the Material Issue from desktop.`,
+        `${eventParts.join(" · ") || "Events recorded"}, and the drugs were issued, but the vet fee did not post: ${batchError}\n\nEnter the fee as a Journal Entry from desktop.`,
       );
     } else {
-      const extra = batchOutcome === "ok" ? "\nBatch drug issue submitted." : "";
+      const extra = batchOutcome === "ok" ? "\nVet fee posted." : "";
       Alert.alert(`${spec.title} recorded`, `${eventParts.join(" · ")}${extra}`);
     }
     router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
@@ -282,10 +310,6 @@ export default function GenericEvent() {
 
   return (
     <Screen title={spec.title} subtitle="New event" back>
-      {/* Operator picker: hidden for vet procedures (auto-set from auth). */}
-      {!spec.isVetProcedure ? (
-      ) : null}
-
       {spec.isVetProcedure ? (
         <Field label="Vet" help="Free-text — the vet who performed the procedure.">
           <Input value={vetName} onChangeText={setVetName} placeholder="Dr. Mwangi" />
@@ -298,7 +322,7 @@ export default function GenericEvent() {
           spec.needsWeight
             ? "Pick one animal — weight is per-animal."
             : spec.isVetProcedure
-              ? "Pick one cow, several, or a whole herd. Drug quantities below are the total for the batch."
+              ? "Pick one cow, several, or a whole herd. Drug quantities below are per animal."
               : "Pick one cow, several, or a whole herd. Same details applied per animal."
         }
       >
@@ -391,7 +415,11 @@ export default function GenericEvent() {
         <View style={s.summary}>
           <KV
             k="Stock Entry"
-            v={filledDrugRows.length > 0 ? `1 Material Issue for ${selected.length || "—"} animals` : "—"}
+            v={
+              filledDrugRows.length > 0
+                ? `1 ${spec.eventType} issue for ${selected.length || "—"} animals`
+                : "—"
+            }
           />
           <KV
             k="Est. drug cost (FIFO)"
@@ -477,8 +505,8 @@ function DrugRows({
       label="Drugs / vaccines (optional)"
       help={
         defaultWarehouse
-          ? `Quantities are the total for the whole batch. One Stock Entry is created from these rows. Source warehouse defaults to ${defaultWarehouse}.`
-          : "Quantities are the total for the whole batch. Pick a source warehouse for each row — set a default via Livestock Settings → Drug warehouse."
+          ? `Quantities are per animal — 2 ml a cow across 20 cows leaves the store as one 40 ml line. Source warehouse defaults to ${defaultWarehouse}.`
+          : "Quantities are per animal. Pick a source warehouse for each row — set a default via Livestock Settings → Drug warehouse."
       }
     >
       {rows.length === 0 ? (
@@ -514,7 +542,7 @@ function DrugRows({
             />
           </Field>
           <FieldRow>
-            <Field label="Qty (batch total)" style={{ flex: 1 }}>
+            <Field label="Qty per animal" style={{ flex: 1 }}>
               <Input
                 value={r.qty}
                 onChangeText={(t) => update(r.id, { qty: t })}

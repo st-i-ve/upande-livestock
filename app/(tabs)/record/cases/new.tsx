@@ -39,16 +39,31 @@ type TreatmentRow = {
   sourceWarehouse: string;
   withdrawalDays: string;
   description: string;
+  /** Must be one of the doctype's own options — a free-text route makes the
+   *  server refuse the entire case, not just the row. */
+  route: string;
 };
+
+const ROUTES = [
+  "IM (Intramuscular)",
+  "IV (Intravenous)",
+  "SC (Subcutaneous)",
+  "Oral / PO",
+  "Topical",
+  "Intramammary",
+  "Intrauterine",
+  "Ophthalmic",
+  "Other",
+];
 
 export default function CaseNew() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const { data: company } = useDefaultCompany();
   const { data: settings } = useLivestockSettings();
-  const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
+  const defaultDrugWarehouse = settings?.drug_warehouse || "";
 
-  const { operator, missing: noOperator, missingMessage } = useOperator();
+  const { operator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [condition, setCondition] = useState("");
   const [severity, setSeverity] = useState<CaseSeverity>("Moderate");
@@ -90,6 +105,7 @@ export default function CaseNew() {
         rateSource: "",
         sourceWarehouse: defaultDrugWarehouse,
         withdrawalDays: "",
+        route: "",
         description: "",
       },
     ]);
@@ -121,7 +137,7 @@ export default function CaseNew() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (noOperator) return setError(missingMessage);
+    if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one animal.");
     if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     if (!condition.trim() && !notes.trim()) {
@@ -148,6 +164,7 @@ export default function CaseNew() {
         rate: Number(t.rate) || 0,
         sourceWarehouse: t.sourceWarehouse,
         withdrawalDays: t.withdrawalDays ? Number(t.withdrawalDays) : undefined,
+        route: t.route || undefined,
         description: t.description.trim() || undefined,
         administeredBy: operator,
         treatmentDate: todayISO(),
@@ -336,11 +353,18 @@ export default function CaseNew() {
                 />
               </Field>
             </FieldRow>
-            <Field label="Description / dosage">
+            <Field label="Route">
+              <Picker
+                value={t.route || "Pick a route"}
+                onChange={(v) => updateTreatment(t.id, { route: v })}
+                options={ROUTES}
+              />
+            </Field>
+            <Field label="Dosage">
               <Input
                 value={t.description}
                 onChangeText={(v) => updateTreatment(t.id, { description: v })}
-                placeholder="e.g. Procaine Penicillin 20 ml IM"
+                placeholder="e.g. 20 ml"
               />
             </Field>
             <Button label="Remove treatment" variant="link" onPress={() => removeTreatment(t.id)} />

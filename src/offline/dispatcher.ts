@@ -93,6 +93,12 @@ export const drainQueue = async (): Promise<DrainResult> => {
 export const isOfflineError = (err: unknown): boolean => {
   const e = err as any;
   if (!e) return false;
+  // An operations endpoint that answers `{error: "..."}` does so with HTTP 200
+  // and no axios response attached to the thrown error. Without this check it
+  // looks identical to being offline, and a refused entry — a cow with no open
+  // service, a store that cannot cover the dose — would be queued and retried
+  // forever instead of shown to the operator.
+  if (e.isServerRejection) return false;
   // No HTTP response means we never got past the network — typical when
   // offline, DNS fails, or the server is unreachable.
   if (!e.response) return true;
