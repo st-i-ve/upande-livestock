@@ -6,11 +6,10 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
-import { useAuthStore } from "@/src/auth/authStore";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useOperator } from "@/src/hooks/useOperator";
 import { useServicedPendingPd } from "@/src/hooks/useServicedPendingPd";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -18,10 +17,8 @@ import type { Animal } from "@/types";
 type Result = "Confirmed" | "Not Pregnant" | "Aborted";
 
 export default function PD() {
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
@@ -32,9 +29,8 @@ export default function PD() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (noOperator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow.");
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     let succeeded = 0;
     let queued = 0;
@@ -70,9 +66,6 @@ export default function PD() {
 
   return (
     <Screen title="Pregnancy diagnosis" subtitle="Confirm or rule out" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
       <Field
         label="Cow(s)"
         help={

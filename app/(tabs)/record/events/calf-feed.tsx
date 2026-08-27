@@ -8,14 +8,13 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Calc } from "@/components/Calc";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { ageDays, initials } from "@/services/utils";
 import { useColors } from "@/src/hooks/useColors";
-import { useAuthStore } from "@/src/auth/authStore";
+import { useOperator } from "@/src/hooks/useOperator";
 import {
   CalfFeedType,
   CalfFeedingSession,
@@ -52,11 +51,9 @@ const recommendedFor = (calf: Animal) => {
 export default function CalfFeed() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [calf, setCalf] = useState<Animal | null>(null);
   const [session, setSession] = useState<CalfFeedingSession>("AM");
   const [feedType, setFeedType] = useState<CalfFeedType>("Whole Milk");
@@ -81,11 +78,10 @@ export default function CalfFeed() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (noOperator) return setError(missingMessage);
     if (!calf) return setError("Pick the calf.");
     if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     if (!qty || Number(qty) <= 0) return setError("Enter quantity fed (kg).");
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
       const r = await mutation.mutateAsync({
@@ -114,9 +110,6 @@ export default function CalfFeed() {
 
   return (
     <Screen title="Calf feeding" subtitle={calf?.name ?? "Pick a calf"} back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
       <Field label="Calf" help="Pick from the herd list — calves are filtered by repro status.">
         <AnimalPickerButton
           title="Select calf"

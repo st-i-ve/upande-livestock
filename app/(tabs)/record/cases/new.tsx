@@ -5,7 +5,6 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
@@ -13,7 +12,7 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-import { useAuthStore } from "@/src/auth/authStore";
+import { useOperator } from "@/src/hooks/useOperator";
 import type {
   CaseSeverity,
   HealthTreatmentInput,
@@ -45,13 +44,11 @@ type TreatmentRow = {
 export default function CaseNew() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
   const { data: settings } = useLivestockSettings();
   const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [condition, setCondition] = useState("");
   const [severity, setSeverity] = useState<CaseSeverity>("Moderate");
@@ -124,7 +121,7 @@ export default function CaseNew() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (noOperator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one animal.");
     if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     if (!condition.trim() && !notes.trim()) {
@@ -168,7 +165,6 @@ export default function CaseNew() {
     );
     if (shortage) return setError(shortage);
 
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     const presentingSymptoms = [condition.trim(), notes.trim()].filter(Boolean).join(" — ");
 
@@ -207,9 +203,6 @@ export default function CaseNew() {
 
   return (
     <Screen title="New health case" subtitle="Opens cases in the action queue" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
       <Field label="Animal(s)" help="One or many — same condition opens a case per animal.">
         <AnimalPickerButton
           mode="multi"

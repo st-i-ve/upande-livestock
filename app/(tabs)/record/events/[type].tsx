@@ -7,7 +7,6 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { HandlersPicker } from "@/components/HandlersPicker";
@@ -15,7 +14,7 @@ import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-import { useAuthStore } from "@/src/auth/authStore";
+import { useOperator } from "@/src/hooks/useOperator";
 import {
   AnimalEventInput,
   AnimalEventType,
@@ -59,10 +58,8 @@ export default function GenericEvent() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const spec = SPECS[type || ""];
 
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [vetName, setVetName] = useState("");
   const [handlerIds, setHandlerIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Animal[]>([]);
@@ -129,10 +126,10 @@ export default function GenericEvent() {
 
     if (spec.isVetProcedure) {
       if (!vetName.trim()) return setError("Enter the vet's name.");
-      if (!operator) return setError("Operator missing — sign out and back in.");
+      if (noOperator) return setError(missingMessage);
       if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     } else {
-      if (!operator) return setError("Pick the operator before submitting.");
+      if (noOperator) return setError(missingMessage);
     }
 
     if (spec.needsWeight) {
@@ -160,7 +157,6 @@ export default function GenericEvent() {
       if (shortage) return setError(shortage);
     }
 
-    if (operator && operator !== defaultOperator) await setStoredOperator(operator);
 
     // ----- compose per-cow events -------------------------------------------
     const remarksBits: string[] = [];
@@ -288,9 +284,6 @@ export default function GenericEvent() {
     <Screen title={spec.title} subtitle="New event" back>
       {/* Operator picker: hidden for vet procedures (auto-set from auth). */}
       {!spec.isVetProcedure ? (
-        <Field label="Operator">
-          <EmployeePickerButton value={operator} onChange={setOperator} />
-        </Field>
       ) : null}
 
       {spec.isVetProcedure ? (

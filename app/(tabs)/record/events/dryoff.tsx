@@ -5,14 +5,13 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-import { useAuthStore } from "@/src/auth/authStore";
+import { useOperator } from "@/src/hooks/useOperator";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
 import { findStoreShortage } from "@/src/frappe/stock";
 import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
@@ -34,13 +33,11 @@ type DCTRow = {
 export default function Dryoff() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: herds = [] } = useHerds();
   const { data: settings } = useLivestockSettings();
   const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [toHerd, setToHerd] = useState<string>("");
   const [dctRows, setDctRows] = useState<DCTRow[]>([]);
@@ -83,7 +80,7 @@ export default function Dryoff() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (noOperator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to dry off.");
     if (!toHerd) return setError("Pick a destination herd.");
 
@@ -113,7 +110,6 @@ export default function Dryoff() {
     );
     if (shortage) return setError(shortage);
 
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     let succeeded = 0;
     let queued = 0;
@@ -151,9 +147,6 @@ export default function Dryoff() {
         drugs to apply the same treatment to every selected cow.
       </Banner>
 
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
 
       <Field label="Cow(s) to dry off">
         <AnimalPickerButton

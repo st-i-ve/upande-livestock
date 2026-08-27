@@ -6,13 +6,12 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { useAuthStore } from "@/src/auth/authStore";
 import { useAnimals } from "@/src/hooks/useAnimals";
+import { useOperator } from "@/src/hooks/useOperator";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
@@ -20,13 +19,11 @@ import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 export default function Calving() {
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: animals = [] } = useAnimals();
   const { data: herds = [] } = useHerds();
   const { data: settings } = useLivestockSettings();
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [dam, setDam] = useState<Animal | null>(null);
   const [outcome, setOutcome] = useState<"Live Birth" | "Still Birth" | "Abortion">("Live Birth");
   const [sex, setSex] = useState<"Female" | "Male">("Female");
@@ -69,12 +66,11 @@ export default function Calving() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (noOperator) return setError(missingMessage);
     if (!dam) return setError("Pick the dam (mother).");
     if (outcome === "Live Birth" && (!calfBook.trim() || !calfName.trim())) {
       return setError("Live births need a calf book number and burn name — the server uses these to create the Animal record.");
     }
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     try {
       const r = await mutation.mutateAsync({
@@ -112,9 +108,6 @@ export default function Calving() {
         <Banner tone="warning">No pregnant cows on record.</Banner>
       ) : null}
 
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
 
       <Field label="Dam (mother)" help="If your cow isn't here, she has no pregnancy on record. Use the + button to add a Pregnancy Diagnosis first.">
         <AnimalPickerButton

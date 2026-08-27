@@ -5,24 +5,21 @@ import { Alert } from "react-native";
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { useAuthStore } from "@/src/auth/authStore";
 import { findStoreShortage } from "@/src/frappe/stock";
 import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useOperator } from "@/src/hooks/useOperator";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 export default function Service() {
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
@@ -45,7 +42,7 @@ export default function Service() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (noOperator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to service.");
     // For A.I. with a semen straw, we issue it from a store — need the source.
     const willIssueSemen = type === "A.I." && !!straw;
@@ -62,7 +59,6 @@ export default function Service() {
       ]);
       if (shortage) return setError(shortage);
     }
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     let succeeded = 0;
     let queued = 0;
@@ -129,9 +125,6 @@ export default function Service() {
 
   return (
     <Screen title="Service / AI" subtitle="Issue semen straw" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
       <Field
         label="Cow(s)"
         help="Pick one or many. Same straw issued per cow; one Animal Event per cow on submit."

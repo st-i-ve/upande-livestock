@@ -7,7 +7,6 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { ScoreRow } from "@/components/ScoreRow";
@@ -15,8 +14,8 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { APP, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+import { useOperator } from "@/src/hooks/useOperator";
 import type { DiagnosisAction } from "@/src/frappe/animalDiagnosis";
-import { useAuthStore } from "@/src/auth/authStore";
 import { useCreateAnimalDiagnosis } from "@/src/hooks/mutations";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { extractFrappeError, todayISO } from "@/src/services/api";
@@ -43,13 +42,11 @@ type CustomField = { id: number; label: string; value: string };
 export default function Diagnosis() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: company } = useDefaultCompany();
 
   // Live picked animals + operator (replacing the stub picker that never lifted).
   const [selected, setSelected] = useState<Animal[]>([]);
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const mutation = useCreateAnimalDiagnosis();
 
@@ -112,9 +109,6 @@ export default function Diagnosis() {
 
       {/* 1. BASIC INFORMATION */}
       <SectionTitle>1 · Basic information</SectionTitle>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
       <Field
         label="Animal(s)"
         help="Pick one or many. Same vitals + diagnosis applied per animal — one record each."
@@ -326,10 +320,9 @@ export default function Diagnosis() {
         disabled={mutation.isPending || selected.length === 0}
         onPress={async () => {
           setSubmitError(null);
-          if (!operator) return setSubmitError("Pick the operator before submitting.");
+          if (noOperator) return setSubmitError(missingMessage);
           if (selected.length === 0) return setSubmitError("Pick at least one animal.");
           if (!company) return setSubmitError("Default company not loaded yet. Try again in a moment.");
-          if (operator !== defaultOperator) await setStoredOperator(operator);
 
           const action: DiagnosisAction =
             diagnosis === "Confirmed disease"
