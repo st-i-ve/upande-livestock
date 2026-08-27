@@ -7,15 +7,14 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+import { useOperator } from "@/src/hooks/useOperator";
 import type { Animal } from "@/types";
-import { useAuthStore } from "@/src/auth/authStore";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { extractFrappeError, todayISO } from "@/src/services/api";
@@ -25,11 +24,9 @@ const REASONS = ["Routine age-out", "Repro status", "Other"] as const;
 export default function Movement() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: herds = [] } = useHerds();
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missing: noOperator, missingMessage } = useOperator();
   const [toHerd, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
@@ -52,8 +49,8 @@ export default function Movement() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) {
-      setError("Pick the operator (your Employee record) before submitting.");
+    if (noOperator) {
+      setError(missingMessage);
       return;
     }
     if (selected.length === 0) {
@@ -64,8 +61,6 @@ export default function Movement() {
       setError("Pick a destination herd.");
       return;
     }
-    // Persist operator override so the next form pre-fills it.
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     const remarks = reason === "Other" ? otherReason : reason;
     // One Animal Event per moved animal — server script updates per-animal
@@ -102,9 +97,6 @@ export default function Movement() {
 
   return (
     <Screen title="Movement" subtitle="Move animals between herds" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
 
       <Field label="Animals to move" help="Search by tag, or open the By herd tab to grab a whole herd.">
         <AnimalPickerButton
