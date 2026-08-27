@@ -15,6 +15,7 @@ import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import type { MilkSession } from "@/src/frappe/milkRecording";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
+import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import {
   extractFrappeError,
@@ -33,11 +34,25 @@ export default function Milk() {
   const employeeName = useAuthStore((s) => s.employeeName);
   const { data: herds = [] } = useHerds();
 
-  // Eligible animals for milking: female, in a herd flagged `custom_is_milking`,
-  // and not in withdrawal today. We look up the milking-herd set once.
+  // Eligible animals for milking: female, in a lactation herd, and not in
+  // withdrawal today.
+  //
+  // The lactation herds come from the backend, which derives them from Herd
+  // Movement settings. This used to filter on a `custom_is_milking` flag ticked
+  // on each herd — correct until somebody renamed a herd or added one, after
+  // which the form quietly offered the wrong animals. Two places deciding the
+  // same thing is two places to disagree.
+  const { data: eligibility } = useEligibility();
   const milkingHerdNames = useMemo(
-    () => new Set(herds.filter((h) => h.isMilking).map((h) => h.n)),
-    [herds],
+    () =>
+      new Set(
+        eligibility?.milking_herds?.length
+          ? eligibility.milking_herds
+          // Until it loads, fall back to the herd flag rather than offering
+          // everything — a stale answer beats an unfiltered one here.
+          : herds.filter((h) => h.isMilking).map((h) => h.n),
+      ),
+    [eligibility, herds],
   );
   const today = todayISO();
   const eligibleFilter = (a: Animal) =>

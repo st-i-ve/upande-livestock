@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -48,6 +49,17 @@ function Subheader({ children }: { children: React.ReactNode }) {
   const s = useMemo(() => makeStyles(c), [c]);
   return <Text style={s.subheader}>{children}</Text>;
 }
+
+// Read from the manifest, not from a constant somebody has to remember to bump.
+// The runtime version is what an over-the-air update must match, so it is worth
+// showing: two builds on the same app version can be on different runtimes.
+const appVersion =
+  Constants.expoConfig?.version || Constants.nativeAppVersion || APP.version;
+const runtimeVersion =
+  (Constants.expoConfig as any)?.runtimeVersion ||
+  (Constants as any).manifest?.runtimeVersion ||
+  null;
+const runtimeLabel = runtimeVersion ? `Runtime ${runtimeVersion}` : "Runtime embedded";
 
 export default function Profile() {
   const c = useColors();
@@ -135,7 +147,8 @@ export default function Profile() {
         </View>
 
         <Pressable style={s.versionContainer}>
-          <Text style={s.versionText}>Version {APP.version}</Text>
+          <Text style={s.versionText}>Version {appVersion}</Text>
+          <Text style={s.versionText}>{runtimeLabel}</Text>
         </Pressable>
       </ScrollView>
 

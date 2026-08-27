@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
@@ -37,8 +38,10 @@ import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 // Login form fields never grow past 80% of the screen width so they stay
 // comfortable to read on tablets and large phones.
 const FIELD_WIDTH = Math.min(Math.round(Dimensions.get("window").width * 0.8), 400);
-// How long the logo must be held to reveal the hidden instance-URL field.
-const REVEAL_HOLD_MS = 3000;
+// How long the logo must be held to reveal the hidden instance-URL field. One
+// second, matching the Scout app — three was long enough that people let go
+// before anything happened and concluded the gesture did not exist.
+const REVEAL_HOLD_MS = 1000;
 // The URL field collapses back into the logo after this long with no activity.
 const IDLE_HIDE_MS = 5000;
 // Fully-expanded height of the URL field row (input + spacing below).
@@ -108,6 +111,9 @@ export default function LoginScreen() {
 
   const revealUrl = () => {
     if (urlRevealed) return;
+    // A hidden gesture needs to confirm itself. Without this the only feedback
+    // is the field animating in, which is easy to miss mid-hold.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setUrlRevealed(true);
     reveal.value = withTiming(
       1,

@@ -15,6 +15,7 @@ import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { Animal } from "@/types";
+import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { extractFrappeError, todayISO } from "@/src/services/api";
@@ -25,6 +26,16 @@ export default function Movement() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const { data: herds = [] } = useHerds();
+  const { data: eligibility } = useEligibility();
+
+  // Where the herd structure says these animals should go next. The ladder is
+  // ordered on the backend and this reads that order rather than guessing from
+  // herd names — "2-4" looks like a rule and is a label.
+  const suggested = useMemo(() => {
+    const from = Array.from(new Set(selected.map((a) => a.herd)));
+    if (from.length !== 1 || !eligibility) return null;
+    return eligibility.next_herd?.[from[0]] ?? null;
+  }, [selected, eligibility]);
 
   const { operator, missing: noOperator, missingMessage } = useOperator();
   const [toHerd, setToHerd] = useState<string>("");
@@ -39,10 +50,15 @@ export default function Movement() {
       ? selected[0].herd
       : "Mixed (per animal)";
 
-  // Default the destination herd once the herd list arrives.
+  // Default to where the ladder leads, and follow it when the selection changes
+  // to a different herd. Defaulting to herds[0] meant the form opened proposing
+  // an alphabetically-first herd that was almost never the right one.
+  const [toHerdTouched, setToHerdTouched] = useState(false);
   React.useEffect(() => {
-    if (!toHerd && herds.length) setToHerd(herds[0].n);
-  }, [herds, toHerd]);
+    if (toHerdTouched) return;
+    if (suggested) setToHerd(suggested);
+    else if (!toHerd && herds.length) setToHerd(herds[0].n);
+  }, [suggested, herds, toHerd, toHerdTouched]);
 
   const mutation = useCreateAnimalEvent();
   const removeOne = (id: string) => setSelected((prev) => prev.filter((a) => a.id !== id));
@@ -131,7 +147,21 @@ export default function Movement() {
           <Input value={fromHerd} editable={false} />
         </Field>
         <Field label="To herd" style={{ flex: 1 }}>
-          <Picker value={toHerd || (herds[0]?.n ?? "")} onChange={setToHerd} options={herds.map((h) => h.n)} />
+          <Picker
+            value={toHerd || (herds[0]?.n ?? "")}
+            onChange={(v) => {
+              setToHerdTouched(true);
+              setToHerd(v);
+            }}
+            options={herds.map((h) => h.n)}
+          />
+          {suggested ? (
+            <Text style={s.hint}>
+              {suggested === toHerd
+                ? `${suggested} is the next herd for these animals.`
+                : `The herd structure suggests ${suggested}.`}
+            </Text>
+          ) : null}
         </Field>
       </FieldRow>
       <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
@@ -180,6 +210,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     },
     selName: { fontSize: 13, fontWeight: "600", color: c.text },
     selId: { fontFamily: "monospace", fontSize: 11, fontWeight: "400", color: c.textSubtle },
+    hint: {
+      marginTop: 6,
+      fontSize: 12,
+      color: c.textMuted,
+    },
     selMeta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
     remove: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   });
