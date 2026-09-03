@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -8,26 +8,11 @@ import { TimeField, toHHMM, toISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import type { MilkSession } from "@/src/frappe/milkRecording";
 import { useColors } from "@/src/hooks/useColors";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { extractFrappeError } from "@/src/services/api";
-
-/**
- * `session` is `reqd: 1` on the Milk Recording DocType and the After Submit
- * script stamps it onto the generated Stock Entry, so it cannot be dropped
- * from the payload. Nobody at the parlour thinks in AM/PM though — they know
- * what time they milked. The time is what gets asked for; the session is read
- * off it.
- */
-const sessionForTime = (hhmm: string): MilkSession => {
-  const h = Number(hhmm.split(":")[0]) || 0;
-  if (h < 12) return "AM — Morning";
-  if (h < 17) return "PM — Afternoon";
-  return "Evening";
-};
 
 export default function Milk() {
   const c = useColors();
@@ -57,7 +42,6 @@ export default function Milk() {
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const session = sessionForTime(time);
   const kg = Number(totalKg) || 0;
   const canSubmit = !!herd && kg > 0 && !mutation.isPending;
 
@@ -70,8 +54,8 @@ export default function Milk() {
     try {
       await mutation.mutateAsync({
         herd: herdDoc?.herdName ?? herd,
-        session,
         recordingDate: date,
+        milkingTime: time,
         totalYieldKg: kg,
         cowsMilked: herdDoc?.cnt || undefined,
         // No pricePerKg: the Milk Recording server script pulls it from
@@ -125,11 +109,6 @@ export default function Milk() {
         />
       </Field>
 
-      <View style={s.sessionRow}>
-        <Text style={s.sessionLabel}>Session</Text>
-        <Text style={s.sessionValue}>{session}</Text>
-      </View>
-
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit"}
         onPress={submit}
@@ -143,15 +122,4 @@ export default function Milk() {
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     empty: { fontSize: 13, color: c.textMuted, paddingVertical: 10 },
-    sessionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: 10,
-      marginBottom: 4,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: c.borderSubtle,
-    },
-    sessionLabel: { fontSize: 12, color: c.textMuted },
-    sessionValue: { fontSize: 12, color: c.text },
   });
