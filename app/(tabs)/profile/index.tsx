@@ -117,27 +117,15 @@ export default function Profile() {
 
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
-          <Row
-            icon="tune-variant"
-            label="Configurations"
-            onPress={() => router.push("/(tabs)/profile/configurations")}
-          />
-          <Row
-            icon="cog"
-            label="Livestock settings"
-            onPress={() => router.push("/(tabs)/profile/settings")}
-          />
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
+          {/* The offline queue still runs; this row only reports it. Tapping it
+              went to a pending-submissions screen that no longer exists, so the
+              count is shown here as plain status. */}
           <Row
             icon="cloud-upload-outline"
             label={online === false ? "Offline · pending submissions" : "Pending submissions"}
-            onPress={() => router.push("/(tabs)/profile/pending" as any)}
             right={
-              pending > 0 ? (
-                <View style={s.badge}>
-                  <Text style={s.badgeText}>{pending}</Text>
-                </View>
-              ) : undefined
+              <Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>
             }
           />
 
@@ -274,6 +262,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       color: c.bg,
       fontSize: 11,
       fontFamily: FONT_FAMILY.semibold,
+    },
+    pendingCount: {
+      fontSize: 13,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.medium,
     },
     empWrapper: {
       marginHorizontal: 16,

@@ -15,7 +15,9 @@ export default function EventSuccess() {
         <Text style={{ fontWeight: "700" }}>{name} submitted</Text>
         {"\n"}Recorded by {APP.user}.
       </Banner>
-      <Button label="Done" onPress={() => router.replace("/(tabs)")} />
+      {/* "/(tabs)" no longer resolves — there is no tabs index route. Done
+          returns to the event list, which is where the next entry starts. */}
+      <Button label="Done" onPress={() => router.replace("/(tabs)/record")} />
       <Button label="Record another" variant="outline" onPress={() => router.back()} />
     </Screen>
   );
