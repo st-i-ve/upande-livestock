@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
@@ -66,8 +65,6 @@ export default function Profile() {
   const s = useMemo(() => makeStyles(c), [c]);
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
-  const employeeName = useAuthStore((s) => s.employeeName);
-  const setEmployeeName = useAuthStore((s) => s.setEmployeeName);
   const logout = useAuthStore((s) => s.logout);
   const pending = usePendingCount();
   const online = useNetworkStatus();
@@ -98,20 +95,6 @@ export default function Profile() {
             <Text style={s.name} numberOfLines={1}>{displayName}</Text>
             <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
             <Text style={s.caption} numberOfLines={1}>{APP.farm}</Text>
-          </View>
-        </View>
-
-        <View style={s.empWrapper}>
-          <Subheader>My employee</Subheader>
-          <View style={s.empBody}>
-            <EmployeePickerButton
-              value={employeeName}
-              onChange={(name) => setEmployeeName(name)}
-              placeholder="Tap to pick your Employee"
-            />
-            <Text style={s.empHint}>
-              Used as the default operator on every record you submit. Pick once; we remember it.
-            </Text>
           </View>
         </View>
 

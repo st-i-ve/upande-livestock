@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Kaitet Dairy",
+    "name": "Upande Livestock",
     "slug": "upande-livestock",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -44,10 +44,11 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Kaitet Dairy uses the camera to photograph a newborn calf so the picture lands on the animal's record.",
-          "photosPermission": "Kaitet Dairy needs access to your photos only if you choose an existing picture instead of taking one."
+          "cameraPermission": "Upande Livestock uses the camera to photograph a newborn calf so the picture lands on the animal's record.",
+          "photosPermission": "Upande Livestock needs access to your photos only if you choose an existing picture instead of taking one."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

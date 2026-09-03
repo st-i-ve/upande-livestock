@@ -1,6 +1,8 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
 
+import { DEV_FAKE_SESSION_KEY } from "@/src/auth/devBypass";
 import { STORAGE_KEYS, storage } from "./storage";
+import { previewAdapter } from "./previewApi";
 
 const normalizeBaseUrl = (url: string) => url.trim().replace(/\/+$/, "");
 
@@ -149,6 +151,17 @@ export const getWorkingUrl = async (inputUrl: string): Promise<string | null> =>
 export const getClient = async (): Promise<AxiosInstance> => {
   const baseUrl = await storage.getItem(STORAGE_KEYS.INSTANCE_URL);
   if (!baseUrl) {
+    // Under the DEV bypass there is no instance to talk to. Serve the screens
+    // from fixtures instead of throwing, so the UI can be reviewed offline.
+    if (__DEV__ && (await storage.getItem(DEV_FAKE_SESSION_KEY))) {
+      const preview = axios.create({
+        baseURL: "http://preview.local",
+        adapter: previewAdapter,
+        timeout: 15_000,
+      });
+      attachLogging(preview);
+      return preview;
+    }
     throw new Error("No Frappe instance URL set. Sign in to configure one.");
   }
   const cookie = await storage.getItem(STORAGE_KEYS.COOKIE);
