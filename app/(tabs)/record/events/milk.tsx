@@ -1,348 +1,133 @@
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { Calc } from "@/components/Calc";
-import { Field, FieldRow, Input } from "@/components/Field";
+import { DateField, toISODate } from "@/components/DateField";
+import { Field, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { SectionTitle } from "@/components/SectionTitle";
-import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
-import { useColors } from "@/src/hooks/useColors";
-import { useAuthStore } from "@/src/auth/authStore";
+import { APP } from "@/constants/theme";
 import type { MilkSession } from "@/src/frappe/milkRecording";
+import { useColors } from "@/src/hooks/useColors";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
-import {
-  extractFrappeError,
-  todayISO,
-} from "@/src/services/api";
-import type { Animal } from "@/types";
+import { extractFrappeError } from "@/src/services/api";
 
-const SESSIONS: MilkSession[] = ["AM — Morning", "PM — Afternoon", "Evening"];
-
-// Kept in step with the Milk Recording `discard_reason` Select on the ERP side.
-// Milk poured away is a loss; recording why is the only way it can be reduced.
-const DISCARD_REASONS = [
-  "Mastitis",
-  "Antibiotic withdrawal",
-  "Colostrum",
-  "Spoiled / soured",
-  "Spilled",
-  "Failed quality test",
-  "Other",
-] as const;
-type DiscardReason = (typeof DISCARD_REASONS)[number];
-
-type PerHerd = {
-  total: string;
-  discard: string;
-  colostrum: string;
-  reason: DiscardReason | "";
-  reasonNotes: string;
+/**
+ * `session` is `reqd: 1` on the Milk Recording DocType and the After Submit
+ * script stamps it onto the generated Stock Entry, so it cannot simply be
+ * dropped from the form. It is derived from the clock instead of asked for:
+ * milk is recorded at the parlour, right after milking.
+ */
+const sessionForNow = (now: Date): MilkSession => {
+  const h = now.getHours();
+  if (h < 12) return "AM — Morning";
+  if (h < 17) return "PM — Afternoon";
+  return "Evening";
 };
-const EMPTY: PerHerd = { total: "", discard: "", colostrum: "", reason: "", reasonNotes: "" };
 
 export default function Milk() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const employeeName = useAuthStore((s) => s.employeeName);
+
   const { data: herds = [] } = useHerds();
-
-  // Eligible animals for milking: female, in a lactation herd, and not in
-  // withdrawal today.
-  //
-  // The lactation herds come from the backend, which derives them from Herd
-  // Movement settings. This used to filter on a `custom_is_milking` flag ticked
-  // on each herd — correct until somebody renamed a herd or added one, after
-  // which the form quietly offered the wrong animals. Two places deciding the
-  // same thing is two places to disagree.
   const { data: eligibility } = useEligibility();
-  const milkingHerdNames = useMemo(
-    () =>
-      new Set(
-        eligibility?.milking_herds?.length
-          ? eligibility.milking_herds
-          // Until it loads, fall back to the herd flag rather than offering
-          // everything — a stale answer beats an unfiltered one here.
-          : herds.filter((h) => h.isMilking).map((h) => h.n),
-      ),
-    [eligibility, herds],
-  );
-  const today = todayISO();
-  const eligibleFilter = (a: Animal) =>
-    a.sex === "F" &&
-    milkingHerdNames.has(a.herd) &&
-    (!a.milkSafe || a.milkSafe < today);
-
-  const [selected, setSelected] = useState<Animal[]>([]);
-  const [session, setSession] = useState<MilkSession>(SESSIONS[0]);
-  // Per-herd yields, keyed by herd name. Cleared when an animal from that
-  // herd is unselected and no others remain.
-  const [yields, setYields] = useState<Record<string, PerHerd>>({});
-  const [allCol, setAllCol] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Group selected animals by herd for per-herd entry sections.
-  const grouped = useMemo(() => {
-    const m: Record<string, Animal[]> = {};
-    for (const a of selected) (m[a.herd] ||= []).push(a);
-    return m;
-  }, [selected]);
-  const herdsInPlay = useMemo(() => Object.keys(grouped).sort(), [grouped]);
-
-  const onPickMulti = (list: Animal[]) => {
-    setSelected(list);
-    // Prune yield entries for herds no longer represented in the picker.
-    const stillIn = new Set(list.map((a) => a.herd));
-    setYields((prev) => {
-      const next: Record<string, PerHerd> = {};
-      for (const k of Object.keys(prev)) if (stillIn.has(k)) next[k] = prev[k];
-      return next;
-    });
-  };
-
-  const setYield = (herd: string, patch: Partial<PerHerd>) =>
-    setYields((prev) => ({ ...prev, [herd]: { ...(prev[herd] ?? EMPTY), ...patch } }));
-
-  // Aggregate totals across herds, for the summary tile.
-  const totals = useMemo(() => {
-    let total = 0;
-    let discard = 0;
-    let colostrum = 0;
-    for (const h of herdsInPlay) {
-      const v = yields[h] ?? EMPTY;
-      const t = Number(v.total) || 0;
-      const d = Number(v.discard) || 0;
-      const c = allCol ? Math.max(t - d, 0) : Number(v.colostrum) || 0;
-      total += t;
-      discard += d;
-      colostrum += c;
-    }
-    const net = Math.max(total - discard - colostrum, 0);
-    return { total, discard, colostrum, net, revenue: Math.round(net * APP.milkPriceKES) };
-  }, [yields, herdsInPlay, allCol]);
-
   const mutation = useCreateMilkRecording();
 
-  const handleSubmit = async () => {
+  // Only herds that actually produce milk. The backend derives this list from
+  // Herd Movement settings; the `custom_is_milking` flag is the fallback until
+  // it loads, so a slow response never offers a dry herd.
+  const milkingHerds = useMemo(() => {
+    const fromServer = eligibility?.milking_herds ?? [];
+    const names = fromServer.length
+      ? fromServer
+      : herds.filter((h) => h.isMilking).map((h) => h.n);
+    return names.slice().sort();
+  }, [eligibility, herds]);
+
+  const [herd, setHerd] = useState("");
+  const [date, setDate] = useState(() => toISODate(new Date()));
+  const [totalKg, setTotalKg] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const session = sessionForNow(new Date());
+  const kg = Number(totalKg) || 0;
+  const canSubmit = !!herd && kg > 0 && !mutation.isPending;
+
+  const submit = async () => {
+    if (!canSubmit) return;
     setError(null);
-    if (selected.length === 0) return setError("Pick at least one cow.");
-    if (herdsInPlay.length === 0) return setError("No herds represented in the selection.");
-    // Every represented herd must have a total entered (so we don't post
-    // empty Milk Recording rows).
-    for (const h of herdsInPlay) {
-      const t = Number(yields[h]?.total || 0);
-      if (t <= 0) return setError(`Enter total yield for ${h}.`);
-      const d = Number(yields[h]?.discard || 0);
-      if (d > 0 && !yields[h]?.reason)
-        return setError(`Say why ${d} kg was discarded in ${h}.`);
-      if (yields[h]?.reason === "Other" && !yields[h]?.reasonNotes?.trim())
-        return setError(`Describe the discard reason for ${h}.`);
+    // Submit the Herds doc's `herd_name` as the Link value — that is what the
+    // field points at, even though this schema names the doc the same thing.
+    const herdDoc = herds.find((h) => h.n === herd);
+    try {
+      await mutation.mutateAsync({
+        herd: herdDoc?.herdName ?? herd,
+        session,
+        recordingDate: date,
+        totalYieldKg: kg,
+        cowsMilked: herdDoc?.cnt || undefined,
+        pricePerKg: APP.milkPriceKES,
+        remarks: remarks.trim() || undefined,
+      });
+      router.replace("/(tabs)/record/success?name=Milk recording");
+    } catch (err) {
+      setError(extractFrappeError(err));
     }
-
-    let succeeded = 0;
-    let queued = 0;
-    const submitted: string[] = [];
-
-    for (const herdName of herdsInPlay) {
-      const cowsMilked = grouped[herdName].length;
-      const v = yields[herdName] ?? EMPTY;
-      const t = Number(v.total) || 0;
-      const d = Number(v.discard) || 0;
-      const c = allCol ? Math.max(t - d, 0) : Number(v.colostrum) || 0;
-      // Look up the Herds doc and submit its `herd_name` as the Link value.
-      // The Animal's current_herd stores the herd's Frappe name, which in
-      // this schema equals herd_name — but we resolve explicitly so the
-      // intent matches the field semantics.
-      const herdDoc = herds.find((h) => h.n === herdName);
-      const herdLink = herdDoc?.herdName ?? herdName;
-
-      try {
-        const r = await mutation.mutateAsync({
-          herd: herdLink,
-          session,
-          recordingDate: todayISO(),
-          totalYieldKg: t,
-          discardedKg: d || undefined,
-          discardReason: d > 0 ? (v.reason || undefined) : undefined,
-          discardReasonNotes:
-            d > 0 && v.reason === "Other" ? v.reasonNotes.trim() || undefined : undefined,
-          colostrumYieldKg: !allCol && c > 0 ? c : undefined,
-          isColostrum: allCol,
-          pricePerKg: APP.milkPriceKES,
-          cowsMilked,                      // <-- count of selected animals from this herd
-          operator: employeeName || undefined,
-        });
-        if (r.queued) queued += 1;
-        else succeeded += 1;
-        submitted.push(`${herdLink} (${cowsMilked} cows · ${t} kg)`);
-      } catch (err) {
-        setError(
-          `Stopped at ${herdName}: ${extractFrappeError(err)}. ${submitted.length} recording${submitted.length === 1 ? "" : "s"} already submitted.`,
-        );
-        return;
-      }
-    }
-
-    const parts: string[] = [];
-    if (succeeded) parts.push(`${succeeded} recording${succeeded === 1 ? "" : "s"} submitted`);
-    if (queued) parts.push(`${queued} queued offline`);
-    Alert.alert("Milk recording done", `${parts.join(" · ")}\n${submitted.join("\n")}`);
-    router.replace("/(tabs)/record/success?name=Milk recording");
   };
 
   return (
-    <Screen
-      title="Milk recording"
-      subtitle={
-        selected.length
-          ? `${selected.length} cow${selected.length === 1 ? "" : "s"} · ${herdsInPlay.length} herd${herdsInPlay.length === 1 ? "" : "s"} · ${session}`
-          : `Pick cows · ${session}`
-      }
-      back
-    >
-      {!employeeName ? (
-        <Banner tone="warning">
-          Your Employee record isn't set. Open Profile → My employee to pick one — submissions will
-          still post, but with no operator on the doc.
-        </Banner>
-      ) : null}
+    <Screen title="Milk recording" subtitle="Record a herd's yield" back>
+      {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <Field
-        label="Cows milked"
-        help="Pick individual cows, or use the By herd tab to take a whole herd. Mixed-herd selections submit one Milk Recording per herd."
-      >
-        <AnimalPickerButton
-          mode="multi"
-          title="Select cows (milking herds only)"
-          placeholder="Search lactating cows..."
-          include={eligibleFilter}
-          value={selected}
-          onPickMulti={onPickMulti}
+      <Field label="Herd">
+        {milkingHerds.length ? (
+          <Picker
+            value={herd || "Select a milking herd"}
+            onChange={(next) => setHerd(next)}
+            options={milkingHerds}
+          />
+        ) : (
+          <Text style={s.empty}>No milking herds found.</Text>
+        )}
+      </Field>
+
+      <Field label="Date">
+        <DateField value={date} onChange={setDate} maximumDate={new Date()} />
+      </Field>
+
+      <Field label="Total yield (kg)">
+        <Input
+          value={totalKg}
+          onChangeText={setTotalKg}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          returnKeyType="done"
         />
       </Field>
 
-      <FieldRow>
-        <Field label="Session" style={{ flex: 1 }}>
-          <Picker value={session} onChange={(v) => setSession(v as MilkSession)} options={SESSIONS} />
-        </Field>
-        <Field label="Date" style={{ flex: 1 }}>
-          <Input value={todayISO()} editable={false} />
-        </Field>
-      </FieldRow>
+      <Field label="Remarks" help="Optional.">
+        <Textarea
+          value={remarks}
+          onChangeText={setRemarks}
+          placeholder="Anything worth noting about this milking"
+        />
+      </Field>
 
-      <View style={s.toggleRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.toggleTitle}>Entire session is colostrum</Text>
-          <Text style={s.toggleSub}>Posts the whole net yield to the Colostrum item</Text>
-        </View>
-        <Pressable
-          onPress={() => setAllCol((v) => !v)}
-          style={[s.toggle, allCol && { backgroundColor: c.text }]}
-        >
-          <View style={[s.knob, allCol && { transform: [{ translateX: 16 }] }]} />
-        </Pressable>
+      <View style={s.sessionRow}>
+        <Text style={s.sessionLabel}>Session</Text>
+        <Text style={s.sessionValue}>{session}</Text>
       </View>
 
-      {herdsInPlay.length === 0 ? (
-        <Banner tone="info">Pick cows above. You can take a whole herd from the By herd tab.</Banner>
-      ) : (
-        <>
-          <SectionTitle>Per-herd yields</SectionTitle>
-          {herdsInPlay.map((herd) => {
-            const cnt = grouped[herd].length;
-            const v = yields[herd] ?? EMPTY;
-            const label = herds.find((h) => h.n === herd)?.herdName ?? herd;
-            return (
-              <View key={herd} style={s.herdCard}>
-                <View style={s.herdCardHeader}>
-                  <Text style={s.herdName} numberOfLines={1}>{label}</Text>
-                  <Text style={s.herdMeta}>{cnt} cow{cnt === 1 ? "" : "s"}</Text>
-                </View>
-                <FieldRow>
-                  <Field label="Total yield (kg)" style={{ flex: 1 }}>
-                    <Input
-                      value={v.total}
-                      onChangeText={(t) => setYield(herd, { total: t })}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </Field>
-                  <Field label="Discard (kg)" style={{ flex: 1 }}>
-                    <Input
-                      value={v.discard}
-                      onChangeText={(d) => setYield(herd, { discard: d })}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </Field>
-                </FieldRow>
-                {Number(v.discard) > 0 ? (
-                  <Field
-                    label="Reason for discard"
-                    help="Milk poured away is a loss. Recording why is the only way it can be reduced."
-                  >
-                    <Picker
-                      value={(v.reason || "Select a reason") as DiscardReason}
-                      onChange={(r) => setYield(herd, { reason: r })}
-                      options={DISCARD_REASONS as unknown as DiscardReason[]}
-                    />
-                  </Field>
-                ) : null}
-                {Number(v.discard) > 0 && v.reason === "Other" ? (
-                  <Field label="Describe the reason">
-                    <Input
-                      value={v.reasonNotes}
-                      onChangeText={(n) => setYield(herd, { reasonNotes: n })}
-                      placeholder="What happened to the milk?"
-                    />
-                  </Field>
-                ) : null}
-                {!allCol ? (
-                  <Field
-                    label="Colostrum portion (kg)"
-                    help="If part of this herd's yield is colostrum (e.g. one fresh cow). Leave blank if none."
-                  >
-                    <Input
-                      value={v.colostrum}
-                      onChangeText={(c) => setYield(herd, { colostrum: c })}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </Field>
-                ) : null}
-              </View>
-            );
-          })}
-
-          <Calc
-            label={`Net sellable across ${herdsInPlay.length} herd${herdsInPlay.length === 1 ? "" : "s"}`}
-            value={
-              allCol
-                ? `${(totals.total - totals.discard).toFixed(1)} kg → Colostrum bank`
-                : `${totals.net.toFixed(1)} kg → ${totals.revenue.toLocaleString()} KES`
-            }
-            footer={
-              allCol
-                ? "All yield posted to colostrum · 0 KES revenue"
-                : `${totals.total} − ${totals.discard} discard${totals.colostrum ? ` − ${totals.colostrum} colostrum` : ""}`
-            }
-          />
-        </>
-      )}
-
-      {error ? <Banner tone="danger">{error}</Banner> : null}
-
       <Button
-        label={mutation.isPending ? "Submitting…" : "Submit recording"}
-        disabled={mutation.isPending || selected.length === 0}
+        label={mutation.isPending ? "Submitting…" : "Submit"}
+        onPress={submit}
+        disabled={!canSubmit}
         loading={mutation.isPending}
-        onPress={handleSubmit}
       />
     </Screen>
   );
@@ -350,27 +135,16 @@ export default function Milk() {
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    toggleRow: {
-      flexDirection: "row", alignItems: "center",
-      paddingHorizontal: 12, paddingVertical: 10,
-      backgroundColor: c.bgMuted, borderRadius: RADIUS.md, marginBottom: 8,
-    },
-    toggleTitle: { fontSize: 12, fontWeight: "600", color: c.text },
-    toggleSub: { fontSize: 10, color: c.textMuted, marginTop: 2 },
-    toggle: { width: 36, height: 20, borderRadius: 999, backgroundColor: c.border, justifyContent: "center" },
-    knob: { width: 16, height: 16, borderRadius: 8, backgroundColor: c.bg, marginLeft: 2 },
-    herdCard: {
-      backgroundColor: c.bgMuted,
-      borderRadius: RADIUS.md,
-      padding: 12,
-      marginBottom: 10,
-    },
-    herdCardHeader: {
+    empty: { fontSize: 13, color: c.textMuted, paddingVertical: 10 },
+    sessionRow: {
       flexDirection: "row",
+      alignItems: "center",
       justifyContent: "space-between",
-      alignItems: "baseline",
-      marginBottom: 8,
+      paddingVertical: 10,
+      marginBottom: 4,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.borderSubtle,
     },
-    herdName: { fontSize: 13, color: c.text, fontFamily: FONT_FAMILY.semibold, flex: 1, minWidth: 0 },
-    herdMeta: { fontSize: 11, color: c.textMuted, fontVariant: ["tabular-nums"] },
+    sessionLabel: { fontSize: 12, color: c.textMuted },
+    sessionValue: { fontSize: 12, color: c.text },
   });
