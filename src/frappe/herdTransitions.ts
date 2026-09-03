@@ -26,7 +26,7 @@ export type HerdMove = {
 export async function computePendingHerdMoves(): Promise<HerdMove[]> {
   const client = await getClient();
   const res = await client.post(
-    "/api/method/upande_livestock.api.operations.movement_suggestions",
+    "/api/method/upande_livestock.serverscripts.movement.movement_suggestions.movement_suggestions",
     {},
   );
   const msg = res.data?.message;

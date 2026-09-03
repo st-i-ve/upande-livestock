@@ -10,14 +10,21 @@ import { getClient } from "@/src/services/api";
  *      to the herd (Material Issue), attributed to the logged-in employee.
  */
 
-const METHOD_PREFIX = "upande_livestock.api.feeding";
+// This used to call upande_livestock.api.feeding — the engine underneath the
+// feed endpoints, which carried no permission check at all, so the handset was
+// manufacturing feed and moving stock unguarded. The engine is no longer
+// whitelisted; this goes through the guarded mobile entry point.
+const RECORD_FEEDING =
+  "upande_livestock.serverscripts.mobile.record_feeding.record_feeding";
 
 const callMethod = async <T = any>(
-  fn: string,
+  action: "info" | "manufacture" | "issue",
   args: Record<string, any>,
 ): Promise<T> => {
   const client = await getClient();
-  const res = await client.post(`/api/method/${METHOD_PREFIX}.${fn}`, args);
+  const res = await client.post(`/api/method/${RECORD_FEEDING}`, {
+    payload: { action, ...args },
+  });
   return (res.data?.message ?? res.data) as T;
 };
 
@@ -67,7 +74,7 @@ export type FeedResult = {
 
 /** Preview: per-head BOM scaled by head count + how much finished feed is in the store. */
 export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
-  const m = await callMethod("get_herd_feed_info", { herd });
+  const m = await callMethod("info", { herd });
   return {
     herd: m.herd,
     bomNo: m.bom_no,
@@ -91,11 +98,11 @@ export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
 
 /** Stage A — manufacture the herd's TMR into the feed store. */
 export const manufactureHerdFeed = (herd: string): Promise<ManufactureResult> =>
-  callMethod("manufacture_herd_feed", { herd });
+  callMethod("manufacture", { herd });
 
 /** Stage B — issue `qty` of the manufactured feed to the herd (Material Issue). */
 export const feedHerd = (
   herd: string,
   qty: number,
   employee?: string,
-): Promise<FeedResult> => callMethod("feed_herd", { herd, qty, employee });
+): Promise<FeedResult> => callMethod("issue", { herd, qty, employee });

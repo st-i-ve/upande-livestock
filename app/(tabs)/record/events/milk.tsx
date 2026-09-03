@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { DateField, toISODate } from "@/components/DateField";
+import { DateField, toISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";

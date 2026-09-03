@@ -48,7 +48,7 @@ export const useEligibility = () =>
     queryFn: async (): Promise<Eligibility> => {
       const client = await getClient();
       const res = await client.post(
-        "/api/method/upande_livestock.api.operations.eligibility",
+        "/api/method/upande_livestock.serverscripts.movement.eligibility.eligibility",
         {},
       );
       const msg = res.data?.message;

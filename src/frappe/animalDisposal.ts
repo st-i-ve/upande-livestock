@@ -122,7 +122,7 @@ export const createAnimalDisposal = async (
   // the animal is gone and no income came in.
   const client = await getClient();
   const res = await client.post(
-    "/api/method/upande_livestock.api.operations.record_disposal",
+    "/api/method/upande_livestock.serverscripts.disposal.record_disposal.record_disposal",
     { payload: body },
   );
   const msg = res.data?.message;
