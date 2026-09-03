@@ -78,12 +78,10 @@ export const FONT = {
 } as const;
 
 export const APP = {
-  farm: "Westwood Dairies",
-  location: "Kapkolia · 462 head",
-  user: "Abraham K. Sikuku",
-  initials: "AK",
-  emp: "500208",
-  milkPriceKES: 60,
-  today: "2026-05-09",
+  /** Last-resort fallback for the version caption when neither the Expo config
+   *  nor the native build number can be read. Everything else that used to live
+   *  here — farm, operator name, milk price, "today" — was demo data standing in
+   *  for the backend. It now comes from the session or from Livestock Settings,
+   *  where it can actually be correct. */
   version: "1.0.0",
 } as const;
