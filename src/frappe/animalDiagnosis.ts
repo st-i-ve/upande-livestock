@@ -147,7 +147,7 @@ export const createAnimalDiagnosis = async (
   // "Animal Health Check" rather than a bare Material Issue.
   const client = await getClient();
   const res = await client.post(
-    "/api/method/upande_livestock.api.operations.create_check_up",
+    "/api/method/upande_livestock.serverscripts.health.create_check_up.create_check_up",
     { payload: body },
   );
   const msg = res.data?.message;

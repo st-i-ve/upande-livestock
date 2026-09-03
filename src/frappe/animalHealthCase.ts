@@ -160,7 +160,7 @@ export const createAnimalHealthCase = async (
   // issues the treatment drugs out of the store as one entry.
   const client = await getClient();
   const res = await client.post(
-    "/api/method/upande_livestock.api.operations.create_health_case",
+    "/api/method/upande_livestock.serverscripts.health.create_health_case.create_health_case",
     { payload: body },
   );
   const msg = res.data?.message;

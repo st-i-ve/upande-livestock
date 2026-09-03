@@ -7,10 +7,14 @@ import { listDocuments } from "./generic";
 // This module used to insert into a doctype called `Animal Event` with a set of
 // `custom_*` fieldnames, taken from an older Kaitet site. Neither the doctype
 // nor those fields exist in upande_livestock — so every screen routed through
-// here failed. Each type now calls the whitelisted endpoint in
-// upande_livestock.api.operations that owns it: those endpoints hold the
-// guards, the derived dates, the per-animal fan-out and the named Stock Entry
-// types, none of which a raw client-side insert can reproduce.
+// here failed. Every type now goes to one server endpoint — see RECORD_EVENT
+// below — which routes it to whichever module owns it. Those endpoints hold
+// the guards, the derived dates, the per-animal fan-out and the named Stock
+// Entry types, none of which a raw client-side insert can reproduce.
+//
+// This list is mirrored in the backend's tests (serverscripts/tests/test_mobile
+// APP_EVENT_TYPES). Add a type here and the server test fails until it is
+// routed there — deliberately, so a form cannot ship that fails on submit.
 export type AnimalEventType =
   | "Movement"
   | "Service"
@@ -188,14 +192,21 @@ export const getRecentEvents = async (params?: {
   return rows.map(mapEvent);
 };
 
-const OPS = "upande_livestock.api.operations";
+// One path, and it does not move. This used to name the backend module that
+// owned each event type — and when the server reorganised its endpoints, every
+// write this app made became a 404. A handset in the field cannot be
+// force-updated, so the routing lives on the server now: post the type with the
+// payload and it goes wherever that type is owned.
+const RECORD_EVENT = "upande_livestock.serverscripts.mobile.record_animal_event";
 
-/** POST one whitelisted operations endpoint and unwrap its `{ok, ...}` reply. */
-const callOp = async (method: string, payload: Record<string, any>): Promise<any> => {
+/** POST an event to the mobile entry point and unwrap its `{ok, ...}` reply. */
+const callOp = async (type: string, payload: Record<string, any>): Promise<any> => {
   const client = await getClient();
-  const res = await client.post(`/api/method/${OPS}.${method}`, { payload });
+  const res = await client.post(`/api/method/${RECORD_EVENT}.record_animal_event`, {
+    payload: { type, ...payload },
+  });
   const msg = res.data?.message;
-  if (!msg) throw new OpsError(`${method} returned nothing.`);
+  if (!msg) throw new OpsError(`${type} returned nothing.`);
   if (msg.error) throw new OpsError(msg.error);
   return msg;
 };
@@ -239,10 +250,10 @@ export const createAnimalEvent = async (
 
   switch (input.eventType) {
     case "Movement":
-      return callOp("create_movement_event", { ...common, new_herd: input.toHerd });
+      return callOp("Movement", { ...common, new_herd: input.toHerd });
 
     case "Service":
-      return callOp("create_service_event", {
+      return callOp("Service", {
         ...common,
         service_type: input.serviceType,
         service_date: common.event_date,
@@ -251,7 +262,7 @@ export const createAnimalEvent = async (
       });
 
     case "Pregnancy Diagnosis":
-      return callOp("create_pregnancy_diagnosis", {
+      return callOp("Pregnancy Diagnosis", {
         ...common,
         diagnosis_date: common.event_date,
         diagnosis_result: input.diagnosisResult,
@@ -264,7 +275,7 @@ export const createAnimalEvent = async (
       // record_birth books the Calving on the dam and creates one Animal per
       // calf. `animal` here is the dam — the calf does not exist yet.
       const stillborn = input.calvingOutcome !== "Live Birth";
-      return callOp("record_birth", {
+      return callOp(input.eventType, {
         dam: input.animal,
         event_date: common.event_date,
         operator: input.operator,
@@ -290,7 +301,7 @@ export const createAnimalEvent = async (
     }
 
     case "Drying Off":
-      return callOp("create_drying_off_event", {
+      return callOp("Drying Off", {
         ...common,
         new_herd: input.toHerd,
         drugs: mapDrugRows(input.drugIssues),
@@ -299,7 +310,7 @@ export const createAnimalEvent = async (
     case "Weight Recording":
       // Not a Livestock Event at all — weighings are their own doctype, which
       // owns the previous-weight / daily-gain columns and the interval guard.
-      return callOp("create_weight_record", {
+      return callOp("Weight Recording", {
         animal: input.animal,
         weight_date: common.event_date,
         measured_by: input.operator,
@@ -317,8 +328,7 @@ export const createAnimalEvent = async (
       // and posts a single issue out of the drug store, stamped with the named
       // Stock Entry Type ("Vaccination", "Deworming") rather than the bare
       // "Material Issue".
-      return callOp("create_husbandry_event", {
-        event_type: input.eventType,
+      return callOp(input.eventType, {
         event_date: common.event_date,
         operator: input.operator,
         animals: input.animals?.length ? input.animals : [input.animal],
@@ -333,10 +343,10 @@ export const createAnimalEvent = async (
       });
 
     case "Heat Detection":
-      return callOp("create_heat_event", common);
+      return callOp("Heat Detection", common);
 
     case "Abortion":
-      return callOp("create_abortion_event", {
+      return callOp("Abortion", {
         ...common,
         abortion_cause: input.abortionCause,
         abortion_notes: input.abortionNotes,

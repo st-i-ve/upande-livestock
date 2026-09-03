@@ -1,6 +1,5 @@
 import { create } from "zustand";
 
-import { DEV_FAKE_SESSION_KEY, DEV_FAKE_USER } from "@/src/auth/devBypass";
 import { getEmployeeForUser } from "@/src/frappe/employee";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
@@ -12,10 +11,6 @@ interface AuthState {
   instanceUrl: string;
   email: string | null;
   fullname: string | null;
-  /** True while the DEV auth bypass is standing in for a real session. */
-  isFakeSession: boolean;
-  /** DEV only — enter the app with no backend session. See devBypass.ts. */
-  devLogin: () => Promise<void>;
   /** Employee record name linked to the logged-in user, if any. Default
    *  operator for Animal Event submissions; can be overridden per form. */
   employeeName: string | null;
@@ -40,17 +35,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   email: null,
   fullname: null,
   employeeName: null,
-  isFakeSession: false,
-
-  devLogin: async () => {
-    await storage.setItem(DEV_FAKE_SESSION_KEY, "1");
-    set({
-      isAuthenticated: true,
-      isFakeSession: true,
-      email: DEV_FAKE_USER.email,
-      fullname: DEV_FAKE_USER.fullname,
-    });
-  },
 
   setEmployeeName: async (name) => {
     if (name) await storage.setItem(STORAGE_KEY_EMPLOYEE, name);
@@ -61,23 +45,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkAuth: async () => {
     set({ isLoading: true });
     try {
-      const [cookie, url, email, fullname, employee, fake] = await Promise.all([
+      const [cookie, url, email, fullname, employee] = await Promise.all([
         storage.getItem(STORAGE_KEYS.COOKIE),
         storage.getItem(STORAGE_KEYS.INSTANCE_URL),
         storage.getItem(STORAGE_KEYS.EMAIL),
         storage.getItem(STORAGE_KEYS.FULLNAME),
         storage.getItem(STORAGE_KEY_EMPLOYEE),
-        storage.getItem(DEV_FAKE_SESSION_KEY),
       ]);
-      // A faked session has no cookie, so it has to be restored explicitly or
-      // every reload would drop back to the login screen.
-      const isFake = __DEV__ && !!fake;
       set({
-        isAuthenticated: !!cookie || isFake,
-        isFakeSession: isFake,
+        isAuthenticated: !!cookie,
         instanceUrl: url || "",
-        email: isFake ? DEV_FAKE_USER.email : email,
-        fullname: isFake ? DEV_FAKE_USER.fullname : fullname,
+        email,
+        fullname,
         employeeName: employee,
       });
     } catch (e) {
@@ -118,15 +97,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    // A faked session has nothing to end server-side, and api.logout() would
-    // only produce a 401 of its own.
-    if (!get().isFakeSession) await api.logout();
-    await storage.removeItem(DEV_FAKE_SESSION_KEY);
+    await api.logout();
     queryClient.clear();
     await storage.removeItem(STORAGE_KEY_EMPLOYEE);
     set({
       isAuthenticated: false,
-      isFakeSession: false,
       email: null,
       fullname: null,
       employeeName: null,
@@ -141,10 +116,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   handleUnauthorized: () => {
-    // Every request under a faked session comes back 401. Honouring them would
-    // bounce straight back to login on the first screen that loads data, which
-    // would make the bypass useless. Swallow them and stay put.
-    if (get().isFakeSession) return;
     queryClient.clear();
     storage
       .multiRemove([STORAGE_KEYS.COOKIE, STORAGE_KEYS.SID, STORAGE_KEYS.FULLNAME])

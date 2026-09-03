@@ -32,7 +32,6 @@ import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useAuthStore } from "@/src/auth/authStore";
-import { DEV_AUTH_BYPASS } from "@/src/auth/devBypass";
 import { extractFrappeError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 
@@ -64,7 +63,6 @@ export default function LoginScreen() {
   const instanceUrl = useAuthStore((st) => st.instanceUrl);
   const storedEmail = useAuthStore((st) => st.email);
   const login = useAuthStore((st) => st.login);
-  const devLogin = useAuthStore((st) => st.devLogin);
 
   // Editable mirror of the stored URL. Persists via the login flow.
   const [url, setUrl] = useState(instanceUrl);
@@ -142,17 +140,6 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (loading) return;
     setError(null);
-    // DEV bypass: straight in, no URL, no credentials, no backend. See
-    // src/auth/devBypass.ts for what this costs you.
-    if (DEV_AUTH_BYPASS) {
-      setLoading(true);
-      try {
-        await devLogin();
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
     if (!url.trim()) {
       // Surface the hidden field so the user can supply the missing URL.
       revealUrl();
@@ -322,17 +309,7 @@ export default function LoginScreen() {
                   </View>
                 ) : null}
 
-                <Button
-                  label={DEV_AUTH_BYPASS ? "Login (dev — no backend)" : "Login"}
-                  onPress={handleLogin}
-                  loading={loading}
-                />
-                {DEV_AUTH_BYPASS ? (
-                  <Text style={s.devNotice}>
-                    Auth bypassed for testing. No Frappe session, so animals and
-                    livestock events will not load or submit.
-                  </Text>
-                ) : null}
+                <Button label="Login" onPress={handleLogin} loading={loading} />
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -354,13 +331,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     container: { flex: 1 },
     scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingTop: 40 },
     content: { width: FIELD_WIDTH, alignSelf: "center" },
-    devNotice: {
-      marginTop: 10,
-      fontSize: 11,
-      lineHeight: 15,
-      textAlign: "center",
-      color: c.textMuted,
-    },
     header: { alignItems: "center", marginBottom: 40 },
     logoBox: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
     // Instance status: a solid dot with an expanding radar-ping ripple,
