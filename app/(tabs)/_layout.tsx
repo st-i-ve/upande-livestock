@@ -21,7 +21,7 @@ function RecordTabButton(props: BottomTabBarButtonProps) {
       onPress={props.onPress}
       onLongPress={props.onLongPress}
       accessibilityRole="button"
-      accessibilityLabel="Record"
+      accessibilityLabel="Log a livestock event"
       accessibilityState={{ selected }}
       android_ripple={null}
       style={s.recordCell}
@@ -60,15 +60,6 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "home" : "home-outline"} size={ICON_SIZE} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="animals"
         options={{
           title: "Animals",
@@ -82,25 +73,6 @@ export default function TabLayout() {
         options={{
           tabBarLabel: () => null,
           tabBarButton: (props) => <RecordTabButton {...props} />,
-        }}
-      />
-      <Tabs.Screen
-        name="alerts"
-        options={{
-          title: "Alerts",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "bell" : "bell-outline"} size={ICON_SIZE} color={color} />
-          ),
-          tabBarBadge: 5,
-          tabBarBadgeStyle: {
-            backgroundColor: c.danger,
-            color: "#fff",
-            fontSize: 10,
-            fontWeight: "600",
-            minWidth: 16,
-            height: 16,
-            lineHeight: 16,
-          },
         }}
       />
       <Tabs.Screen

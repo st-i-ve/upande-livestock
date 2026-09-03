@@ -45,7 +45,8 @@ function navTheme(dark: boolean) {
 }
 
 // Always start in the (auth) group so we never flash protected content before
-// checkAuth resolves. The AuthGate redirects to (tabs) if a session exists.
+// checkAuth resolves. The AuthGate redirects to the Animals tab if a session
+// exists — there is no tabs index route to land on.
 export const unstable_settings = { anchor: "(auth)" };
 
 function AuthGate() {
@@ -60,7 +61,7 @@ function AuthGate() {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/animals");
     }
   }, [isAuthenticated, isLoading, segments, router]);
 

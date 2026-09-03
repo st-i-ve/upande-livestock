@@ -22,7 +22,6 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     { icon: "heart", label: "Service / AI", href: "/(tabs)/record/events/service" },
     { icon: "clipboard-check", label: "Pregnancy diagnosis", href: "/(tabs)/record/events/pd" },
     { icon: "baby-bottle-outline", label: "Calving", href: "/(tabs)/record/events/calving" },
-    { icon: "stethoscope", label: "New health case", href: "/(tabs)/record/cases/new" },
   ]},
   { title: "Husbandry", items: [
     { icon: "scale", label: "Weight recording", href: "/(tabs)/record/events/weight" },
@@ -31,20 +30,13 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     { icon: "tools", label: "Hoof trimming", href: "/(tabs)/record/events/hoof" },
     { icon: "water-off", label: "Drying off", href: "/(tabs)/record/events/dryoff" },
   ]},
-  { title: "End of life", items: [
-    { icon: "cash", label: "Sell animal", href: "/(tabs)/record/sales/new" },
-    { icon: "delete-outline", label: "Cull / death", href: "/(tabs)/record/culls/new" },
-  ]},
-  { title: "Animals", items: [
-    { icon: "cow", label: "Add purchased animal", href: "/(tabs)/record/animals/new" },
-  ]},
 ];
 
 export default function Record() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   return (
-    <Screen title="Record an event" subtitle="Pick what you observed or did">
+    <Screen title="Livestock events" subtitle="Pick what you observed or did">
       {SECTIONS.map((sec) => (
         <View key={sec.title}>
           <SectionTitle>{sec.title}</SectionTitle>
