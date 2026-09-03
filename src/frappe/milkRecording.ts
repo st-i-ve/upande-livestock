@@ -1,13 +1,13 @@
 import type { DailyMilkRow, Herd } from "@/types";
-import { frappeCreateAndSubmit, getClient, todayISO } from "@/src/services/api";
+import { getClient, todayISO } from "@/src/services/api";
 
 export { todayISO };
 
-export type MilkSession = "AM — Morning" | "PM — Afternoon" | "Evening";
 
 export type CreateMilkRecordingInput = {
   herd: string;
-  session: MilkSession;
+  /** `HH:MM` on the farm's clock. Omitted means "now", decided by the server. */
+  milkingTime?: string;
   recordingDate?: string;       // ISO; default today
   company?: string;             // optional override
   totalYieldKg: number;
@@ -23,11 +23,19 @@ export type CreateMilkRecordingInput = {
 };
 
 /**
- * Create + submit a Milk Recording. The After Submit server script
- * ("Milk Recording After Submit - Stock Entry") auto-creates the Milking
- * Stock Entry — setting `custom_milking_session` and `custom_cows_milked`
- * from this doc's `session` / `cows_milked` — plus a best-effort revenue JE
- * (see livestock_server_scripts §4).
+ * Record a milking through the server's own endpoint.
+ *
+ * This used to insert the document directly, sending an AM/PM `session`. That
+ * field no longer exists — the backend replaced it with a mandatory
+ * `milking_time` (patches/migrate_milking_session_to_time), because a farm can
+ * milk more than twice a day and three fixed labels could not say so. The
+ * insert therefore failed every time with "Value missing for Milk Recording:
+ * Milking Time".
+ *
+ * create_milk_recording defaults `milking_time` to the server clock when none
+ * is sent, derives the net yield and revenue, and posts the Milking Stock Entry
+ * and revenue Journal Entry. A raw insert reproduces none of that, and is not
+ * permission-checked.
  */
 export const createMilkRecording = async (
   input: CreateMilkRecordingInput,
@@ -43,7 +51,7 @@ export const createMilkRecording = async (
 
   const body: Record<string, any> = {
     herd: input.herd,
-    session: input.session,
+    ...(input.milkingTime ? { milking_time: input.milkingTime } : {}),
     recording_date: input.recordingDate || todayISO(),
     total_yield_kg: total,
     discarded_kg: discarded,
@@ -61,13 +69,22 @@ export const createMilkRecording = async (
   if (input.operator) body.operator = input.operator;
   if (input.remarks) body.remarks = input.remarks;
 
-  return frappeCreateAndSubmit("Milk Recording", body);
+  const client = await getClient();
+  const res = await client.post(
+    "/api/method/upande_livestock.serverscripts.mobile.record_milking.record_milking",
+    { payload: body },
+  );
+  const msg = res.data?.message;
+  if (!msg) throw new Error("Milk recording returned nothing.");
+  if (msg.error) throw new Error(msg.error);
+  return msg;
 };
 
 export const MILK_LIST_FIELDS = [
   "name",
   "herd",
-  "session",
+  // `session` used to be here. Reading it back now returns nothing.
+  "milking_time",
   "recording_date",
   "net_yield_kg",
   "cows_milked",
@@ -76,7 +93,8 @@ export const MILK_LIST_FIELDS = [
 export type MilkRecordingRow = {
   name: string;
   herd: string;
-  session: string;
+  /** `HH:MM:SS` on the farm's clock. */
+  milkingTime: string;
   recordingDate: string;
   netYieldKg: number;
   cowsMilked: number;
@@ -85,7 +103,7 @@ export type MilkRecordingRow = {
 const mapRow = (row: any): MilkRecordingRow => ({
   name: row.name,
   herd: row.herd ?? "",
-  session: row.session ?? "",
+  milkingTime: row.milking_time ?? "",
   recordingDate: row.recording_date ?? "",
   netYieldKg: Number(row.net_yield_kg ?? 0),
   cowsMilked: Number(row.cows_milked ?? 0),
@@ -139,11 +157,12 @@ export const getMilkRecordingsBetween = async (
   }));
 };
 
-const sessionBucket = (session: string): "am" | "pm" | "other" => {
-  const s = session.toLowerCase();
-  if (s.includes("am") || s.includes("morning")) return "am";
-  if (s.includes("pm") || s.includes("afternoon") || s.includes("evening")) return "pm";
-  return "other";
+/** Which half of the day a milking falls in, off the clock rather than a label.
+ *  "Evening" bucketed as pm before, and anything from noon still does. */
+const timeBucket = (milkingTime: string): "am" | "pm" | "other" => {
+  const hour = Number(milkingTime.split(":")[0]);
+  if (!Number.isFinite(hour)) return "other";
+  return hour < 12 ? "am" : "pm";
 };
 
 /**
@@ -158,7 +177,7 @@ export const mapTodaysMilkByHerd = (
   const sums: Record<string, { am: number | null; pm: number | null }> = {};
 
   for (const r of rows) {
-    const bucket = sessionBucket(r.session);
+    const bucket = timeBucket(r.milkingTime);
     if (bucket === "other") continue;
     if (!sums[r.herd]) sums[r.herd] = { am: null, pm: null };
     const slot = sums[r.herd];

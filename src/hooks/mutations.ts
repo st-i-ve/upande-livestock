@@ -94,7 +94,7 @@ const tryDirectOrEnqueue = async <T extends object>(
 
 const labelEvent = (i: AnimalEventInput): string => `${i.eventType} · ${i.animal}`;
 const labelMilk = (i: CreateMilkRecordingInput): string =>
-  `Milk · ${i.herd} · ${i.session}`;
+  `Milk · ${i.herd}${i.milkingTime ? ` · ${i.milkingTime}` : ""}`;
 const labelDisposal = (i: CreateAnimalDisposalInput): string =>
   `${i.disposalType} · ${i.animalName || i.animal}`;
 const labelAnimal = (i: CreateAnimalInput): string =>
