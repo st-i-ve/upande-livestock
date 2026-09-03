@@ -69,8 +69,8 @@ export default function Profile() {
   const pending = usePendingCount();
   const online = useNetworkStatus();
 
-  const displayName = fullname || APP.user;
-  const subtitle = email || APP.farm;
+  const displayName = fullname || email || "Signed in";
+  const subtitle = email ?? "";
 
   const [confirmLogout, setConfirmLogout] = useState(false);
 
@@ -93,8 +93,9 @@ export default function Profile() {
           </View>
           <View style={{ marginLeft: 20, flex: 1, justifyContent: "center" }}>
             <Text style={s.name} numberOfLines={1}>{displayName}</Text>
-            <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
-            <Text style={s.caption} numberOfLines={1}>{APP.farm}</Text>
+            {subtitle ? (
+              <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
+            ) : null}
           </View>
         </View>
 

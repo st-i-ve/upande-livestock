@@ -8,7 +8,6 @@ import { TimeField, toHHMM, toISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { APP } from "@/constants/theme";
 import type { MilkSession } from "@/src/frappe/milkRecording";
 import { useColors } from "@/src/hooks/useColors";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
@@ -75,7 +74,11 @@ export default function Milk() {
         recordingDate: date,
         totalYieldKg: kg,
         cowsMilked: herdDoc?.cnt || undefined,
-        pricePerKg: APP.milkPriceKES,
+        // No pricePerKg: the Milk Recording server script pulls it from
+        // Livestock Settings (custom_milk_price_per_kg). Sending a copy from
+        // the handset would override the real figure with whatever was
+        // hardcoded when the build shipped — and price feeds milk_revenue,
+        // which posts a Journal Entry.
         remarks: remarks.trim() || undefined,
       });
       router.replace("/(tabs)/record/success?name=Milk recording");

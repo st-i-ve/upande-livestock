@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -12,7 +12,8 @@ import { Picker } from "@/components/Picker";
 import { ScoreRow } from "@/components/ScoreRow";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { APP, RADIUS } from "@/constants/theme";
+import { RADIUS } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { DiagnosisAction } from "@/src/frappe/animalDiagnosis";
@@ -51,7 +52,12 @@ export default function Diagnosis() {
   const mutation = useCreateAnimalDiagnosis();
 
   // Free-text fields that map directly into Animal Diagnosis.
-  const [examiner, setExaminer] = useState<string>(APP.user);
+  // Defaults to whoever is signed in; editable when somebody else examined.
+  const signedInName = useAuthStore((st) => st.fullname);
+  const [examiner, setExaminer] = useState<string>("");
+  useEffect(() => {
+    if (signedInName && !examiner) setExaminer(signedInName);
+  }, [signedInName]); // eslint-disable-line react-hooks/exhaustive-deps
   const [weight, setWeight] = useState("");
   const [temp, setTemp] = useState("");
   const [hr, setHr] = useState("");
@@ -351,7 +357,7 @@ export default function Diagnosis() {
               .filter((c) => c.label.trim() || c.value.trim())
               .map((c) => `${c.label.trim() || "Custom"}: ${c.value.trim()}`),
             weight ? `Weight: ${weight} kg` : null,
-            examiner !== APP.user ? `Examiner: ${examiner}` : null,
+            examiner && examiner !== signedInName ? `Examiner: ${examiner}` : null,
             condition !== "(specify)" ? `Specific condition: ${condition}` : null,
             isolation === "Yes" ? "Isolation required: Yes" : null,
           ]
