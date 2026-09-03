@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { DateField, toISODate } from "@/components/DateTimeField";
+import { TimeField, toHHMM, toISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
@@ -18,12 +18,13 @@ import { extractFrappeError } from "@/src/services/api";
 
 /**
  * `session` is `reqd: 1` on the Milk Recording DocType and the After Submit
- * script stamps it onto the generated Stock Entry, so it cannot simply be
- * dropped from the form. It is derived from the clock instead of asked for:
- * milk is recorded at the parlour, right after milking.
+ * script stamps it onto the generated Stock Entry, so it cannot be dropped
+ * from the payload. Nobody at the parlour thinks in AM/PM though — they know
+ * what time they milked. The time is what gets asked for; the session is read
+ * off it.
  */
-const sessionForNow = (now: Date): MilkSession => {
-  const h = now.getHours();
+const sessionForTime = (hhmm: string): MilkSession => {
+  const h = Number(hhmm.split(":")[0]) || 0;
   if (h < 12) return "AM — Morning";
   if (h < 17) return "PM — Afternoon";
   return "Evening";
@@ -49,12 +50,15 @@ export default function Milk() {
   }, [eligibility, herds]);
 
   const [herd, setHerd] = useState("");
-  const [date, setDate] = useState(() => toISODate(new Date()));
+  // The date is not asked for: milk is recorded at the parlour, for the
+  // milking that just happened.
+  const [date] = useState(() => toISODate(new Date()));
+  const [time, setTime] = useState(() => toHHMM(new Date()));
   const [totalKg, setTotalKg] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const session = sessionForNow(new Date());
+  const session = sessionForTime(time);
   const kg = Number(totalKg) || 0;
   const canSubmit = !!herd && kg > 0 && !mutation.isPending;
 
@@ -96,8 +100,8 @@ export default function Milk() {
         )}
       </Field>
 
-      <Field label="Date">
-        <DateField value={date} onChange={setDate} maximumDate={new Date()} />
+      <Field label="Time of milking">
+        <TimeField value={time} onChange={setTime} />
       </Field>
 
       <Field label="Total yield (kg)">
