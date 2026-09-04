@@ -517,7 +517,9 @@ function DrugRows({
       }
     >
       {rows.length === 0 ? (
-        <Text style={s.drugEmpty}>No drug rows. Tap "Add drug" if any drug was used.</Text>
+        <Text style={s.drugEmpty}>
+          No drug rows. Tap &quot;Add drug&quot; if any drug was used.
+        </Text>
       ) : null}
       {rows.map((r) => (
         <View key={r.id} style={s.drugBox}>
