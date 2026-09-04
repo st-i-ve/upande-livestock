@@ -81,61 +81,6 @@ export const toHHMM = (d: Date): string => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-const fromHHMM = (hhmm: string): Date => {
-  const [h, m] = hhmm.split(":").map(Number);
-  const d = new Date();
-  d.setHours(h ?? 0, m ?? 0, 0, 0);
-  return d;
-};
-
-const TIME_LABEL = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-export function TimeField({
-  value,
-  onChange,
-}: {
-  /** `HH:mm`, 24-hour. */
-  value: string;
-  onChange: (hhmm: string) => void;
-}) {
-  const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
-  const [open, setOpen] = useState(false);
-
-  const handle = (event: DateTimePickerEvent, picked?: Date) => {
-    setOpen(false);
-    if (event.type === "dismissed" || !picked) return;
-    onChange(toHHMM(picked));
-  };
-
-  return (
-    <>
-      <Pressable
-        onPress={() => setOpen(true)}
-        style={({ pressed }) => [s.box, pressed && { backgroundColor: c.bgMuted }]}
-      >
-        <Text style={s.value}>{TIME_LABEL.format(fromHHMM(value))}</Text>
-        <MaterialCommunityIcons name="clock-outline" size={18} color={c.textMuted} />
-      </Pressable>
-      {open ? (
-        <DateTimePicker
-          value={fromHHMM(value)}
-          mode="time"
-          is24Hour
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={handle}
-          themeVariant={c.bg === "#FFFFFF" ? "light" : "dark"}
-          accentColor={c.text}
-        />
-      ) : null}
-    </>
-  );
-}
-
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     box: {

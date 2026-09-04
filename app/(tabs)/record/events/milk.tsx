@@ -4,7 +4,8 @@ import { StyleSheet, Text } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { TimeField, toHHMM, toISODate } from "@/components/DateTimeField";
+import { toHHMM, toISODate } from "@/components/DateTimeField";
+import { TimeCounter } from "@/components/TimeCounter";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
@@ -88,7 +89,7 @@ export default function Milk() {
       </Field>
 
       <Field label="Time of milking">
-        <TimeField value={time} onChange={setTime} />
+        <TimeCounter value={time} onChange={setTime} />
       </Field>
 
       <Field label="Total yield (kg)">
