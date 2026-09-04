@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/images/upande_logo_no_bg.png",
     "scheme": "upandelivestock",
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/0640a515-d7f3-4710-a550-8cf6b8934b7e"
+    },
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
     "newArchEnabled": true,
