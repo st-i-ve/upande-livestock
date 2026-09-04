@@ -82,14 +82,6 @@ export default function GenericEvent() {
 
   const submitting = eventMutation.isPending || batchMutation.isPending;
 
-  if (!spec) {
-    return (
-      <Screen title="Unknown event" back>
-        <Banner tone="warning">No form configured for &quot;{type}&quot;.</Banner>
-      </Screen>
-    );
-  }
-
   const filledDrugRows = useMemo(
     () => drugs.filter((d) => d.itemCode.trim() && Number(d.qty) > 0),
     [drugs],
@@ -120,6 +112,21 @@ export default function GenericEvent() {
       return total;
     },
   });
+
+  // Guard below every hook, never between them. This one screen serves six
+  // event types off a single `[type]` route, so expo-router keeps the same
+  // component mounted when only the param changes, and a deep link can arrive
+  // with a type that has no spec. Returning early up where `spec` is read meant
+  // a valid type rendered two hooks that an unknown one did not, and React
+  // matches hooks by call order: going from one to the other threw "rendered
+  // fewer hooks than expected" rather than showing this banner.
+  if (!spec) {
+    return (
+      <Screen title="Unknown event" back>
+        <Banner tone="warning">No form configured for &quot;{type}&quot;.</Banner>
+      </Screen>
+    );
+  }
 
   const handleSubmit = async () => {
     setError(null);
