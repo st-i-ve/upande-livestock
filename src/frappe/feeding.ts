@@ -18,7 +18,7 @@ const RECORD_FEEDING =
   "upande_livestock.serverscripts.mobile.record_feeding.record_feeding";
 
 const callMethod = async <T = any>(
-  action: "info" | "manufacture" | "issue",
+  action: "info" | "day" | "manufacture" | "issue",
   args: Record<string, any>,
 ): Promise<T> => {
   const client = await getClient();
@@ -96,11 +96,57 @@ export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
   };
 };
 
-/** Stage A — manufacture the herd's TMR into the feed store. */
-export const manufactureHerdFeed = (herd: string): Promise<ManufactureResult> =>
-  callMethod("manufacture", { herd });
+/** How much of today's ration this herd has had, and what is still owed.
+ *
+ *  The farm feeds twice a day, so "what does this herd need" is not the
+ *  question at the parlour — "what is owed now" is. Read from what was issued,
+ *  so a run someone entered by hand counts too. */
+export type FeedDayStatus = {
+  herd: string;
+  heads: number;
+  runsPerDay: number;
+  dayKg: number;
+  issuedKg: number;
+  remainingKg: number;
+  runsDone: number;
+  suggestedPortion: number;
+  complete: boolean;
+};
 
-/** Stage B — issue `qty` of the manufactured feed to the herd (Material Issue). */
+export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => {
+  const m = await callMethod<any>("day", { herd });
+  return {
+    herd: m.herd,
+    heads: Number(m.heads ?? 0),
+    runsPerDay: Number(m.runs_per_day ?? 2),
+    dayKg: Number(m.day_kg ?? 0),
+    issuedKg: Number(m.issued_kg ?? 0),
+    remainingKg: Number(m.remaining_kg ?? 0),
+    runsDone: Number(m.runs_done ?? 0),
+    suggestedPortion: Number(m.suggested_portion ?? 1),
+    complete: !!m.complete,
+  };
+};
+
+/** Stage A — mix the herd's TMR and issue it, all in one.
+ *
+ *  `portion` is the fraction of the day this run covers: the farm feeds twice,
+ *  so 0.5 twice makes a day. Take it from `getFeedDayStatus` rather than
+ *  assuming a half — a herd already fed once is owed the remainder. */
+export const manufactureHerdFeed = (
+  herd: string,
+  portion = 1,
+): Promise<ManufactureResult> => callMethod("manufacture", { herd, portion });
+
+/** Issue `qty` of feed already sitting in the store, without mixing.
+ *
+ *  No screen calls this, and one should think before adding one:
+ *  `manufactureHerdFeed` already issues everything it mixes, so calling this
+ *  after it feeds the herd a second time out of whatever else the store holds.
+ *  That was a real bug on the feeding screen, which ran the two as stages.
+ *
+ *  It remains because the endpoint does — a store balance left over from
+ *  before mixing-and-feeding became one action still has to be issuable. */
 export const feedHerd = (
   herd: string,
   qty: number,
