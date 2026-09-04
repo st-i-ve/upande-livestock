@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
+import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
 import { usePendingCount } from "@/src/hooks/useQueueStatus";
 
 type RowProps = {
@@ -58,6 +60,25 @@ const runtimeVersion =
   (Constants.expoConfig as any)?.runtimeVersion ||
   (Constants as any).manifest?.runtimeVersion ||
   null;
+// One row, one label per stage — a separate status line under it would be one
+// more thing to read on a screen used one-handed.
+const OTA_LABEL: Record<import("@/src/hooks/useOtaUpdate").OtaStage, string> = {
+  idle: "Check for updates",
+  checking: "Checking…",
+  none: "Check for updates",
+  available: "Update available",
+  downloading: "Downloading…",
+  ready: "Restart to finish",
+  error: "Check for updates",
+};
+
+const OTA_DIALOG: import("@/src/hooks/useOtaUpdate").OtaStage[] = [
+  "available",
+  "ready",
+  "none",
+  "error",
+];
+
 const runtimeLabel = runtimeVersion ? `Runtime ${runtimeVersion}` : "Runtime embedded";
 
 export default function Profile() {
@@ -68,6 +89,7 @@ export default function Profile() {
   const logout = useAuthStore((s) => s.logout);
   const pending = usePendingCount();
   const online = useNetworkStatus();
+  const ota = useOtaUpdate();
 
   const displayName = fullname || email || "Signed in";
   const subtitle = email ?? "";
@@ -113,6 +135,19 @@ export default function Profile() {
             }
           />
 
+          <Row
+            icon="cloud-download-outline"
+            label={OTA_LABEL[ota.stage]}
+            onPress={ota.stage === "checking" || ota.stage === "downloading" ? undefined : ota.check}
+            right={
+              ota.stage === "checking" || ota.stage === "downloading" ? (
+                <ActivityIndicator size="small" color={c.textMuted} />
+              ) : (
+                <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
+              )
+            }
+          />
+
           <View style={s.divider} />
 
           <Row icon="logout" label="Logout" onPress={() => setConfirmLogout(true)} destructive />
@@ -123,6 +158,43 @@ export default function Profile() {
           <Text style={s.versionText}>{runtimeLabel}</Text>
         </Pressable>
       </ScrollView>
+
+      {/* Only the settled stages get a dialog; checking and downloading show a
+          spinner on the row instead, so a slow network never traps the screen
+          behind a modal. Every stage has two real actions, because ConfirmModal
+          always renders both buttons and an "OK / Cancel" pair that do the same
+          thing is worse than giving the second one a job. */}
+      <ConfirmModal
+        visible={OTA_DIALOG.includes(ota.stage)}
+        title={
+          ota.stage === "available"
+            ? "Update available"
+            : ota.stage === "ready"
+              ? "Update downloaded"
+              : ota.stage === "none"
+                ? "Up to date"
+                : "Could not check"
+        }
+        message={ota.message}
+        cancelLabel={ota.stage === "ready" ? "Later" : ota.stage === "available" ? "Not now" : "Close"}
+        confirmLabel={
+          ota.stage === "available"
+            ? "Download"
+            : ota.stage === "ready"
+              ? "Restart now"
+              : ota.stage === "none"
+                ? "Check again"
+                : "Retry"
+        }
+        onCancel={ota.reset}
+        onConfirm={
+          ota.stage === "available"
+            ? ota.download
+            : ota.stage === "ready"
+              ? ota.apply
+              : ota.check
+        }
+      />
 
       <ConfirmModal
         visible={confirmLogout}
