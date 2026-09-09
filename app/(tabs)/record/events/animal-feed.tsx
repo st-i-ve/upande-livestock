@@ -1,7 +1,7 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, PanResponder, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { BACKDATE_AMBER_DARK, BACKDATE_AMBER_LIGHT } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
@@ -17,6 +17,7 @@ import { Loader } from "@/components/Loader";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
+import { Switch } from "@/components/Switch";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
@@ -106,28 +107,16 @@ export default function AnimalFeed() {
 }
 
 /** Half a day's ration, or the whole day — the only two amounts a run is ever
- *  posted for. A slider (not a segmented control) because the ask was
- *  specifically a slider; it only ever rests on one of these two stops, so
- *  there is no third, in-between value to worry about downstream. */
+ *  posted for. */
 type Portion = 0.5 | 1;
 
-/** Two-stop slider: "Half day" at the left, "Full day" at the right, nothing
- *  in between. Built from `PanResponder` + `Animated` rather than pulled in
- *  from `@react-native-community/slider` — that library is a continuous
- *  control (track fills, draggable to any point, optional step) built for
- *  choosing among a range of values, and none of that fits a control that
- *  only ever has two valid states. A native dependency also means every
- *  device needs a fresh build before it can render at all, which cannot be
- *  checked from here (no simulator or device attached to this session); a
- *  same file, JS-only control has none of that risk and is exactly as much
- *  code as the two stops need.
- *
- *  Dragging or tapping anywhere in the track moves the thumb toward the
- *  finger; release commits to whichever half the thumb ended up in. Because
- *  there are only two valid values, the control never reports a value
- *  in-between — it settles on 0.5 or 1 the instant a gesture ends, which is
- *  what the "This run" quantity below re-renders from. */
-function PortionSlider({
+/** Off = Half day, On = Full day — the fuller state is the "on" one. A bare
+ *  switch does not say which side is which, so both states are labelled
+ *  either side of the track, with the active one emphasised; the number
+ *  itself (0.5 / 1) never appears in the UI, only these words. Built on the
+ *  same `Switch` primitive as the profile's light/dark toggle — same
+ *  construction, no new native module. */
+function PortionSwitch({
   value,
   onChange,
   colors,
@@ -136,96 +125,28 @@ function PortionSlider({
   onChange: (v: Portion) => void;
   colors: ReturnType<typeof useColors>;
 }) {
-  const s = useMemo(() => makeSliderStyles(colors), [colors]);
-  const [trackWidth, setTrackWidth] = useState(0);
-  const half = Math.max(0, (trackWidth - PORTION_SLIDER_INSET * 2) / 2);
-  const thumbX = useRef(new Animated.Value(0)).current;
-
-  // Snap to the committed value whenever it changes from outside a gesture —
-  // the initial seed from the server's suggestion, or the track's first
-  // measurement (before which `half` is 0 and the spring below is a no-op).
-  useEffect(() => {
-    Animated.spring(thumbX, {
-      toValue: value === 1 ? half : 0,
-      useNativeDriver: true,
-      bounciness: 4,
-    }).start();
-  }, [value, half, thumbX]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (evt) => {
-        // `locationX` is the touch's current position relative to this
-        // track, recomputed on every move — tap or drag alike, it is just
-        // "where the finger is right now."
-        const leftEdge = clamp(evt.nativeEvent.locationX - half / 2, 0, half);
-        thumbX.setValue(leftEdge);
-      },
-      onPanResponderRelease: (evt) => {
-        const leftEdge = clamp(evt.nativeEvent.locationX - half / 2, 0, half);
-        const next: Portion = leftEdge > half / 2 ? 1 : 0.5;
-        onChange(next);
-        Animated.spring(thumbX, {
-          toValue: next === 1 ? half : 0,
-          useNativeDriver: true,
-          bounciness: 4,
-        }).start();
-      },
-    }),
-  ).current;
+  const s = useMemo(() => makePortionSwitchStyles(colors), [colors]);
+  const full = value === 1;
 
   return (
-    <View
-      style={s.track}
-      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-      accessibilityRole="adjustable"
-      accessibilityLabel="Portion for this run"
-      accessibilityValue={{ text: value === 1 ? "Full day" : "Half day" }}
-      {...panResponder.panHandlers}
-    >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          s.thumb,
-          { width: half, transform: [{ translateX: thumbX }] },
-        ]}
+    <View style={s.row}>
+      <Text style={[s.label, !full && s.labelActive]}>Half day</Text>
+      <Switch
+        checked={full}
+        onChange={(next) => onChange(next ? 1 : 0.5)}
+        accessibilityLabel="Portion for this run: half day or full day"
+        icon={full ? "circle" : "circle-half-full"}
       />
-      <View style={s.half} pointerEvents="none">
-        <Text style={[s.label, value === 0.5 && s.labelActive]}>Half day</Text>
-      </View>
-      <View style={s.half} pointerEvents="none">
-        <Text style={[s.label, value === 1 && s.labelActive]}>Full day</Text>
-      </View>
+      <Text style={[s.label, full && s.labelActive]}>Full day</Text>
     </View>
   );
 }
 
-const PORTION_SLIDER_INSET = 3;
-const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-
-const makeSliderStyles = (c: ReturnType<typeof useColors>) =>
+const makePortionSwitchStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    track: {
-      flexDirection: "row",
-      height: 46,
-      borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: c.border,
-      backgroundColor: c.bgMuted,
-      padding: PORTION_SLIDER_INSET,
-    },
-    thumb: {
-      position: "absolute",
-      top: PORTION_SLIDER_INSET,
-      bottom: PORTION_SLIDER_INSET,
-      left: PORTION_SLIDER_INSET,
-      borderRadius: 999,
-      backgroundColor: c.primary,
-    },
-    half: { flex: 1, alignItems: "center", justifyContent: "center" },
-    label: { fontSize: 13, color: c.textMuted, fontFamily: FONT_FAMILY.medium },
-    labelActive: { color: c.bg },
+    row: { flexDirection: "row", alignItems: "center", gap: 10 },
+    label: { fontSize: 13, color: c.textSubtle, fontFamily: FONT_FAMILY.medium },
+    labelActive: { color: c.text, fontFamily: FONT_FAMILY.semibold },
   });
 
 /** The normal path: the herd's own BOM and head count, run for a fraction of
@@ -308,9 +229,9 @@ function SystemTab({ herd }: { herd: string }) {
 
       <Field
         label="This run"
-        help="Half is offered because the farm feeds twice; slide to Full day if this run covers the whole day instead."
+        help="Half is offered because the farm feeds twice; switch to Full day if this run covers the whole day instead."
       >
-        <PortionSlider value={portion ?? 1} onChange={setPortion} colors={c} />
+        <PortionSwitch value={portion ?? 1} onChange={setPortion} colors={c} />
       </Field>
 
       <Field label="Date fed">
