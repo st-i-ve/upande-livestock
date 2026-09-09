@@ -18,14 +18,20 @@ const RECORD_FEEDING =
   "upande_livestock.serverscripts.mobile.record_feeding.record_feeding";
 
 const callMethod = async <T = any>(
-  action: "info" | "day" | "manufacture" | "issue",
+  action: "info" | "day" | "manufacture" | "issue" | "manual",
   args: Record<string, any>,
 ): Promise<T> => {
   const client = await getClient();
   const res = await client.post(`/api/method/${RECORD_FEEDING}`, {
     payload: { action, ...args },
   });
-  return (res.data?.message ?? res.data) as T;
+  const message = res.data?.message ?? res.data;
+  // The server answers a refusal (e.g. a backdated run the store could not
+  // have covered) with `{error: "..."}` in the body rather than raising, so it
+  // survives the desk's HTML blocks verbatim. Without this check that message
+  // never surfaces here — the caller gets a 200 that looks like a result.
+  if (message?.error) throw new Error(message.error);
+  return message as T;
 };
 
 export type FeedBreakdownRow = {
@@ -132,11 +138,16 @@ export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => 
  *
  *  `portion` is the fraction of the day this run covers: the farm feeds twice,
  *  so 0.5 twice makes a day. Take it from `getFeedDayStatus` rather than
- *  assuming a half — a herd already fed once is owed the remainder. */
+ *  assuming a half — a herd already fed once is owed the remainder.
+ *
+ *  `postingDate` backdates the whole run. The server refuses it if the store
+ *  could not have covered it that day, and says which day would work. */
 export const manufactureHerdFeed = (
   herd: string,
   portion = 1,
-): Promise<ManufactureResult> => callMethod("manufacture", { herd, portion });
+  postingDate?: string,
+): Promise<ManufactureResult> =>
+  callMethod("manufacture", { herd, portion, posting_date: postingDate });
 
 /** Issue `qty` of feed already sitting in the store, without mixing.
  *
