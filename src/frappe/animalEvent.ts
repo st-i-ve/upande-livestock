@@ -187,10 +187,12 @@ export const getRecentEvents = async (params?: {
   eventType?: AnimalEventType;
   since?: string;
   limit?: number;
+  animal?: string;
 }): Promise<EventListRow[]> => {
   const filters: [string, string, any][] = [["docstatus", "=", 1]];
   if (params?.eventType) filters.push(["event_type", "=", params.eventType]);
   if (params?.since) filters.push(["event_date", ">=", params.since]);
+  if (params?.animal) filters.push(["animal", "=", params.animal]);
   const rows = await listDocuments({
     doctype: "Livestock Event",
     fields: EVENT_LIST_FIELDS,

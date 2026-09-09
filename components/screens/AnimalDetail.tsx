@@ -13,24 +13,39 @@ import { Timeline } from "@/components/Timeline";
 import { ageMonths } from "@/services/utils";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimal } from "@/src/hooks/useAnimal";
+import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
+import type { TimelineEvent } from "@/components/Timeline";
 
 export function AnimalDetail({ id }: { id: string }) {
   const { data: a, isLoading, isRefetching, error, refetch } = useAnimal(id);
+  const {
+    data: events,
+    isLoading: eventsLoading,
+    error: eventsError,
+    refetch: refetchEvents,
+  } = useAnimalEvents(id);
 
-  // Build the timeline from the weight history child table — every other
-  // event source still lives in mock data and will be wired in sub-project #2.
-  const timeline = useMemo(() => {
-    if (!a) return [];
-    return a.weightHistory
-      .slice()
-      .reverse()
-      .slice(0, 8)
-      .map((w) => ({
-        date: w.recordingDate,
-        title: `Weight: ${w.weightKg} kg`,
-        desc: `BCS ${w.bcs || "—"}${w.dailyGainG ? ` · gain ${w.dailyGainG} g/day` : ""}`,
-      }));
-  }, [a]);
+  // Timeline is built from Livestock Event — the doctype every submitted
+  // event (movement, service, diagnosis, calving, vaccination, ...) lands in.
+  // Weighings are a separate doctype and Animal.weight_history does not exist
+  // on the server, so neither feeds this list.
+  const timeline: TimelineEvent[] = useMemo(() => {
+    if (!events) return [];
+    return events.map((e) => ({
+      date: e.eventDate,
+      title: e.eventType,
+      desc:
+        e.diagnosisResult != null
+          ? `Result: ${e.diagnosisResult}`
+          : e.newHerd
+            ? `New herd: ${e.newHerd}`
+            : e.currentHerd
+              ? `Herd: ${e.currentHerd}`
+              : undefined,
+      isBackdated: e.isBackdated || undefined,
+      feedMode: e.feedMode,
+    }));
+  }, [events]);
 
   if (isLoading) {
     return (
@@ -115,11 +130,18 @@ export function AnimalDetail({ id }: { id: string }) {
         )}
       </TileGrid>
 
-      <SectionTitle>Weight history</SectionTitle>
-      {timeline.length ? (
+      <SectionTitle>History</SectionTitle>
+      {eventsLoading ? (
+        <Loader />
+      ) : eventsError ? (
+        <ErrorState
+          text={extractFrappeError(eventsError)}
+          onRetry={() => refetchEvents()}
+        />
+      ) : timeline.length ? (
         <Timeline events={timeline} />
       ) : (
-        <Banner tone="info">No weight records yet.</Banner>
+        <Banner tone="info">No recorded events yet.</Banner>
       )}
 
       <Button label="View full history" variant="outline" />
