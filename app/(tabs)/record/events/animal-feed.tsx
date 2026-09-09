@@ -203,11 +203,18 @@ function SystemTab({ herd }: { herd: string }) {
 
       <SectionTitle>Raw materials for this run</SectionTitle>
       <View style={s.box}>
-        {d.breakdown.map((b) => (
+        {/* Recipe units throughout, per-head and whole-run, so the two figures
+            in a row can be read against each other — and so this reads in the
+            same units as the Manual tab's editable boxes. `requiredQty`/`uom`
+            are the stock-unit twins (hay: 222 kg here, 15.54 BALE there); one
+            row must never mix the two. */}
+        {d.lines.map((l) => (
           <KV
-            key={b.itemCode}
-            k={`${b.itemName} (${b.perHeadQty.toLocaleString()} ${b.uom}/head)`}
-            v={`${(b.totalQty * portionNum).toLocaleString()} ${b.uom}`}
+            key={l.itemCode}
+            k={`${l.itemName} (${(d.heads ? l.recipeQty / d.heads : 0).toLocaleString()} ${
+              l.recipeUom
+            }/head)`}
+            v={`${(l.recipeQty * portionNum).toLocaleString()} ${l.recipeUom}`}
           />
         ))}
       </View>
@@ -234,13 +241,25 @@ type TunedRow = { itemCode: string; itemName: string; uom: string; qty: string }
  *  actually cover — not necessarily today, and not necessarily the herd's
  *  registered count.
  *
- *  `lines[].qty` seeds from `getHerdFeedInfo(herd).breakdown[].perHeadQty`,
- *  which is already in the base BOM's own recipe unit of measure (hay is
- *  written in kilograms there even though it is stocked in BALE). Every value
- *  typed here is sent to the server exactly as shown — never scaled by heads,
- *  never converted between UOMs. The server derives the conversion from the
- *  herd's BOM and multiplies by the head count itself; doing either of those
- *  here would silently issue the wrong amount of stock.
+ *  `lines[].qty` seeds from `getHerdFeedInfo(herd).lines[]` as
+ *  `recipeQty / heads`, labelled `recipeUom` — the base BOM's own per-head
+ *  figure, in the unit the recipe is written in. This is exactly what the
+ *  desk block's `seedManual()` does, and it is the only correct source.
+ *
+ *  It used to read `info.breakdown[].perHeadQty`, and `breakdown` is not a key
+ *  the "info" action returns at all, so every herd opened here showed "No
+ *  ingredients. Add one below."
+ *
+ *  The obvious repair is the wrong one. `breakdown` lives on the server's
+ *  `get_herd_feed_info()`, whose `per_head_qty` is `required_qty / heads` with
+ *  `required_qty` in STOCK units. Hay is written 2 kg per head in the recipe
+ *  and stocked in BALE at 0.07 bale/kg, so that route would put 0.14 in a box
+ *  labelled kg and send a fourteenth of the ration.
+ *
+ *  Every value typed here is sent to the server exactly as shown — never
+ *  scaled by heads, never converted between UOMs. The server derives the
+ *  conversion from the herd's BOM and multiplies by the head count itself;
+ *  doing either of those here would silently issue the wrong amount of stock.
  */
 function ManualTab({ herd }: { herd: string }) {
   const c = useColors();
@@ -260,11 +279,13 @@ function ManualTab({ herd }: { herd: string }) {
   useEffect(() => {
     if (!info || rows) return;
     setRows(
-      info.breakdown.map((b) => ({
-        itemCode: b.itemCode,
-        itemName: b.itemName,
-        uom: b.uom,
-        qty: String(b.perHeadQty),
+      info.lines.map((l) => ({
+        itemCode: l.itemCode,
+        itemName: l.itemName,
+        // Recipe unit and recipe amount, per head. Never `uom`/`requiredQty`,
+        // which are the stock-unit twins — see the block comment above.
+        uom: l.recipeUom,
+        qty: String(info.heads ? l.recipeQty / info.heads : 0),
       })),
     );
     setHeads(info.heads ? String(info.heads) : "");

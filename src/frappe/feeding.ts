@@ -34,12 +34,30 @@ const callMethod = async <T = any>(
   return message as T;
 };
 
-export type FeedBreakdownRow = {
+/** One ingredient of a run, as the server computed it.
+ *
+ *  TWO QUANTITIES, TWO UNITS, AND THEY ARE NOT INTERCHANGEABLE.
+ *
+ *    recipeQty / recipeUom  what the BOM says and what the mixer works to.
+ *                           Hay is written 2 kg per head on this farm.
+ *    requiredQty / uom      the same amount in the item's STOCK unit, which is
+ *                           what leaves the store. That same hay is stocked in
+ *                           BALE at 0.07 bale/kg, so 222 kg reads as 15.54 BALE.
+ *
+ *  Anything the operator TYPES is in recipe units — the server converts, using
+ *  the herd's own BOM, and it is the only place that may. Seeding an editable
+ *  field from requiredQty would send a fourteenth of the hay under a kg label. */
+export type FeedLine = {
   itemCode: string;
   itemName: string;
-  perHeadQty: number;
-  totalQty: number;
+  /** Whole-run amount in the recipe's unit (already heads x per-head). */
+  recipeQty: number;
+  recipeUom: string;
+  /** The same amount in the item's stock unit. Display only. */
+  requiredQty: number;
   uom: string;
+  conversionFactor: number;
+  shortQty: number;
 };
 
 export type HerdFeedInfo = {
@@ -53,7 +71,7 @@ export type HerdFeedInfo = {
   uom: string;
   store: string;
   availableInStore: number;
-  breakdown: FeedBreakdownRow[];
+  lines: FeedLine[];
 };
 
 export type ManufactureResult = {
@@ -82,7 +100,9 @@ export type FeedResult = {
   employee: string | null;
 };
 
-/** Preview: per-head BOM scaled by head count + how much finished feed is in the store. */
+/** Preview: the herd's BOM scaled by head count + how much finished feed is in
+ *  the store. Backed by `feeding_program()`, which is what the "info" action
+ *  actually resolves to — see the mapping note on `lines` below. */
 export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
   const m = await callMethod("info", { herd });
   return {
@@ -96,12 +116,25 @@ export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
     uom: m.uom ?? "",
     store: m.store ?? "",
     availableInStore: Number(m.available_in_store ?? 0),
-    breakdown: (m.breakdown ?? []).map((b: any) => ({
-      itemCode: b.item_code,
-      itemName: b.item_name,
-      perHeadQty: Number(b.per_head_qty ?? 0),
-      totalQty: Number(b.total_qty ?? 0),
-      uom: b.uom ?? "",
+    // `lines`, not `breakdown`. The "info" action resolves to feeding_program()
+    // -> _engine.get_herd_feeding_program(), whose payload has no `breakdown`
+    // key at all — that one belongs to get_herd_feed_info(), which nothing
+    // calls. Mapping it meant every consumer of this got an empty array: the
+    // System tab's raw-materials list drew nothing, and the Manual tab seeded
+    // from nothing and said "No ingredients" for every herd.
+    //
+    // Do NOT "fix" that by switching the endpoint to get_herd_feed_info():
+    // its per_head_qty is required_qty / heads, and required_qty is in STOCK
+    // units. Hay would seed the editable kg box with 0.14 instead of 2.
+    lines: (m.lines ?? []).map((l: any) => ({
+      itemCode: l.item_code,
+      itemName: l.item_name,
+      recipeQty: Number(l.recipe_qty ?? 0),
+      recipeUom: l.recipe_uom ?? l.uom ?? "",
+      requiredQty: Number(l.required_qty ?? 0),
+      uom: l.uom ?? "",
+      conversionFactor: Number(l.conversion_factor ?? 1),
+      shortQty: Number(l.short_qty ?? 0),
     })),
   };
 };
