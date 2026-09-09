@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
@@ -72,7 +73,12 @@ export default function PD() {
   };
 
   return (
-    <Screen title="Pregnancy diagnosis" subtitle="Confirm or rule out" back>
+    <Screen
+      title="Pregnancy diagnosis"
+      subtitle="Confirm or rule out"
+      back
+      headerRight={<BackdateButton type="Pregnancy Diagnosis" />}
+    >
       <Field
         label="Cow(s)"
         help={

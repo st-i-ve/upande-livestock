@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
@@ -112,7 +113,12 @@ export default function Movement() {
   };
 
   return (
-    <Screen title="Movement" subtitle="Move animals between herds" back>
+    <Screen
+      title="Movement"
+      subtitle="Move animals between herds"
+      back
+      headerRight={<BackdateButton type="Movement" />}
+    >
 
       <Field label="Animals to move" help="Search by tag, or open the By herd tab to grab a whole herd.">
         <AnimalPickerButton

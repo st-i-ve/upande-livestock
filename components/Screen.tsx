@@ -11,6 +11,7 @@ export function Screen({
   title,
   subtitle,
   back,
+  headerRight,
   scroll = true,
   children,
   footer,
@@ -20,6 +21,8 @@ export function Screen({
   title: string;
   subtitle?: string;
   back?: boolean;
+  /** Rendered at the far right of the app bar, e.g. the amber Backdate control. */
+  headerRight?: React.ReactNode;
   scroll?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -45,6 +48,7 @@ export function Screen({
           <Text style={s.title} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
+        {headerRight ?? null}
       </View>
       {scroll ? (
         <ScrollView

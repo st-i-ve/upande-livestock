@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
@@ -316,7 +317,12 @@ export default function GenericEvent() {
   };
 
   return (
-    <Screen title={spec.title} subtitle="New event" back>
+    <Screen
+      title={spec.title}
+      subtitle="New event"
+      back
+      headerRight={<BackdateButton type={spec.eventType} />}
+    >
       {spec.isVetProcedure ? (
         <Field label="Vet" help="Free-text — the vet who performed the procedure.">
           <Input value={vetName} onChangeText={setVetName} placeholder="Dr. Mwangi" />

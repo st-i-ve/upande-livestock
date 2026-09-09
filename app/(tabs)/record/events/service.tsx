@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
@@ -124,7 +125,12 @@ export default function Service() {
   };
 
   return (
-    <Screen title="Service / AI" subtitle="Issue semen straw" back>
+    <Screen
+      title="Service / AI"
+      subtitle="Issue semen straw"
+      back
+      headerRight={<BackdateButton type="Service" />}
+    >
       <Field
         label="Cow(s)"
         help="Pick one or many. Same straw issued per cow; one Animal Event per cow on submit."

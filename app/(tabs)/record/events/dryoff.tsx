@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Field, FieldRow, Input } from "@/components/Field";
@@ -141,7 +142,12 @@ export default function Dryoff() {
   };
 
   return (
-    <Screen title="Drying off" subtitle="From a milking herd" back>
+    <Screen
+      title="Drying off"
+      subtitle="From a milking herd"
+      back
+      headerRight={<BackdateButton type="Drying Off" />}
+    >
       <Banner tone="info">
         The destination herd defaults to the dry / steamers herd; you can override below. Add DCT
         drugs to apply the same treatment to every selected cow.

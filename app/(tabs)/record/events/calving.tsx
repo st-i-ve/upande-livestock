@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
@@ -175,7 +176,12 @@ export default function Calving() {
   };
 
   return (
-    <Screen title="Calving" subtitle="Birth event from existing pregnancy" back>
+    <Screen
+      title="Calving"
+      subtitle="Birth event from existing pregnancy"
+      back
+      headerRight={<BackdateButton type="Calving" />}
+    >
       {pregnantCount === 0 ? (
         <Banner tone="warning">No pregnant cows on record.</Banner>
       ) : null}
