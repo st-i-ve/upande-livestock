@@ -3,15 +3,18 @@ import React, { useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
+import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { findStoreShortage } from "@/src/frappe/stock";
 import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
@@ -21,6 +24,7 @@ import type { Animal } from "@/types";
 export default function Service() {
 
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
@@ -71,7 +75,7 @@ export default function Service() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           serviceType: type,
           semenItem: straw || undefined,
           remarks: remarks || undefined,
@@ -129,8 +133,9 @@ export default function Service() {
       title="Service / AI"
       subtitle="Issue semen straw"
       back
-      headerRight={<BackdateButton type="Service" />}
+      headerRight={isBackdating ? undefined : <BackdateButton type="service" />}
     >
+      {isBackdating ? <BackdateBanner /> : null}
       <Field
         label="Cow(s)"
         help="Pick one or many. Same straw issued per cow; one Animal Event per cow on submit."
@@ -146,7 +151,11 @@ export default function Service() {
       </Field>
       <FieldRow>
         <Field label="Service date" style={{ flex: 1 }}>
-          <Input value={todayISO()} editable={false} />
+          {isBackdating ? (
+            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          ) : (
+            <Input value={todayISO()} editable={false} />
+          )}
         </Field>
         <Field label="Type" style={{ flex: 1 }}>
           <Picker value={type} onChange={(v) => setType(v as "A.I." | "Natural")} options={["A.I.", "Natural"]} />

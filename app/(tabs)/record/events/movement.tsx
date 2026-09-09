@@ -4,16 +4,19 @@ import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { Animal } from "@/types";
 import { useEligibility } from "@/src/hooks/useEligibility";
@@ -30,6 +33,7 @@ export default function Movement() {
   const { data: eligibility } = useEligibility();
 
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [toHerd, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
@@ -93,7 +97,7 @@ export default function Movement() {
           currentHerd: a.herd,
           toHerd,
           operator,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           remarks,
         });
         if (r.queued) queued += 1;
@@ -117,8 +121,9 @@ export default function Movement() {
       title="Movement"
       subtitle="Move animals between herds"
       back
-      headerRight={<BackdateButton type="Movement" />}
+      headerRight={isBackdating ? undefined : <BackdateButton type="movement" />}
     >
+      {isBackdating ? <BackdateBanner /> : null}
 
       <Field label="Animals to move" help="Search by tag, or open the By herd tab to grab a whole herd.">
         <AnimalPickerButton
@@ -170,7 +175,13 @@ export default function Movement() {
           ) : null}
         </Field>
       </FieldRow>
-      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+        </Field>
+      ) : (
+        <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      )}
 
       <Field label="Reason">
         <Chips>

@@ -4,9 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { ScoreRow } from "@/components/ScoreRow";
@@ -15,6 +18,7 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { RADIUS } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { DiagnosisAction } from "@/src/frappe/animalDiagnosis";
 import { useCreateAnimalDiagnosis } from "@/src/hooks/mutations";
@@ -48,6 +52,7 @@ export default function Diagnosis() {
   // Live picked animals + operator (replacing the stub picker that never lifted).
   const [selected, setSelected] = useState<Animal[]>([]);
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const mutation = useCreateAnimalDiagnosis();
 
@@ -107,7 +112,13 @@ export default function Diagnosis() {
     setCustoms((prev) => prev.filter((c) => c.id !== id));
 
   return (
-    <Screen title="Animal diagnosis" subtitle="Full health examination" back>
+    <Screen
+      title="Animal diagnosis"
+      subtitle="Full health examination"
+      back
+      headerRight={isBackdating ? undefined : <BackdateButton type="diagnosis" />}
+    >
+      {isBackdating ? <BackdateBanner /> : null}
       <Banner tone="info">
         Walk through the cow head-to-tail. Anything not covered by the standard sections, add as a
         custom field at the bottom. Escalate to a Health Case from the Diagnosis section if needed.
@@ -128,7 +139,11 @@ export default function Diagnosis() {
       </Field>
       <FieldRow>
         <Field label="Date of examination" style={{ flex: 1 }}>
-          <Input value={todayISO()} editable={false} />
+          {isBackdating ? (
+            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          ) : (
+            <Input value={todayISO()} editable={false} />
+          )}
         </Field>
         <Field label="Examiner name" style={{ flex: 1 }}>
           <Input value={examiner} onChangeText={setExaminer} />
@@ -393,7 +408,7 @@ export default function Diagnosis() {
                 animal: a.id,
                 operator,
                 company,
-                diagnosisDate: todayISO(),
+                diagnosisDate: isBackdating ? backdateDate : todayISO(),
                 actionTaken: action,
                 systemChecks: systemChecks.length ? systemChecks : undefined,
                 bcs: bcs ? Number(bcs) : undefined,

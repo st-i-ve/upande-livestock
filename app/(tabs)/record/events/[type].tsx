@@ -4,10 +4,12 @@ import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { HandlersPicker } from "@/components/HandlersPicker";
@@ -15,6 +17,7 @@ import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
 import {
   AnimalEventInput,
@@ -61,6 +64,7 @@ export default function GenericEvent() {
 
 
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [vetName, setVetName] = useState("");
   const [handlerIds, setHandlerIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Animal[]>([]);
@@ -210,7 +214,7 @@ export default function GenericEvent() {
           animals: selected.map((a) => a.id),
           currentHerd: selected[0].herd,
           operator: operator!,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           remarks: baseRemarks,
           vetName: vetName.trim(),
           handlerIds: handlerIds.length ? handlerIds : undefined,
@@ -238,7 +242,7 @@ export default function GenericEvent() {
           animal: a.id,
           currentHerd: a.herd,
           operator: operator!, // checked above
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           remarks: baseRemarks,
         } as const;
 
@@ -321,8 +325,9 @@ export default function GenericEvent() {
       title={spec.title}
       subtitle="New event"
       back
-      headerRight={<BackdateButton type={spec.eventType} />}
+      headerRight={isBackdating ? undefined : <BackdateButton type={type ?? ""} />}
     >
+      {isBackdating ? <BackdateBanner /> : null}
       {spec.isVetProcedure ? (
         <Field label="Vet" help="Free-text — the vet who performed the procedure.">
           <Input value={vetName} onChangeText={setVetName} placeholder="Dr. Mwangi" />
@@ -356,7 +361,13 @@ export default function GenericEvent() {
         )}
       </Field>
 
-      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+        </Field>
+      ) : (
+        <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      )}
 
       {spec.needsWeight ? (
         <FieldRow>

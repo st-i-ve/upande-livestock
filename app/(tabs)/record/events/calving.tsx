@@ -3,16 +3,19 @@ import React, { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { captureAndAttachCalfPhoto } from "@/src/frappe/calfPhoto";
 import { useAnimals } from "@/src/hooks/useAnimals";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
@@ -26,6 +29,7 @@ export default function Calving() {
   const { data: settings } = useLivestockSettings();
 
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [dam, setDam] = useState<Animal | null>(null);
   const [outcome, setOutcome] = useState<"Live Birth" | "Still Birth" | "Abortion">("Live Birth");
   const [abortionCause, setAbortionCause] = useState<
@@ -90,7 +94,7 @@ export default function Calving() {
           animal: dam.id,
           currentHerd: dam.herd,
           operator,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           abortionCause,
           abortionNotes: coatColour || undefined,
         });
@@ -111,7 +115,7 @@ export default function Calving() {
         animal: dam.id,
         currentHerd: dam.herd,
         operator,
-        eventDate: todayISO(),
+        eventDate: isBackdating ? backdateDate : todayISO(),
         calvingOutcome: outcome as "Live Birth" | "Still Birth",
         toHerd: toHerd || undefined,
         calfBookNumber: outcome === "Live Birth" ? calfBook.trim() : undefined,
@@ -180,8 +184,9 @@ export default function Calving() {
       title="Calving"
       subtitle="Birth event from existing pregnancy"
       back
-      headerRight={<BackdateButton type="Calving" />}
+      headerRight={isBackdating ? undefined : <BackdateButton type="calving" />}
     >
+      {isBackdating ? <BackdateBanner /> : null}
       {pregnantCount === 0 ? (
         <Banner tone="warning">No pregnant cows on record.</Banner>
       ) : null}
@@ -200,7 +205,11 @@ export default function Calving() {
 
       <FieldRow>
         <Field label="Calving date" style={{ flex: 1 }}>
-          <Input value={todayISO()} editable={false} />
+          {isBackdating ? (
+            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          ) : (
+            <Input value={todayISO()} editable={false} />
+          )}
         </Field>
         <Field label="Outcome" style={{ flex: 1 }}>
           <Picker

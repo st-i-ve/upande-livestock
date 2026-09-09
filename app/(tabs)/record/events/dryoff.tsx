@@ -3,15 +3,18 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
+import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
 import { findStoreShortage } from "@/src/frappe/stock";
@@ -39,6 +42,7 @@ export default function Dryoff() {
   const defaultDrugWarehouse = settings?.drug_warehouse || "";
 
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [toHerd, setToHerd] = useState<string>("");
   const [dctRows, setDctRows] = useState<DCTRow[]>([]);
@@ -121,7 +125,7 @@ export default function Dryoff() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           toHerd,
           drugIssues: drugIssues.length ? drugIssues : undefined,
         });
@@ -146,8 +150,9 @@ export default function Dryoff() {
       title="Drying off"
       subtitle="From a milking herd"
       back
-      headerRight={<BackdateButton type="Drying Off" />}
+      headerRight={isBackdating ? undefined : <BackdateButton type="dryoff" />}
     >
+      {isBackdating ? <BackdateBanner /> : null}
       <Banner tone="info">
         The destination herd defaults to the dry / steamers herd; you can override below. Add DCT
         drugs to apply the same treatment to every selected cow.
@@ -167,7 +172,13 @@ export default function Dryoff() {
       <Field label="To herd">
         <Picker value={toHerd} onChange={setToHerd} options={herds.map((h) => h.n)} />
       </Field>
-      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+        </Field>
+      ) : (
+        <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      )}
 
       <Field
         label="DCT drugs (applied to every selected cow)"

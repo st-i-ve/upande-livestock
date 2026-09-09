@@ -3,13 +3,16 @@ import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { DateField } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useBackdate } from "@/src/hooks/useBackdate";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useOperator } from "@/src/hooks/useOperator";
 import { extractFrappeError, todayISO } from "@/src/services/api";
@@ -20,6 +23,7 @@ type Result = "Confirmed" | "Not Pregnant" | "Aborted";
 export default function PD() {
 
   const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
@@ -49,7 +53,7 @@ export default function PD() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : todayISO(),
           diagnosisResult: result,
           remarks: remarks || undefined,
         });
@@ -77,8 +81,9 @@ export default function PD() {
       title="Pregnancy diagnosis"
       subtitle="Confirm or rule out"
       back
-      headerRight={<BackdateButton type="Pregnancy Diagnosis" />}
+      headerRight={isBackdating ? undefined : <BackdateButton type="pd" />}
     >
+      {isBackdating ? <BackdateBanner /> : null}
       <Field
         label="Cow(s)"
         help={
@@ -102,7 +107,13 @@ export default function PD() {
           onPickMulti={setSelected}
         />
       </Field>
-      <Field label="Diagnosis date"><Input value={todayISO()} editable={false} /></Field>
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+        </Field>
+      ) : (
+        <Field label="Diagnosis date"><Input value={todayISO()} editable={false} /></Field>
+      )}
       <Field label="Result">
         <Chips>
           {(["Confirmed", "Not Pregnant", "Aborted"] as const).map((r) => (
