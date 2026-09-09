@@ -147,6 +147,11 @@ export type EventListRow = {
   newHerd: string | null;
   diagnosisResult: string | null;
   activityCost: number;
+  /** `custom_is_backdated` — set when the event was entered for a past day. */
+  isBackdated: boolean;
+  /** `custom_feed_mode` — "System" or "Manual", only ever set on Feeding
+   *  events. `null` for every other event type. */
+  feedMode: string | null;
 };
 
 const EVENT_LIST_FIELDS = [
@@ -158,6 +163,8 @@ const EVENT_LIST_FIELDS = [
   "new_herd",
   "diagnosis_result",
   "docstatus",
+  "custom_is_backdated",
+  "custom_feed_mode",
 ];
 
 const mapEvent = (row: any): EventListRow => ({
@@ -172,6 +179,8 @@ const mapEvent = (row: any): EventListRow => ({
   // own Journal Entry. Reported as 0 rather than dropped, so the reports that
   // sum this field keep their shape.
   activityCost: 0,
+  isBackdated: !!row.custom_is_backdated,
+  feedMode: row.custom_feed_mode ?? null,
 });
 
 export const getRecentEvents = async (params?: {

@@ -88,6 +88,7 @@ export const MILK_LIST_FIELDS = [
   "recording_date",
   "net_yield_kg",
   "cows_milked",
+  "custom_is_backdated",
 ] as const;
 
 export type MilkRecordingRow = {
@@ -98,6 +99,8 @@ export type MilkRecordingRow = {
   recordingDate: string;
   netYieldKg: number;
   cowsMilked: number;
+  /** `custom_is_backdated` — set when the milking was entered for a past day. */
+  isBackdated: boolean;
 };
 
 const mapRow = (row: any): MilkRecordingRow => ({
@@ -107,6 +110,7 @@ const mapRow = (row: any): MilkRecordingRow => ({
   recordingDate: row.recording_date ?? "",
   netYieldKg: Number(row.net_yield_kg ?? 0),
   cowsMilked: Number(row.cows_milked ?? 0),
+  isBackdated: !!row.custom_is_backdated,
 });
 
 export const getMilkRecordingsForDate = async (

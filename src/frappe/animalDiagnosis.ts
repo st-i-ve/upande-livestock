@@ -65,6 +65,8 @@ export type DiagnosisListRow = {
   suggestedDiagnosis: string | null;
   followUpDate: string | null;
   relatedCase: string | null;
+  /** `custom_is_backdated` — set when the diagnosis was entered for a past day. */
+  isBackdated: boolean;
 };
 
 const DIAGNOSIS_LIST_FIELDS = [
@@ -76,6 +78,7 @@ const DIAGNOSIS_LIST_FIELDS = [
   "suggested_disease",
   "follow_up_date",
   "related_case",
+  "custom_is_backdated",
 ];
 
 const mapDiagnosis = (row: any): DiagnosisListRow => ({
@@ -87,6 +90,7 @@ const mapDiagnosis = (row: any): DiagnosisListRow => ({
   suggestedDiagnosis: row.suggested_disease ?? null,
   followUpDate: row.follow_up_date ?? null,
   relatedCase: row.related_case ?? null,
+  isBackdated: !!row.custom_is_backdated,
 });
 
 export const getDiagnoses = async (limit = 100): Promise<DiagnosisListRow[]> => {

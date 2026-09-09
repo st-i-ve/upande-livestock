@@ -91,6 +91,8 @@ export type HealthCaseListRow = {
   presentingSymptoms: string;
   totalTreatmentCost: number;
   duration: number | null;
+  /** `custom_is_backdated` — set when the case was opened for a past day. */
+  isBackdated: boolean;
 };
 
 const mapCase = (row: any): HealthCaseListRow => ({
@@ -103,6 +105,7 @@ const mapCase = (row: any): HealthCaseListRow => ({
   presentingSymptoms: row.presenting_symptoms ?? "",
   totalTreatmentCost: Number(row.total_treatment_cost ?? 0),
   duration: row.duration_days ?? null,
+  isBackdated: !!row.custom_is_backdated,
 });
 
 const HEALTH_CASE_LIST_FIELDS = [
@@ -115,6 +118,7 @@ const HEALTH_CASE_LIST_FIELDS = [
   "presenting_symptoms",
   "total_treatment_cost",
   "duration_days",
+  "custom_is_backdated",
 ];
 
 export const getHealthCases = async (

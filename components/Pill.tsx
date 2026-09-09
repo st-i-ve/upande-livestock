@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { BACKDATE_AMBER_DARK, BACKDATE_AMBER_LIGHT } from "@/components/BackdateButton";
 import { useColors } from "@/src/hooks/useColors";
+import { useScheme } from "@/src/theme/themeStore";
 
-type Tone = "default" | "info" | "success" | "warning" | "danger" | "preg" | "heif";
+type Tone = "default" | "info" | "success" | "warning" | "danger" | "preg" | "heif" | "amber";
 
 export function Pill({
   label,
@@ -18,9 +20,12 @@ export function Pill({
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
+  const amber = useScheme() === "dark" ? BACKDATE_AMBER_DARK : BACKDATE_AMBER_LIGHT;
   // Monochrome system: pills don't carry meaning through colour. We keep the
-  // tone API for compatibility, but everything except `danger` collapses to a
-  // single neutral style.
+  // tone API for compatibility, but everything except `danger` and `amber`
+  // collapses to a single neutral style. `amber` marks a fact about *when* or
+  // *how* a record was entered (backdated / manual) — same exception as
+  // BackdateButton, and for the same reason.
   const TONES: Record<Tone, { bg: string; fg: string; border: string }> = {
     default: { bg: c.bgMuted, fg: c.textMuted, border: c.borderSubtle },
     info:    { bg: c.bgMuted, fg: c.text,      border: c.borderSubtle },
@@ -29,6 +34,7 @@ export function Pill({
     danger:  { bg: "transparent",  fg: c.danger,    border: c.danger },
     preg:    { bg: c.bgMuted, fg: c.textMuted, border: c.borderSubtle },
     heif:    { bg: c.bgMuted, fg: c.textMuted, border: c.borderSubtle },
+    amber:   { bg: "transparent",  fg: amber,       border: amber },
   };
   const t = TONES[tone];
   return (

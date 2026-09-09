@@ -54,10 +54,13 @@ export type DisposalListRow = {
   salePrice: number;
   gainLoss: number;
   buyerName: string | null;
+  /** `custom_is_backdated` — set when the disposal was entered for a past day. */
+  isBackdated: boolean;
 };
 
 const DISPOSAL_LIST_FIELDS = [
   "name",
+  "custom_is_backdated",
   "animal",
   "animal_name",
   "disposal_date",
@@ -78,6 +81,7 @@ const mapDisposal = (row: any): DisposalListRow => ({
   salePrice: Number(row.sale_price ?? 0),
   gainLoss: Number(row.gain_loss ?? 0),
   buyerName: row.buyer_name ?? null,
+  isBackdated: !!row.custom_is_backdated,
 });
 
 export const getDisposals = async (params?: {
