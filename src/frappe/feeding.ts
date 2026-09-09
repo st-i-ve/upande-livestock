@@ -64,6 +64,10 @@ export type ManufactureResult = {
   produced_qty: number;
   uom: string;
   store: string;
+  /** "System" for the normal path, "Manual" when a hand-tuned recipe and head
+   *  count were submitted instead — echoed by the server on every run so the
+   *  screen can say which one just happened. */
+  feed_mode: string;
   transfer_stock_entry: string;
   manufacture_stock_entry: string;
 };

@@ -181,8 +181,8 @@ export const useCreateAnimalHealthCase = () => {
 export const useManufactureHerdFeed = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { herd: string; portion?: number }) =>
-      manufactureHerdFeed(v.herd, v.portion ?? 1),
+    mutationFn: (v: { herd: string; portion?: number; postingDate?: string }) =>
+      manufactureHerdFeed(v.herd, v.portion ?? 1, v.postingDate),
     onSuccess: () => invalidateAll(qc),
   });
 };
