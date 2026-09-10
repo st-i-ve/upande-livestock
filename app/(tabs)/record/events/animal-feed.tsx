@@ -265,9 +265,6 @@ function SystemTab({
   const info = useHerdFeedInfo(herd);
   const day = useFeedDayStatus(herd);
   const manufacture = useManufactureHerdFeed();
-  // The fallback for a non-standing pick — see the comment on `onRun` below
-  // for why this tab needs it at all.
-  const runRecipe = useManualFeed();
 
   const [portion, setPortion] = useState<Portion | null>(null);
   const [date, setDate] = useState(todayISO());
@@ -280,7 +277,6 @@ function SystemTab({
   // preview for the chosen bom_no — is what "no extra round trip" means here
   // too, same as the Manual tab's rows.
   const selectedRecipe = recipes.find((r) => r.bomNo === selectedBom) ?? null;
-  const onStanding = !selectedRecipe || selectedRecipe.isStanding;
 
   // The suggestion is a default, not a rule: half a fresh day, the remainder
   // after. Only seeded once — after that the operator's own choice on the
@@ -298,44 +294,25 @@ function SystemTab({
   const d = info.data;
   const st = day.data;
 
-  // Two routes to the same button, chosen by what's picked above:
-  //
-  //   standing ration -> `manufactureHerdFeed`, unchanged from before this
-  //     screen had a picker at all.
-  //
-  //   a previously-used recipe -> `manualFeed`, sending that recipe's own
-  //     lines back UNEDITED plus the herd's registered head count. That is
-  //     not a workaround bolted on here — it is the one route the server
-  //     already wires a `bom_no` override through end to end
-  //     (`manual_feed.py` -> `tuned_bom(base_bom=...)` ->
-  //     `manufacture_herd_feed(bom_no=...)`), because `record_feeding.py`'s
-  //     "manufacture" action and `manufacture_feed()` never read a `bom_no`
-  //     out of their payload at all (only the engine call underneath them
-  //     accepts one). Since nothing here is actually tuned, `tuned_bom`
-  //     reuses `selectedBom` rather than minting a new BOM, so this reads as
-  //     "mix this recipe" — the run still lands labelled "Manual" in
-  //     `feed_mode`, because that is genuinely the path that ran it.
+  // One route, always: `manufactureHerdFeed` (the "manufacture" action),
+  // whichever recipe is picked above. `record_feeding.py` now reads `bom_no`
+  // for this action and validates it server-side (submitted, same production
+  // item, belongs to the herd), so a previously-used recipe mixes exactly
+  // like the standing ration — the herd's own registered head count, System
+  // path, `feed_mode` "System". Nothing here is hand-tuned, so nothing here
+  // should ever call `manualFeed`.
   const onRun = async () => {
     setSubmitError(null);
     if (!herd) return setSubmitError("Pick a herd.");
     if (!d) return setSubmitError("Still loading the herd's programme — try again in a moment.");
     if (portionNum <= 0) return setSubmitError("A run has to be for more than nothing.");
     try {
-      const r = onStanding
-        ? await manufacture.mutateAsync({
-            herd,
-            portion: portionNum,
-            postingDate: date,
-            bomNo: selectedBom || undefined,
-          })
-        : await runRecipe.mutateAsync({
-            herd,
-            lines: selectedRecipe!.lines.map((l) => ({ itemCode: l.itemCode, qty: l.qty })),
-            heads: d.heads,
-            portion: portionNum,
-            postingDate: date,
-            baseBom: selectedBom,
-          });
+      const r = await manufacture.mutateAsync({
+        herd,
+        portion: portionNum,
+        postingDate: date,
+        bomNo: selectedBom || undefined,
+      });
       await Promise.all([info.refetch(), day.refetch()]);
       Alert.alert(
         `${r.feed_mode} feeding mixed`,
@@ -402,13 +379,6 @@ function SystemTab({
         <RecipePicker recipes={recipes} value={selectedBom} onChange={onSelectBom} />
       </Field>
 
-      {!onStanding ? (
-        <Banner tone="warning">
-          Mixing a previously used recipe for {herd}, not the standing ration. This posts as a
-          Manual feeding, since that is the run this recipe was made on.
-        </Banner>
-      ) : null}
-
       <View style={s.card}>
         <Text style={s.cardLbl}>Ration</Text>
         <Text style={s.cardTitle}>{active.itemName}</Text>
@@ -458,8 +428,8 @@ function SystemTab({
       {submitError ? <Banner tone="danger">{submitError}</Banner> : null}
 
       <Button
-        label={manufacture.isPending || runRecipe.isPending ? "Mixing…" : "Mix & feed"}
-        disabled={manufacture.isPending || runRecipe.isPending || !herd || portionNum <= 0}
+        label={manufacture.isPending ? "Mixing…" : "Mix & feed"}
+        disabled={manufacture.isPending || !herd || portionNum <= 0}
         onPress={onRun}
       />
     </>
