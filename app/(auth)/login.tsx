@@ -33,7 +33,7 @@ import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useAuthStore } from "@/src/auth/authStore";
-import { extractFrappeError } from "@/src/services/api";
+import { classifyError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 
 // Login form fields never grow past 80% of the screen width so they stay
@@ -169,7 +169,7 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password, url.trim());
     } catch (err) {
-      setError(extractFrappeError(err));
+      setError(classifyError(err).message);
     } finally {
       setLoading(false);
     }

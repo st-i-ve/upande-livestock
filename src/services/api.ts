@@ -104,33 +104,152 @@ const isSessionAlive = async (): Promise<boolean> => {
 };
 
 /**
- * Returns a single user-readable string from a Frappe error response.
  * Frappe wraps validation messages inside `_server_messages` as a JSON string
- * of JSON strings, so we double-decode and pick the first message.
+ * of JSON strings, so we double-decode and pick the first message. Shared by
+ * every helper below that needs the server's own wording.
+ */
+const parseServerMessages = (raw: unknown): string | null => {
+  if (typeof raw !== "string") return null;
+  try {
+    const outer = JSON.parse(raw);
+    const arr = Array.isArray(outer) ? outer : [outer];
+    for (const item of arr) {
+      try {
+        const inner = typeof item === "string" ? JSON.parse(item) : item;
+        if (inner?.message) return String(inner.message);
+      } catch {
+        if (typeof item === "string") return item;
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+};
+
+/**
+ * Returns a single user-readable string from a Frappe error response.
  */
 export const extractFrappeError = (err: unknown): string => {
   const e = err as AxiosError;
   const data = e?.response?.data as any;
-  if (data?._server_messages) {
-    try {
-      const outer = JSON.parse(data._server_messages);
-      const arr = Array.isArray(outer) ? outer : [outer];
-      for (const item of arr) {
-        try {
-          const inner = typeof item === "string" ? JSON.parse(item) : item;
-          if (inner?.message) return String(inner.message);
-        } catch {
-          if (typeof item === "string") return item;
-        }
-      }
-    } catch {
-      // fall through
-    }
-  }
+  const serverMessage = parseServerMessages(data?._server_messages);
+  if (serverMessage) return serverMessage;
   if (data?.exception) return String(data.exception);
   if (data?.message) return String(data.message);
   if (e?.message) return e.message;
   return "Something went wrong.";
+};
+
+/** Reason category for a failed request, coarse enough to drive UI copy. */
+export type ErrorReason =
+  | "site_updating"
+  | "invalid_credentials"
+  | "forbidden"
+  | "network_unreachable"
+  | "invalid_site"
+  | "server_message"
+  | "unknown";
+
+export interface ClassifiedError {
+  reason: ErrorReason;
+  message: string;
+}
+
+/** Axios's own boilerplate text — never worth showing verbatim. */
+const isGenericAxiosMessage = (msg: string | undefined): boolean =>
+  !!msg && /^(network error|request failed with status code \d+|timeout of \d+ms exceeded)$/i.test(msg.trim());
+
+/**
+ * A Frappe error response is JSON carrying at least one of these fields.
+ * Anything else that answers the request (an HTML error page, a captive
+ * portal, a completely different API) is not a Frappe site.
+ */
+const looksLikeFrappeResponse = (data: unknown): boolean => {
+  if (!data || typeof data !== "object") return false;
+  const d = data as any;
+  return (
+    d._server_messages !== undefined ||
+    d.exception !== undefined ||
+    d.exc !== undefined ||
+    d.exc_type !== undefined ||
+    d.message !== undefined
+  );
+};
+
+/**
+ * Classifies a failed request into a reason the UI can act on, and a message
+ * safe to show the person holding the phone. Keeps the server's own wording
+ * wherever Frappe sent something specific (validation errors like a
+ * backdating refusal or a feed shortage are written for farm workers on
+ * purpose) and only substitutes our own copy where the raw text would be
+ * meaningless or actively misleading — most importantly, a site mid-update
+ * (503/SessionStopped) must never read like a wrong password.
+ */
+export const classifyError = (err: unknown): ClassifiedError => {
+  const e = err as AxiosError;
+  const status = e?.response?.status;
+  const data = e?.response?.data as any;
+  const serverMessage = parseServerMessages(data?._server_messages);
+
+  // No response at all: DNS failure, unreachable host, dropped connection,
+  // or a timeout. Axios collapses all of these to a bare `err.message` with
+  // no `response`.
+  if (!e?.response) {
+    const timedOut = e?.code === "ECONNABORTED" || /timeout/i.test(e?.message ?? "");
+    return {
+      reason: "network_unreachable",
+      message: timedOut
+        ? "The connection timed out. Check your internet connection and try again."
+        : "Could not reach the server. Check your internet connection and the site address, then try again.",
+    };
+  }
+
+  // Site is mid-update. Frappe answers 503/SessionStopped with the bare word
+  // "Updating" — true, but it doesn't tell a farm worker to stop suspecting
+  // their password, so we always replace it here.
+  if (status === 503) {
+    return {
+      reason: "site_updating",
+      message: "This site is being updated. It isn't your password — please try again in a few minutes.",
+    };
+  }
+
+  // Genuinely wrong credentials. Frappe's own "Invalid login credentials" is
+  // clear, so keep it; only fall back to our own wording if it's missing.
+  if (status === 401) {
+    return {
+      reason: "invalid_credentials",
+      message: serverMessage || "Incorrect email or password. Please check and try again.",
+    };
+  }
+
+  // A bare 403 is ambiguous (see the comment above isAuthFailure): it can mean
+  // a dead session or a valid session lacking rights on one doctype. Either
+  // way it is not a wrong password, so never word it like one.
+  if (status === 403) {
+    return {
+      reason: "forbidden",
+      message: serverMessage || "You don't have permission to sign in with this account. Contact your administrator.",
+    };
+  }
+
+  if (serverMessage) {
+    return { reason: "server_message", message: serverMessage };
+  }
+
+  if (!looksLikeFrappeResponse(data)) {
+    return {
+      reason: "invalid_site",
+      message: "This doesn't look like a Frappe site. Check the site address and try again.",
+    };
+  }
+
+  if (data?.exception) return { reason: "unknown", message: String(data.exception) };
+  if (data?.message) return { reason: "unknown", message: String(data.message) };
+
+  const fallback = !isGenericAxiosMessage(e?.message) && e?.message ? e.message : "Something went wrong. Please try again.";
+  return { reason: "unknown", message: fallback };
 };
 
 export const getWorkingUrl = async (inputUrl: string): Promise<string | null> => {
@@ -239,23 +358,8 @@ export const isoDaysAgo = (days: number): string => {
  */
 export const extractFrappeMessage = (response: any): string | null => {
   const data = response?.data ?? response;
-  if (data?._server_messages) {
-    try {
-      const outer = JSON.parse(data._server_messages);
-      const arr = Array.isArray(outer) ? outer : [outer];
-      for (const item of arr) {
-        try {
-          const inner = typeof item === "string" ? JSON.parse(item) : item;
-          if (inner?.message) return String(inner.message).replace(/<[^>]+>/g, "");
-        } catch {
-          if (typeof item === "string") return item;
-        }
-      }
-    } catch {
-      // fall through
-    }
-  }
-  return null;
+  const msg = parseServerMessages(data?._server_messages);
+  return msg ? msg.replace(/<[^>]+>/g, "") : null;
 };
 
 /**
