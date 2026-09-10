@@ -12,6 +12,10 @@ export const useManualFeed = () => {
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: ["feedDayStatus", input.herd] });
       qc.invalidateQueries({ queryKey: ["herdFeedInfo", input.herd] });
+      // A genuinely tuned submit mints a new BOM (`tuned_bom` only reuses one
+      // when the lines match exactly) — refetch so it shows up in the recipe
+      // picker without waiting out the 15s stale time or restarting the app.
+      qc.invalidateQueries({ queryKey: ["herdRecipes", input.herd] });
     },
   });
 };

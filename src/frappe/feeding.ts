@@ -178,13 +178,24 @@ export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => 
  *  assuming a half — a herd already fed once is owed the remainder.
  *
  *  `postingDate` backdates the whole run. The server refuses it if the store
- *  could not have covered it that day, and says which day would work. */
+ *  could not have covered it that day, and says which day would work.
+ *
+ *  `bomNo` is the recipe the herd-feed screen's picker chose — the standing
+ *  ration by default, or a previously-tuned BOM the operator picked instead.
+ *  Sent through as `bom_no`. NOTE: as of this writing `record_feeding.py`'s
+ *  "manufacture" action and the `manufacture_feed()` it calls do not read this
+ *  key at all — only `_engine.manufacture_herd_feed()` underneath accepts a
+ *  `bom_no` override, and only `manual_feed()` passes one to it. Until that
+ *  backend wiring is added, choosing a non-standing recipe here changes the
+ *  screen's own preview but the server still mixes the herd's registered BOM.
+ *  Sent anyway so the client is ready the moment the backend catches up. */
 export const manufactureHerdFeed = (
   herd: string,
   portion = 1,
   postingDate?: string,
+  bomNo?: string,
 ): Promise<ManufactureResult> =>
-  callMethod("manufacture", { herd, portion, posting_date: postingDate });
+  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo });
 
 /** Issue `qty` of feed already sitting in the store, without mixing.
  *

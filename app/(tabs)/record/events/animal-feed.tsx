@@ -23,10 +23,12 @@ import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useFeedDayStatus } from "@/src/hooks/useFeedDayStatus";
 import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
+import { useHerdRecipes } from "@/src/hooks/useHerdRecipes";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useManualFeed } from "@/src/hooks/useManualFeed";
 import { useManufactureHerdFeed } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
+import type { HerdRecipe } from "@/src/frappe/herdRecipes";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 
 const kg = (n: number) => `${Number(n || 0).toLocaleString()} kg`;
@@ -66,10 +68,28 @@ export default function AnimalFeed() {
   const feedable = useMemo(() => herds.filter((h) => !!h.bom), [herds]);
   const [herdName, setHerdName] = useState<string>("");
   const [mode, setMode] = useState<Mode>("system");
+  const recipes = useHerdRecipes(herdName);
+
+  // Which recipe is currently picked — shared between the System and Manual
+  // tabs so switching tabs never loses the choice. Defaults to the herd's
+  // standing ration the moment `herd_recipes` answers, and only then: `herd`
+  // changing before `recipes.data` catches up must not leave the previous
+  // herd's bom_no selected under the new herd's name. `selectedForHerd` is
+  // the guard — it reseeds exactly once per herd, the same "seed once, then
+  // leave it alone" shape `ManualTab`'s own rows already use below.
+  const [selectedBom, setSelectedBom] = useState<string>("");
+  const [selectedForHerd, setSelectedForHerd] = useState<string>("");
 
   useEffect(() => {
     if (!herdName && feedable.length) setHerdName(feedable[0].n);
   }, [feedable, herdName]);
+
+  useEffect(() => {
+    if (recipes.data && selectedForHerd !== herdName) {
+      setSelectedBom(recipes.data.standingBom);
+      setSelectedForHerd(herdName);
+    }
+  }, [recipes.data, herdName, selectedForHerd]);
 
   if (isLoading) {
     return (
@@ -101,8 +121,84 @@ export default function AnimalFeed() {
         />
       </Chips>
 
-      {mode === "manual" ? <ManualTab herd={herdName} /> : <SystemTab herd={herdName} />}
+      {mode === "manual" ? (
+        <ManualTab
+          herd={herdName}
+          recipes={recipes.data?.recipes ?? []}
+          selectedBom={selectedBom}
+          onSelectBom={setSelectedBom}
+        />
+      ) : (
+        <SystemTab
+          herd={herdName}
+          recipes={recipes.data?.recipes ?? []}
+          selectedBom={selectedBom}
+          onSelectBom={setSelectedBom}
+        />
+      )}
     </Screen>
+  );
+}
+
+const formatCreated = (raw: string): string => {
+  const d = new Date(raw && raw.includes("T") ? raw : raw?.replace(" ", "T"));
+  if (!raw || Number.isNaN(d.getTime())) return raw ?? "";
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const recipeLabel = (r: HerdRecipe): string =>
+  r.isStanding ? `Standing ration — ${r.itemName}` : `${r.itemName} · tuned ${formatCreated(r.created)}`;
+
+/** Every recipe this herd has been fed under: the standing ration first and
+ *  always the default, then whatever was tuned for it before, newest first —
+ *  the order `herd_recipes` already returns them in.
+ *
+ *  Built on `Picker`, not `SearchPicker` or `FrappeSearchPicker`: this list is
+ *  short and arrives whole with the herd (no remote search, no paging), which
+ *  is exactly the case `Picker` is for — the other two exist for long or
+ *  remote catalogues. `Picker`'s options are plain strings, so each recipe is
+ *  folded into one label (item name, plus when it was made for a tuned one)
+ *  rather than reaching for a bespoke row layout. */
+function RecipePicker({
+  recipes,
+  value,
+  onChange,
+}: {
+  recipes: HerdRecipe[];
+  value: string;
+  onChange: (bomNo: string) => void;
+}) {
+  const { labels, byLabel } = useMemo(() => {
+    const seen = new Map<string, number>();
+    const labels: string[] = [];
+    const byLabel = new Map<string, string>();
+    for (const r of recipes) {
+      let label = recipeLabel(r);
+      // Two tunes made the same minute of the same item would otherwise
+      // collide on one label and silently pick whichever the Map keeps.
+      const n = (seen.get(label) ?? 0) + 1;
+      seen.set(label, n);
+      if (n > 1) label = `${label} (${n})`;
+      labels.push(label);
+      byLabel.set(label, r.bomNo);
+    }
+    return { labels, byLabel };
+  }, [recipes]);
+
+  if (!labels.length) return null;
+
+  const selectedIndex = recipes.findIndex((r) => r.bomNo === value);
+  const currentLabel = labels[selectedIndex] ?? labels[0];
+
+  return (
+    <Picker
+      value={currentLabel}
+      onChange={(label) => {
+        const bomNo = byLabel.get(label);
+        if (bomNo) onChange(bomNo);
+      }}
+      options={labels}
+    />
   );
 }
 
@@ -153,16 +249,38 @@ const makePortionSwitchStyles = (c: ReturnType<typeof useColors>) =>
  *  the day. `date` now lets this post on a day other than today — wired
  *  through `useManufactureHerdFeed` to `manufactureHerdFeed`'s third
  *  argument, which was previously dead from this hook. */
-function SystemTab({ herd }: { herd: string }) {
+function SystemTab({
+  herd,
+  recipes,
+  selectedBom,
+  onSelectBom,
+}: {
+  herd: string;
+  recipes: HerdRecipe[];
+  selectedBom: string;
+  onSelectBom: (bomNo: string) => void;
+}) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const info = useHerdFeedInfo(herd);
   const day = useFeedDayStatus(herd);
   const manufacture = useManufactureHerdFeed();
+  // The fallback for a non-standing pick — see the comment on `onRun` below
+  // for why this tab needs it at all.
+  const runRecipe = useManualFeed();
 
   const [portion, setPortion] = useState<Portion | null>(null);
   const [date, setDate] = useState(todayISO());
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // What the picker's choice actually mixes: the selected recipe's own
+  // per-head figures where one is resolved, falling back to `info` (always
+  // the herd's standing BOM) until `recipes` has loaded. Recomputing this
+  // from the payload `herd_recipes` already sent — rather than re-fetching a
+  // preview for the chosen bom_no — is what "no extra round trip" means here
+  // too, same as the Manual tab's rows.
+  const selectedRecipe = recipes.find((r) => r.bomNo === selectedBom) ?? null;
+  const onStanding = !selectedRecipe || selectedRecipe.isStanding;
 
   // The suggestion is a default, not a rule: half a fresh day, the remainder
   // after. Only seeded once — after that the operator's own choice on the
@@ -180,12 +298,44 @@ function SystemTab({ herd }: { herd: string }) {
   const d = info.data;
   const st = day.data;
 
+  // Two routes to the same button, chosen by what's picked above:
+  //
+  //   standing ration -> `manufactureHerdFeed`, unchanged from before this
+  //     screen had a picker at all.
+  //
+  //   a previously-used recipe -> `manualFeed`, sending that recipe's own
+  //     lines back UNEDITED plus the herd's registered head count. That is
+  //     not a workaround bolted on here — it is the one route the server
+  //     already wires a `bom_no` override through end to end
+  //     (`manual_feed.py` -> `tuned_bom(base_bom=...)` ->
+  //     `manufacture_herd_feed(bom_no=...)`), because `record_feeding.py`'s
+  //     "manufacture" action and `manufacture_feed()` never read a `bom_no`
+  //     out of their payload at all (only the engine call underneath them
+  //     accepts one). Since nothing here is actually tuned, `tuned_bom`
+  //     reuses `selectedBom` rather than minting a new BOM, so this reads as
+  //     "mix this recipe" — the run still lands labelled "Manual" in
+  //     `feed_mode`, because that is genuinely the path that ran it.
   const onRun = async () => {
     setSubmitError(null);
     if (!herd) return setSubmitError("Pick a herd.");
+    if (!d) return setSubmitError("Still loading the herd's programme — try again in a moment.");
     if (portionNum <= 0) return setSubmitError("A run has to be for more than nothing.");
     try {
-      const r = await manufacture.mutateAsync({ herd, portion: portionNum, postingDate: date });
+      const r = onStanding
+        ? await manufacture.mutateAsync({
+            herd,
+            portion: portionNum,
+            postingDate: date,
+            bomNo: selectedBom || undefined,
+          })
+        : await runRecipe.mutateAsync({
+            herd,
+            lines: selectedRecipe!.lines.map((l) => ({ itemCode: l.itemCode, qty: l.qty })),
+            heads: d.heads,
+            portion: portionNum,
+            postingDate: date,
+            baseBom: selectedBom,
+          });
       await Promise.all([info.refetch(), day.refetch()]);
       Alert.alert(
         `${r.feed_mode} feeding mixed`,
@@ -201,6 +351,33 @@ function SystemTab({ herd }: { herd: string }) {
   if (info.isLoading || !d) {
     return <Loader />;
   }
+
+  // What the picker's choice actually mixes: the selected recipe's own
+  // per-head figures where one has resolved, else `info`'s (always the
+  // herd's standing BOM — `getHerdFeedInfo` cannot answer for another
+  // recipe). Every recipe already arrived with its own `lines` in the
+  // `herd_recipes` payload, so this is a client-side recompute, not a second
+  // round trip — the same "already have it" reasoning the Manual tab's row
+  // seeding below relies on.
+  const active = selectedRecipe
+    ? {
+        itemName: selectedRecipe.itemName,
+        perHeadQty: selectedRecipe.perHeadQty,
+        uom: selectedRecipe.uom,
+        lines: selectedRecipe.lines,
+      }
+    : {
+        itemName: d.productionItemName,
+        perHeadQty: d.perHeadQty,
+        uom: d.uom,
+        lines: d.lines.map((l) => ({
+          itemCode: l.itemCode,
+          itemName: l.itemName,
+          qty: d.heads ? l.recipeQty / d.heads : 0,
+          uom: l.recipeUom,
+        })),
+      };
+  const activeTotal = active.perHeadQty * d.heads;
 
   return (
     <>
@@ -218,12 +395,26 @@ function SystemTab({ herd }: { herd: string }) {
         </View>
       ) : null}
 
+      <Field
+        label="Recipe"
+        help="Defaults to the herd's standing ration. Pick a recipe tuned for this herd before instead if this run should follow it."
+      >
+        <RecipePicker recipes={recipes} value={selectedBom} onChange={onSelectBom} />
+      </Field>
+
+      {!onStanding ? (
+        <Banner tone="warning">
+          Mixing a previously used recipe for {herd}, not the standing ration. This posts as a
+          Manual feeding, since that is the run this recipe was made on.
+        </Banner>
+      ) : null}
+
       <View style={s.card}>
         <Text style={s.cardLbl}>Ration</Text>
-        <Text style={s.cardTitle}>{d.productionItemName}</Text>
+        <Text style={s.cardTitle}>{active.itemName}</Text>
         <Text style={s.cardSub}>
-          {d.heads} head × {d.perHeadQty.toLocaleString()} {d.uom} = {kg(d.totalManufactureQty)}{" "}
-          for a full day
+          {d.heads} head × {active.perHeadQty.toLocaleString()} {active.uom} = {kg(activeTotal)} for
+          a full day
         </Text>
       </View>
 
@@ -240,7 +431,7 @@ function SystemTab({ herd }: { herd: string }) {
 
       <Calc
         label="This run mixes and feeds"
-        value={kg(d.totalManufactureQty * portionNum)}
+        value={kg(activeTotal * portionNum)}
         footer={`${d.heads} head · mixed into ${d.store} and issued in the same action`}
       />
 
@@ -248,16 +439,13 @@ function SystemTab({ herd }: { herd: string }) {
       <View style={s.box}>
         {/* Recipe units throughout, per-head and whole-run, so the two figures
             in a row can be read against each other — and so this reads in the
-            same units as the Manual tab's editable boxes. `requiredQty`/`uom`
-            are the stock-unit twins (hay: 222 kg here, 15.54 BALE there); one
-            row must never mix the two. */}
-        {d.lines.map((l) => (
+            same units as the Manual tab's editable boxes. The stock-unit twins
+            (hay: 222 kg here, 15.54 BALE there) never belong in this row. */}
+        {active.lines.map((l) => (
           <KV
             key={l.itemCode}
-            k={`${l.itemName} (${(d.heads ? l.recipeQty / d.heads : 0).toLocaleString()} ${
-              l.recipeUom
-            }/head)`}
-            v={`${(l.recipeQty * portionNum).toLocaleString()} ${l.recipeUom}`}
+            k={`${l.itemName} (${l.qty.toLocaleString()} ${l.uom}/head)`}
+            v={`${(l.qty * d.heads * portionNum).toLocaleString()} ${l.uom}`}
           />
         ))}
       </View>
@@ -270,8 +458,8 @@ function SystemTab({ herd }: { herd: string }) {
       {submitError ? <Banner tone="danger">{submitError}</Banner> : null}
 
       <Button
-        label={manufacture.isPending ? "Mixing…" : "Mix & feed"}
-        disabled={manufacture.isPending || !herd || portionNum <= 0}
+        label={manufacture.isPending || runRecipe.isPending ? "Mixing…" : "Mix & feed"}
+        disabled={manufacture.isPending || runRecipe.isPending || !herd || portionNum <= 0}
         onPress={onRun}
       />
     </>
@@ -284,27 +472,40 @@ type TunedRow = { itemCode: string; itemName: string; uom: string; qty: string }
  *  actually cover — not necessarily today, and not necessarily the herd's
  *  registered count.
  *
- *  `lines[].qty` seeds from `getHerdFeedInfo(herd).lines[]` as
- *  `recipeQty / heads`, labelled `recipeUom` — the base BOM's own per-head
- *  figure, in the unit the recipe is written in. This is exactly what the
- *  desk block's `seedManual()` does, and it is the only correct source.
+ *  `rows` seeds from the *selected recipe's* own `lines[]` — arriving as part
+ *  of the same `herd_recipes` payload the recipe picker (`RecipePicker`,
+ *  shared with the System tab) already fetched, so picking a recipe here is
+ *  never a second round trip. Each line is already a per-head figure in the
+ *  recipe's own unit of measure (`HerdRecipeLine.qty`/`uom` — `BOM Item.qty`,
+ *  never `stock_qty`), so it is used exactly as it arrives.
  *
- *  It used to read `info.breakdown[].perHeadQty`, and `breakdown` is not a key
- *  the "info" action returns at all, so every herd opened here showed "No
- *  ingredients. Add one below."
- *
- *  The obvious repair is the wrong one. `breakdown` lives on the server's
- *  `get_herd_feed_info()`, whose `per_head_qty` is `required_qty / heads` with
- *  `required_qty` in STOCK units. Hay is written 2 kg per head in the recipe
- *  and stocked in BALE at 0.07 bale/kg, so that route would put 0.14 in a box
- *  labelled kg and send a fourteenth of the ration.
+ *  This used to seed from `getHerdFeedInfo(herd).lines[]` (`recipeQty /
+ *  heads`) — always the herd's *standing* BOM, with no way to start from a
+ *  previously tuned one. Before that it read `info.breakdown[].perHeadQty`,
+ *  which is not a key the "info" action returns at all, so every herd opened
+ *  here showed "No ingredients. Add one below." The obvious repair then was
+ *  the wrong one too: `breakdown` lives on the server's `get_herd_feed_info()`,
+ *  whose `per_head_qty` is `required_qty / heads` with `required_qty` in STOCK
+ *  units — hay is written 2 kg per head in the recipe and stocked in BALE at
+ *  0.07 bale/kg, so that route would put 0.14 in a box labelled kg and send a
+ *  fourteenth of the ration.
  *
  *  Every value typed here is sent to the server exactly as shown — never
  *  scaled by heads, never converted between UOMs. The server derives the
  *  conversion from the herd's BOM and multiplies by the head count itself;
  *  doing either of those here would silently issue the wrong amount of stock.
  */
-function ManualTab({ herd }: { herd: string }) {
+function ManualTab({
+  herd,
+  recipes,
+  selectedBom,
+  onSelectBom,
+}: {
+  herd: string;
+  recipes: HerdRecipe[];
+  selectedBom: string;
+  onSelectBom: (bomNo: string) => void;
+}) {
   const c = useColors();
   const amber = useScheme() === "dark" ? BACKDATE_AMBER_DARK : BACKDATE_AMBER_LIGHT;
   const s = useMemo(() => makeStyles(c), [c]);
@@ -317,22 +518,60 @@ function ManualTab({ herd }: { herd: string }) {
   const [date, setDate] = useState(todayISO());
   const [error, setError] = useState<string | null>(null);
 
-  // Seed once, then leave the operator's edits alone. Re-seeding on every
-  // refetch would wipe a half-typed recipe under their fingers.
+  // Which recipe `rows` currently reflects, and a snapshot of the rows it was
+  // seeded with — the pair `isDirty` below compares the live rows against, to
+  // tell a tuned edit from an unopened recipe before letting a picker change
+  // silently overwrite it.
+  const [seededBom, setSeededBom] = useState<string | null>(null);
+  const [seedSnapshot, setSeedSnapshot] = useState<string>("");
+
+  // The head count still seeds once from the herd's registered count and is
+  // then left alone — untouched by the recipe picker, per the brief. Only
+  // where the ingredient rows come from has changed (below).
   useEffect(() => {
-    if (!info || rows) return;
-    setRows(
-      info.lines.map((l) => ({
-        itemCode: l.itemCode,
-        itemName: l.itemName,
-        // Recipe unit and recipe amount, per head. Never `uom`/`requiredQty`,
-        // which are the stock-unit twins — see the block comment above.
-        uom: l.recipeUom,
-        qty: String(info.heads ? l.recipeQty / info.heads : 0),
-      })),
-    );
+    if (!info || heads) return;
     setHeads(info.heads ? String(info.heads) : "");
-  }, [info, rows]);
+  }, [info, heads]);
+
+  // Rows seed from the *selected recipe's* own lines — already per-head, in
+  // the recipe's own unit of measure, arrived with the `herd_recipes` payload
+  // — never from `info.lines` (the herd's standing BOM only) and never
+  // re-derived by dividing anything by heads. Seeds once per distinct
+  // `selectedBom`: switching recipes reseeds; typing in a box does not, same
+  // "seed once" shape as the old effect this replaces.
+  useEffect(() => {
+    if (!selectedBom || seededBom === selectedBom) return;
+    const recipe = recipes.find((r) => r.bomNo === selectedBom);
+    if (!recipe) return;
+    const fresh: TunedRow[] = recipe.lines.map((l) => ({
+      itemCode: l.itemCode,
+      itemName: l.itemName,
+      uom: l.uom,
+      qty: String(l.qty),
+    }));
+    setRows(fresh);
+    setSeededBom(selectedBom);
+    setSeedSnapshot(JSON.stringify(fresh));
+  }, [selectedBom, recipes, seededBom]);
+
+  const isDirty = seedSnapshot !== "" && JSON.stringify(rows) !== seedSnapshot;
+
+  // Switching recipes reseeds every row from scratch — so a tuned edit not
+  // yet submitted would vanish silently. Warn and require confirmation rather
+  // than either blocking the switch outright or losing the edit quietly;
+  // "keep editing" leaves the picker showing the old recipe until confirmed.
+  const requestRecipeChange = (bomNo: string) => {
+    if (bomNo === selectedBom) return;
+    if (!isDirty) return onSelectBom(bomNo);
+    Alert.alert(
+      "Switch recipe?",
+      "You've changed quantities for the current recipe. Switching will replace them with the new recipe's amounts.",
+      [
+        { text: "Keep editing", style: "cancel" },
+        { text: "Switch recipe", style: "destructive", onPress: () => onSelectBom(bomNo) },
+      ],
+    );
+  };
 
   const setQty = (itemCode: string, qty: string) =>
     setRows((prev) => (prev ?? []).map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)));
@@ -376,6 +615,10 @@ function ManualTab({ herd }: { herd: string }) {
         heads: count,
         postingDate: date,
         employee: operator ?? undefined,
+        // The recipe the operator was actually tuning from — so the BOM
+        // `manual_feed` builds descends from what was on screen, not from
+        // whichever BOM happens to be the herd's registered one.
+        baseBom: selectedBom || undefined,
       });
       Alert.alert(
         `${r.feed_mode} feeding mixed`,
@@ -398,6 +641,13 @@ function ManualTab({ herd }: { herd: string }) {
         <MaterialCommunityIcons name="alert-outline" size={16} color={amber} style={{ marginTop: 1 }} />
         <Text style={[s.warningText, { color: amber }]}>{MANUAL_WARNING}</Text>
       </View>
+
+      <Field
+        label="Start from"
+        help="The rows below reload from whichever recipe is picked here. Untuned edits are confirmed before they're replaced."
+      >
+        <RecipePicker recipes={recipes} value={selectedBom} onChange={requestRecipeChange} />
+      </Field>
 
       <SectionTitle>Per animal</SectionTitle>
       {rows.length === 0 ? <Text style={s.empty}>No ingredients. Add one below.</Text> : null}

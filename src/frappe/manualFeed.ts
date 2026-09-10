@@ -23,6 +23,13 @@ export type ManualFeedInput = {
   postingDate?: string;
   portion?: number;
   employee?: string;
+  /** The recipe the operator was tuning from — the herd's standing ration, or
+   *  a previously-tuned BOM picked instead. Sent as `base_bom` so the tuned
+   *  BOM `manual_feed` builds descends from what was actually on screen,
+   *  rather than from whichever BOM happens to be the herd's registered one.
+   *  `manual_feed.py` already reads this key (`tuned_bom(herd, lines,
+   *  base_bom=d.get("base_bom"))`) — it was simply never sent from here. */
+  baseBom?: string;
 };
 
 /** Mix and issue a ration the operator tuned by hand.
@@ -47,6 +54,7 @@ export const manualFeed = async (
       portion: input.portion ?? 1,
       posting_date: input.postingDate,
       employee: input.employee,
+      base_bom: input.baseBom,
       lines: input.lines.map((l) => ({ item_code: l.itemCode, qty: l.qty })),
     },
   });
