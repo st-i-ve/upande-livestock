@@ -22,15 +22,17 @@
  * and Livestock Settings names a vet expense account). Create the test vets,
  * Employee and Supplier yourself and remove them afterwards.
  *
- * THE TEST USER needs (1) the Employee role, because the app reads Employee
- * (operator lookup, operator picker) as the logged-in user, and (2) an Employee
- * record whose user_id is that user ("GET Employee by user" fails otherwise),
- * plus the field roles the phone user has (Livestock User / Livestock Manager or
- * whatever the site grants record-keeping staff). Without the Employee role
- * the three Employee read steps fail with 403 - that is the setup, not the app.
- *   bench --site kaitet.local add-system-user-role ... or in a console:
- *   frappe.get_doc("User", u).add_roles("Employee", "Livestock Manager")
- * Remove the user and Employee afterwards.
+ * THE TEST USER (a System User; nothing else makes this green):
+ *   - role Employee: the app reads Employee (operator lookup and picker) as the
+ *     logged-in user; without it those three steps fail with 403
+ *   - an Employee record with user_id = that user and employee_name set
+ *   - role Livestock Manager (record-keeping), plus Stock User, Stock Manager and
+ *     Manufacturing User for the feeding steps (Stock Entry / Work Order)
+ *   frappe.get_doc("User", u).add_roles("Employee", "Livestock Manager",
+ *     "Stock User", "Stock Manager", "Manufacturing User")
+ * SMOKE_ANIMALS: three adult females in a milking herd, EXCEPT the third, which
+ * must be under 6 months old (the Dehorning step is refused on an older animal).
+ * Remove the user, Employee and animals afterwards.
  * Point it at a development site only.
  */
 import { Buffer } from "node:buffer";
