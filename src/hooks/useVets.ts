@@ -28,6 +28,8 @@ export const useVetChoice = () => {
     setVet,
     /** The chosen vet is a farm employee, who is not paid a fee. */
     isInternal: vets.find((v) => v.id === vet)?.type === "Internal",
+    /** The chosen vet is a contracted practitioner, who may charge a fee. */
+    isExternal: vets.find((v) => v.id === vet)?.type === "External",
     loading: q.isLoading,
   };
 };

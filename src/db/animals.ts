@@ -12,6 +12,8 @@ export type ServerAnimal = {
   dob: string | null;
   herd: string | null;
   status: string | null;
+  /** heifer | fresh | open | served | confirmed | dry | retired, worked out by the server. */
+  stage?: string | null;
   repro_status: string | null;
   image: string | null;
   dam: string | null;
@@ -24,7 +26,7 @@ export type ServerAnimal = {
 type Row = Omit<ServerAnimal, "dob"> & { dob: string | null };
 
 const COLS = [
-  "name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status",
+  "name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage",
   "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified",
 ] as const;
 
@@ -77,6 +79,7 @@ const toAnimal = (r: Row): Animal => ({
   dam: r.dam,
   sire: r.sire,
   status: r.status,
+  stage: r.stage ?? null,
 });
 
 /** Active animals, optionally narrowed by a search on tag, name or herd. */

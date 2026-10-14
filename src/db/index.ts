@@ -34,6 +34,13 @@ const MIGRATIONS: string[][] = [
     `CREATE INDEX idx_animals_herd ON animals (herd COLLATE NOCASE)`,
     `CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT)`,
   ],
+  // 1 -> 2: the animal's stage ("fresh", "confirmed", ...) now rides on every
+  // animals_since row so the badge works offline. Rows already on the phone have
+  // none, so the sync cursor is dropped and the next sync is a full one.
+  [
+    `ALTER TABLE animals ADD COLUMN stage TEXT`,
+    `DELETE FROM meta WHERE key = 'animals_server_time'`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

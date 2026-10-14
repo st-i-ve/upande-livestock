@@ -32,6 +32,8 @@ export function AnimalDetail({ id }: { id: string }) {
   const a = local.data
     ? { ...local.data, inTreatment: online.data?.inTreatment ?? 0, milkSafe: online.data?.milkSafe ?? null }
     : (online.data ?? null);
+  // The stored stage answers offline; the live profile, when there is one, wins.
+  const stage = profile?.stage ?? local.data?.stage ?? null;
   const isLoading = local.isLoading && online.isLoading;
   const error = a ? null : online.error;
   const isRefetching = online.isRefetching;
@@ -113,7 +115,7 @@ export function AnimalDetail({ id }: { id: string }) {
             <Text style={s.capName} numberOfLines={1}>{a.name}</Text>
             <Text style={s.capId}>{a.id}</Text>
           </View>
-          {profile ? <Text style={s.stage}>{STAGE_LABELS[profile.stage] ?? profile.stage}</Text> : null}
+          {stage ? <Text style={s.stage}>{STAGE_LABELS[stage] ?? stage}</Text> : null}
         </View>
       </View>
 
