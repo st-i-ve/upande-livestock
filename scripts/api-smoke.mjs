@@ -383,6 +383,19 @@ async function writes() {
     same(doc, { herd: HERD, total_yield_kg: 120, discarded_kg: 5, cows_milked: 10 }, "milk recording");
     return m.name;
   });
+  await step("write", "mobile.record_milking: offline yesterday (grace), 2 days ago refused", async () => {
+    const pd = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+    const day = (n) => new Date(Date.parse(pd.today) - n * 864e5).toISOString().slice(0, 10);
+    const base = { herd: HERD, milking_time: "05:30", total_yield_kg: 10, cows_milked: 1, operator: op, remarks: "smoke offline", offline: 1, captured_at: `${day(1)} 05:35:00` };
+    const old = (await post(`${M}.mobile.record_milking.record_milking`, { payload: { ...base, recording_date: day(3) } })).data?.message;
+    if (!old?.error || !/more than a day old/i.test(old.error)) throw new Error(`an offline milking 3 days old was not refused clearly: ${JSON.stringify(old)}`);
+    if (pd.backdating_open) return "skipped: backdating is open on this site";
+    const m = msgOf(await post(`${M}.mobile.record_milking.record_milking`, { payload: { ...base, recording_date: day(1) } }));
+    track("Milk Recording", m.name);
+    const doc = await got("Milk Recording", m.name);
+    same(doc, { captured_offline: 1 }, "offline milking");
+    return m.name;
+  });
   await step("write", "feeding: manufacture (system)", async () => {
     const m = msgOf(await post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "manufacture", herd: ctx.feedHerd, portion: 0.01, posting_date: today } }));
     track("Work Order", m.work_order);

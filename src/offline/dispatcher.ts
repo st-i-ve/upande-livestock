@@ -84,6 +84,13 @@ export const dispatchDirect = (
   payload: any,
 ): Promise<any> => HANDLERS[type](payload);
 
+/** A queued milking the server refuses on a closed window is more than a day
+ *  old; say what to do about it. The item stays queued for retry or discard. */
+const tooOldMessage = (item: PendingMutation, message: string): string =>
+  item.type === "MilkRecording" && /backdating is closed|more than a day old/i.test(message)
+    ? "This milking is more than a day old — ask the Livestock Manager to open backdating, then retry."
+    : message;
+
 let draining = false;
 
 export type DrainResult = {
@@ -111,7 +118,7 @@ export const drainQueue = async (): Promise<DrainResult> => {
         await remove(item.id);
         succeeded += 1;
       } catch (err) {
-        const message = extractFrappeError(err);
+        const message = tooOldMessage(item, extractFrappeError(err));
         await markAttempt(item.id, message);
         // A refusal the server wrote (OpsError: HTTP 200 + {error}) carries no
         // `response` but is not a dead network; it must not stall the queue.

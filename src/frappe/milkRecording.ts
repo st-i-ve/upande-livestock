@@ -20,6 +20,11 @@ export type CreateMilkRecordingInput = {
   cowsMilked?: number;
   operator?: string;            // Employee name (optional)
   remarks?: string;
+  /** Set only when the milking is parked in the offline queue: phone time of
+   *  recording (`YYYY-MM-DD HH:MM:SS`) and the flag that earns one day of grace
+   *  on a closed backdating window. The milking's date stays the milker's own. */
+  capturedAt?: string;
+  offline?: boolean;
 };
 
 /**
@@ -68,6 +73,10 @@ export const createMilkRecording = async (
   if (input.cowsMilked != null) body.cows_milked = input.cowsMilked;
   if (input.operator) body.operator = input.operator;
   if (input.remarks) body.remarks = input.remarks;
+  if (input.offline) {
+    body.offline = 1;
+    if (input.capturedAt) body.captured_at = input.capturedAt;
+  }
 
   const client = await getClient();
   const res = await client.post(

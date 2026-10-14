@@ -42,6 +42,15 @@ export type OfflineMutationResult = {
   data: any;
 };
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Mark a milking as taken without signal, with the phone's time. */
+const stampOffline = <T extends object>(payload: T): T => {
+  const d = new Date();
+  const capturedAt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return { ...payload, offline: true, capturedAt };
+};
+
 /**
  * MILKING ONLY. Every other event moves stock or is checked live by the server,
  * so it is sent directly and never queued. Milking is the one thing a parlour
@@ -61,7 +70,7 @@ const tryDirectOrEnqueue = async <T extends object>(
       const queued = await enqueue({
         id: newId(),
         type,
-        payload,
+        payload: type === "MilkRecording" ? stampOffline(payload) : payload,
         label,
         createdAt: new Date().toISOString(),
       });
