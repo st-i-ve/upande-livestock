@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
+import type { BottomTabBarButtonProps } from "expo-router/js-tabs";
 import { Tabs } from "expo-router";
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -12,7 +12,9 @@ const BAR_CONTENT_HEIGHT = 58;
 const CIRCLE_DIAMETER = 50;
 const CIRCLE_LIFT = 10;
 
-function RecordTabButton(props: BottomTabBarButtonProps) {
+type RecordTabButtonProps = Pick<BottomTabBarButtonProps, "onPress" | "onLongPress" | "accessibilityState">;
+
+function RecordTabButton(props: RecordTabButtonProps) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const selected = props.accessibilityState?.selected;
@@ -72,7 +74,13 @@ export default function TabLayout() {
         name="record"
         options={{
           tabBarLabel: () => null,
-          tabBarButton: (props) => <RecordTabButton {...props} />,
+          tabBarButton: (props) => (
+            <RecordTabButton
+              onPress={props.onPress}
+              onLongPress={props.onLongPress}
+              accessibilityState={props.accessibilityState}
+            />
+          ),
         }}
       />
       <Tabs.Screen
