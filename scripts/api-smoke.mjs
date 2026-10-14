@@ -21,8 +21,20 @@
  * is posted as a Journal Entry when SMOKE_VET_POSTS=1 (that vet has a Supplier
  * and Livestock Settings names a vet expense account). Create the test vets,
  * Employee and Supplier yourself and remove them afterwards.
+ *
+ * THE TEST USER needs (1) the Employee role, because the app reads Employee
+ * (operator lookup, operator picker) as the logged-in user, and (2) an Employee
+ * record whose user_id is that user ("GET Employee by user" fails otherwise),
+ * plus the field roles the phone user has (Livestock User / Livestock Manager or
+ * whatever the site grants record-keeping staff). Without the Employee role
+ * the three Employee read steps fail with 403 - that is the setup, not the app.
+ *   bench --site kaitet.local add-system-user-role ... or in a console:
+ *   frappe.get_doc("User", u).add_roles("Employee", "Livestock Manager")
+ * Remove the user and Employee afterwards.
  * Point it at a development site only.
  */
+import { Buffer } from "node:buffer";
+
 const URL_ = process.env.LIVESTOCK_URL;
 const USER = process.env.LIVESTOCK_USER;
 const PASS = process.env.LIVESTOCK_PASSWORD;
@@ -120,6 +132,11 @@ await step("read", "mobile.get_bootstrap_bundle (useHerds)", async () => {
   need(m.herds?.[0], ["name", "label", "heads", "category", "is_milking", "is_dry", "has_bom"], "herd");
   ctx.herds = m.herds;
   return `${m.herds.length} herds`;
+});
+await step("read", "settings.posting_day (server today + backdating open?)", async () => {
+  const m = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+  need(m, ["today", "backdating_open"], "posting_day");
+  return `today ${m.today}, backdating ${m.backdating_open ? "OPEN" : "closed"}`;
 });
 const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified"];
 await step("read", "mobile.animals_since full (offline store, login)", async () => {
