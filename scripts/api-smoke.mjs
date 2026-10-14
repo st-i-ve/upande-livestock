@@ -23,16 +23,30 @@
  * Employee and Supplier yourself and remove them afterwards.
  *
  * THE TEST USER (a System User; nothing else makes this green):
- *   - role Employee: the app reads Employee (operator lookup and picker) as the
- *     logged-in user; without it those three steps fail with 403
- *   - an Employee record with user_id = that user and employee_name set
- *   - role Livestock Manager (record-keeping), plus Stock User, Stock Manager and
- *     Manufacturing User for the feeding steps (Stock Entry / Work Order)
- *   frappe.get_doc("User", u).add_roles("Employee", "Livestock Manager",
- *     "Stock User", "Stock Manager", "Manufacturing User")
+ *   - an Employee record with user_id = that user and employee_name set (the
+ *     app learns who the user is from posting_day, so no Employee role is needed;
+ *     a user without an Employee is view-only, see WHO MAY RECORD below)
+ *   - role Livestock Manager. That is all: the feeding steps book Stock Entries and
+ *     Work Orders on the server after its own role check, so no ERPNext role
+ *     (Stock User, Manufacturing User ...) is needed.
+ *   frappe.get_doc("User", u).add_roles("Livestock Manager")
  * SMOKE_ANIMALS: three adult females in a milking herd, EXCEPT the third, which
  * must be under 6 months old (the Dehorning step is refused on an older animal).
  * Remove the user, Employee and animals afterwards.
+ *
+ * WHO MAY RECORD (both optional; each is a step group of its own):
+ *   SMOKE_NONEMP_USER / SMOKE_NONEMP_PASSWORD: a user with a livestock role but NO
+ *     Employee. Must be view-only: posting_day says is_employee false, the reads
+ *     still answer, and every recording endpoint refuses with code not_employee
+ *     (and the milking-specific words for milking).
+ *   SMOKE_ROLES='{"Livestock Milker":{"user":"..","password":".."}, ...}': one test
+ *     user per role (Livestock Milker, Livestock Attendant, Livestock Breeder,
+ *     Livestock Vet, Livestock Stores, Livestock Manager), each holding ONLY that
+ *     role plus an Employee with user_id set. Each is logged in and must be able to
+ *     make the reads the app makes for its screens and to record what its role
+ *     records, with no ERPNext role. A 403 or "not permitted" fails the step.
+ *     Roles' writes need WRITE=1 (and SMOKE_ANIMALS / SMOKE_HERD).
+ * Remove those users, their Employees and everything they recorded afterwards.
  * Point it at a development site only.
  */
 import { Buffer } from "node:buffer";
@@ -46,6 +60,9 @@ const HERD = process.env.SMOKE_HERD;
 const VET_EXT = process.env.SMOKE_VET_EXTERNAL;
 const VET_INT = process.env.SMOKE_VET_INTERNAL;
 const VET_POSTS = process.env.SMOKE_VET_POSTS === "1";
+const NONEMP_USER = process.env.SMOKE_NONEMP_USER;
+const NONEMP_PASS = process.env.SMOKE_NONEMP_PASSWORD;
+const ROLES = process.env.SMOKE_ROLES ? JSON.parse(process.env.SMOKE_ROLES) : null;
 if (!URL_ || !USER || !PASS) {
   console.error("Set LIVESTOCK_URL, LIVESTOCK_USER and LIVESTOCK_PASSWORD.");
   process.exit(2);
@@ -113,15 +130,16 @@ const track = (doctype, name) => name && created.push({ doctype, name });
 const ctx = {};
 
 // ---------------------------------------------------------------------------
-await step("auth", "POST /api/method/login", async () => {
-  const body = new URLSearchParams({ usr: USER, pwd: PASS });
+async function login(user, pass) {
+  const body = new URLSearchParams({ usr: user, pwd: pass });
   const headers = { "Content-Type": "application/x-www-form-urlencoded" };
   const res = await fetch(URL_ + "/api/method/login", { method: "POST", headers, body });
   cookie = (res.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
   const j = await res.json();
   if (res.status !== 200 || !cookie) throw new Error(`login ${res.status} ${JSON.stringify(j)}`);
   return j.full_name;
-});
+}
+await step("auth", "POST /api/method/login", () => login(USER, PASS));
 await step("auth", "frappe.auth.get_logged_user", async () => {
   const m = msgOf(await get("/api/method/frappe.auth.get_logged_user"));
   if (m !== USER) throw new Error(`logged in as ${m}`);
@@ -137,7 +155,7 @@ await step("read", "mobile.get_bootstrap_bundle (useHerds)", async () => {
 });
 await step("read", "settings.posting_day (server today + backdating open?)", async () => {
   const m = msgOf(await get(`${M}.settings.posting_day.posting_day`));
-  need(m, ["today", "backdating_open"], "posting_day");
+  need(m, ["today", "backdating_open", "is_employee", "employee", "employee_name"], "posting_day");
   return `today ${m.today}, backdating ${m.backdating_open ? "OPEN" : "closed"}`;
 });
 const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage", "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified"];
@@ -180,23 +198,16 @@ await step("read", "GET Livestock Event list (useAnimalEvents)", async () => {
   if (m.length) need(m[0], f, "event row");
   return `${m.length} events`;
 });
-await step("read", "GET Employee by user (useOperator)", async () => {
-  const m = msgOf(await get("/api/resource/Employee", {
-    fields: ["name", "employee_name", "user_id"], filters: [["user_id", "=", USER]], limit_page_length: 1,
-  }));
-  if (!m[0]) throw new Error("no Employee linked to this user");
-  ctx.employee = m[0].name;
-  return m[0].name;
+await step("read", "posting_day names the Employee (useOperator, login)", async () => {
+  const m = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+  if (!m.is_employee || !m.employee) throw new Error("no Employee linked to this user");
+  ctx.employee = m.employee;
+  return `${m.employee} ${m.employee_name}`;
 });
-await step("read", "GET Employee search (useEmployees)", async () => {
-  const m = msgOf(await get("/api/resource/Employee", {
-    fields: ["name", "employee_name", "user_id"], filters: [["status", "=", "Active"], ["employee_name", "like", "%a%"]],
-    limit_page_length: 20, order_by: "employee_name asc",
-  }));
-  return `${m.length} rows`;
-});
-await step("read", "GET Employee/<name>", async () => {
-  need(msgOf(await get(`/api/resource/Employee/${encodeURIComponent(ctx.employee)}`)), ["employee_name"], "employee");
+await step("read", "people.employee_options (operator picker, no Employee role needed)", async () => {
+  const m = msgOf(await post(`${M}.people.employee_options.employee_options`, { payload: {} }));
+  need(m, ["employees", "mine"], "employee_options");
+  return `${m.employees.length} rows, mine=${m.mine}`;
 });
 await step("read", "get_single_value Livestock Settings.custom_default_company", async () => {
   const m = msgOf(await get("/api/method/frappe.client.get_single_value", { doctype: "Livestock Settings", field: "custom_default_company" }));
@@ -528,6 +539,129 @@ async function writes() {
 }
 
 if (WRITE) await writes();
+
+// ---------------------------------------------------------------------------
+// WHO MAY RECORD
+const NOT_EMP = "You're not registered as an employee, so you can't record. Ask HR to link your user to an Employee.";
+const NOT_EMP_MILK = "You're not registered as an employee, so you can't record milkings.";
+const isPerm = (t) => /403|not permitted|insufficient permission/i.test(t);
+
+/** Run a read as the session user; a 403 or a "not permitted" answer fails it. */
+async function readOk(fn) {
+  const r = await fn();
+  const text = r.status !== 200 ? `HTTP ${r.status} ${JSON.stringify(r.data)?.slice(0, 200)}` : r.data?.message?.error || "";
+  if (r.status !== 200 || r.data?.message?.error) throw new Error(String(text).slice(0, 220));
+}
+
+/** The reads every signed-in farm user's app makes, whatever the role. */
+function commonReads(who, me) {
+  const rd = (name, fn) => step(who, `read ${name}`, () => readOk(fn));
+  return Promise.all([]).then(async () => {
+    await rd("posting_day", () => get(`${M}.settings.posting_day.posting_day`));
+    await rd("get_bootstrap_bundle", () => post(`${M}.mobile.get_bootstrap_bundle.get_bootstrap_bundle`, {}));
+    await rd("animals_since", () => get(`${M}.mobile.animals_since.animals_since`));
+    await rd("Animal/<name>", () => get(`/api/resource/Animal/${encodeURIComponent(ctx.animal)}`));
+    await rd("animal_profile", () => post(`${M}.animals.animal_profile.animal_profile`, { payload: { animal: ctx.animal } }));
+    await rd("Livestock Health Case list", () => get("/api/resource/Livestock Health Case", { fields: ["name", "milk_safe_date"], limit_page_length: 1 }));
+    await rd("Livestock Event list", () => get("/api/resource/Livestock Event", { fields: ["name", "animal", "event_type", "event_date"], limit_page_length: 5 }));
+    await rd("Livestock Settings doc", () => get("/api/resource/Livestock Settings/Livestock Settings"));
+    await rd("health_options", () => post(`${M}.health.health_options.health_options`, {}));
+    await rd("movement.eligibility", () => post(`${M}.movement.eligibility.eligibility`, {}));
+    await rd("employee_options", () => post(`${M}.people.employee_options.employee_options`, { payload: {} }));
+  });
+}
+
+async function nonEmployee() {
+  await step("auth", "non-employee: login", () => login(NONEMP_USER, NONEMP_PASS));
+  const who = "non-employee";
+  await step(who, "posting_day says is_employee false", async () => {
+    const m = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+    if (m.is_employee !== false || m.employee) throw new Error(`is_employee ${m.is_employee} employee ${m.employee}`);
+  });
+  await step(who, "the herd is still readable (animals_since, Animal/<name>)", async () => {
+    msgOf(await get(`${M}.mobile.animals_since.animals_since`));
+    msgOf(await get(`/api/resource/Animal/${encodeURIComponent(ctx.animal)}`));
+  });
+  const refused = (name, call, words) =>
+    step(who, `${name} is refused`, async () => {
+      const m = (await call()).data?.message;
+      if (!m?.error) throw new Error(`was accepted: ${JSON.stringify(m)?.slice(0, 120)}`);
+      if (m.code !== "not_employee") throw new Error(`refused for another reason: ${m.error}`);
+      if (m.error !== words) throw new Error(`wrong words: ${m.error}`);
+      track("Livestock Event", m.name); // nothing should exist; tracked defensively
+    });
+  const t = today;
+  await refused("record_milking", () => post(`${M}.mobile.record_milking.record_milking`, { payload: { herd: HERD || "x", milking_time: "05:30", recording_date: t, total_yield_kg: 1, cows_milked: 1 } }), NOT_EMP_MILK);
+  for (const [type, extra] of [
+    ["Weight Recording", { animal: F1 || ctx.animal, weight_date: t, weight_kg: 400 }],
+    ["Heat Detection", { animal: F1 || ctx.animal, event_date: t }],
+    ["Service", { animal: F1 || ctx.animal, event_date: t, service_type: "Natural", service_date: t }],
+    ["Hoof Trimming", { event_date: t, animals: [F1 || ctx.animal] }],
+    ["Movement", { animal: F1 || ctx.animal, event_date: t, new_herd: HERD || "x" }],
+  ])
+    await refused(`record_animal_event ${type}`, () => post(`${M}.mobile.record_animal_event.record_animal_event`, { payload: { type, ...extra } }), NOT_EMP);
+  await refused("create_check_up", () => post(`${M}.health.create_check_up.create_check_up`, { payload: { animal: F1 || ctx.animal, event_date: t, reason_for_check: "smoke", action_taken: "Logged — monitor" } }), NOT_EMP);
+  await refused("treat_animal", () => post(`${M}.health.treat_animal.treat_animal`, { payload: { animal: F1 || ctx.animal, open_new: true, presenting_symptoms: "smoke", provisional_diagnosis: "Mastitis", severity: "Mild", treatment_date: t, treatments: [{ drug_name_text: "smoke", qty: 1 }] } }), NOT_EMP);
+  await refused("record_feeding manufacture", () => post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "manufacture", herd: ctx.feedHerd || "x", portion: 0.01, posting_date: t } }), NOT_EMP);
+  await refused("record_disposal", () => post(`${M}.disposal.record_disposal.record_disposal`, { payload: { animal: F1 || ctx.animal, disposal_type: "Culled (Farm Use)", disposal_date: t, reason_details: "smoke" } }), NOT_EMP);
+}
+
+/** What each role records: [name, call] pairs. They run only with WRITE=1; without
+ *  it the role is only checked for the reads and for not being refused as a
+ *  permission (a harmless bad payload). */
+function roleWrites(role, op) {
+  const ev = (type, payload) => post(`${M}.mobile.record_animal_event.record_animal_event`, { payload: { type, ...payload } });
+  const out = {
+    "Livestock Milker": [["record_milking", () => post(`${M}.mobile.record_milking.record_milking`, { payload: { herd: HERD, milking_time: "05:30", recording_date: today, total_yield_kg: 20, cows_milked: 2, operator: op, remarks: "smoke role" } }), "Milk Recording"]],
+    "Livestock Attendant": [["Weight Recording", () => ev("Weight Recording", { animal: F1, weight_date: today, measured_by: op, weight_kg: 470, remarks: "smoke role" }), "Livestock Weight Record"]],
+    "Livestock Breeder": [["Heat Detection", () => ev("Heat Detection", { animal: F3, event_date: today, operator: op, remarks: "smoke role" }), "Livestock Event"]],
+    "Livestock Vet": [["create_check_up", () => post(`${M}.health.create_check_up.create_check_up`, { payload: { animal: F1, operator: op, event_date: today, reason_for_check: "smoke role", action_taken: "Logged — monitor" } }), "Livestock Diagnosis"]],
+    "Livestock Stores": [["record_feeding manufacture", () => post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "manufacture", herd: ctx.feedHerd, portion: 0.01, posting_date: today } }), "Work Order"]],
+    "Livestock Manager": [["Heat Detection", () => ev("Heat Detection", { animal: F3, event_date: today, operator: op, remarks: "smoke role" }), "Livestock Event"], ["record_feeding manufacture", () => post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "manufacture", herd: ctx.feedHerd, portion: 0.01, posting_date: today } }), "Work Order"]],
+  };
+  return out[role] || [];
+}
+
+async function perRole() {
+  for (const [role, cred] of Object.entries(ROLES)) {
+    const who = role;
+    let op;
+    await step("auth", `${role}: login`, () => login(cred.user, cred.password));
+    await step(who, "posting_day: Employee linked", async () => {
+      const m = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+      if (!m.is_employee) throw new Error("test user has no Employee");
+      op = m.employee;
+    });
+    await commonReads(who, op);
+    for (const [name, call, doctype] of roleWrites(role, op)) {
+      await step(who, `record: ${name}`, async () => {
+        const r = await call();
+        if (!WRITE) {
+          // Not recording: a bad herd/animal is fine, a permission refusal is not.
+          const m = r.data?.message;
+          if (r.status !== 200 || (m?.error && isPerm(m.error))) throw new Error(`refused: ${JSON.stringify(m?.error ?? r.data)?.slice(0, 200)}`);
+          return "not refused as a permission (dry)";
+        }
+        const m = msgOf(r);
+        track(doctype, m.name || m.work_order);
+        if (m.transfer_stock_entry) track("Stock Entry", m.transfer_stock_entry);
+        if (m.manufacture_stock_entry) track("Stock Entry", m.manufacture_stock_entry);
+        if (m.stock_entry) track("Stock Entry", m.stock_entry);
+        return m.name || m.work_order;
+      });
+    }
+  }
+}
+
+if (NONEMP_USER && NONEMP_PASS) {
+  ctx.animal ||= F1;
+  await nonEmployee();
+}
+if (ROLES) {
+  ctx.animal ||= F1;
+  ctx.herds ||= [];
+  await perRole();
+}
 
 // ---------------------------------------------------------------------------
 const w = Math.max(...rows.map((r) => r.name.length));
