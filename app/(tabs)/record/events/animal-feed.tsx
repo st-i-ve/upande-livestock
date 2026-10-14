@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -66,7 +66,8 @@ export default function AnimalFeed() {
   const { data: herds = [], isLoading, error, refetch } = useHerds();
 
   const feedable = useMemo(() => herds.filter((h) => !!h.bom), [herds]);
-  const [herdName, setHerdName] = useState<string>("");
+  const [herdPick, setHerdName] = useState<string>("");
+  const herdName = herdPick || feedable[0]?.n || "";
   const [mode, setMode] = useState<Mode>("system");
   const recipes = useHerdRecipes(herdName);
 
@@ -80,16 +81,10 @@ export default function AnimalFeed() {
   const [selectedBom, setSelectedBom] = useState<string>("");
   const [selectedForHerd, setSelectedForHerd] = useState<string>("");
 
-  useEffect(() => {
-    if (!herdName && feedable.length) setHerdName(feedable[0].n);
-  }, [feedable, herdName]);
-
-  useEffect(() => {
-    if (recipes.data && selectedForHerd !== herdName) {
-      setSelectedBom(recipes.data.standingBom);
-      setSelectedForHerd(herdName);
-    }
-  }, [recipes.data, herdName, selectedForHerd]);
+  if (recipes.data && selectedForHerd !== herdName) {
+    setSelectedBom(recipes.data.standingBom);
+    setSelectedForHerd(herdName);
+  }
 
   if (isLoading) {
     return (
@@ -266,7 +261,9 @@ function SystemTab({
   const day = useFeedDayStatus(herd);
   const manufacture = useManufactureHerdFeed();
 
-  const [portion, setPortion] = useState<Portion | null>(null);
+  const [portionPick, setPortion] = useState<Portion | null>(null);
+  const portion: Portion | null =
+    portionPick ?? (day.data ? (day.data.suggestedPortion === 0.5 ? 0.5 : 1) : null);
   const [date, setDate] = useState(todayISO());
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -284,12 +281,6 @@ function SystemTab({
   // the slider's two stops (should never happen — the server only ever sends
   // 0.5 or 1) collapses to the safe default of a full day rather than being
   // silently dropped.
-  useEffect(() => {
-    if (day.data && portion === null) {
-      setPortion(day.data.suggestedPortion === 0.5 ? 0.5 : 1);
-    }
-  }, [day.data, portion]);
-
   const portionNum: number = portion ?? 0;
   const d = info.data;
   const st = day.data;
@@ -484,7 +475,8 @@ function ManualTab({
   const feed = useManualFeed();
 
   const [rows, setRows] = useState<TunedRow[] | null>(null);
-  const [heads, setHeads] = useState("");
+  const [headsEdit, setHeads] = useState<string | null>(null);
+  const heads = headsEdit ?? (info?.heads ? String(info.heads) : "");
   const [date, setDate] = useState(todayISO());
   const [error, setError] = useState<string | null>(null);
 
@@ -498,22 +490,16 @@ function ManualTab({
   // The head count still seeds once from the herd's registered count and is
   // then left alone — untouched by the recipe picker, per the brief. Only
   // where the ingredient rows come from has changed (below).
-  useEffect(() => {
-    if (!info || heads) return;
-    setHeads(info.heads ? String(info.heads) : "");
-  }, [info, heads]);
-
   // Rows seed from the *selected recipe's* own lines — already per-head, in
   // the recipe's own unit of measure, arrived with the `herd_recipes` payload
   // — never from `info.lines` (the herd's standing BOM only) and never
   // re-derived by dividing anything by heads. Seeds once per distinct
   // `selectedBom`: switching recipes reseeds; typing in a box does not, same
   // "seed once" shape as the old effect this replaces.
-  useEffect(() => {
-    if (!selectedBom || seededBom === selectedBom) return;
-    const recipe = recipes.find((r) => r.bomNo === selectedBom);
-    if (!recipe) return;
-    const fresh: TunedRow[] = recipe.lines.map((l) => ({
+  const seedRecipe =
+    selectedBom && seededBom !== selectedBom ? recipes.find((r) => r.bomNo === selectedBom) : undefined;
+  if (seedRecipe) {
+    const fresh: TunedRow[] = seedRecipe.lines.map((l) => ({
       itemCode: l.itemCode,
       itemName: l.itemName,
       uom: l.uom,
@@ -522,7 +508,7 @@ function ManualTab({
     setRows(fresh);
     setSeededBom(selectedBom);
     setSeedSnapshot(JSON.stringify(fresh));
-  }, [selectedBom, recipes, seededBom]);
+  }
 
   const isDirty = seedSnapshot !== "" && JSON.stringify(rows) !== seedSnapshot;
 

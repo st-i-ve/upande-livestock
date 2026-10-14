@@ -1,3 +1,4 @@
+import { useOnChange } from "@/src/hooks/useOnChange";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -48,9 +49,9 @@ function RollingDigit({ digit, dir }: { digit: string; dir: 1 | -1 }) {
   // 1 = settled on `to`; a step drops it to 0 and eases back up.
   const p = useSharedValue(1);
 
-  useEffect(() => {
-    setPair((prev) => (prev.to === digit ? prev : { from: prev.to, to: digit }));
-  }, [digit]);
+  useOnChange(digit, (d) => {
+    setPair((prev) => (prev.to === d ? prev : { from: prev.to, to: d }));
+  });
 
   useEffect(() => {
     if (pair.from === pair.to) return;

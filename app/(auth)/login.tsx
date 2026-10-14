@@ -1,3 +1,4 @@
+import { useOnChange } from "@/src/hooks/useOnChange";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -77,13 +78,13 @@ export default function LoginScreen() {
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedRef = useRef(false);
 
-  useEffect(() => {
-    if (storedEmail && !email) setEmail(storedEmail);
-  }, [storedEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnChange(storedEmail, (stored) => {
+    if (stored && !email) setEmail(stored);
+  });
 
-  useEffect(() => {
-    if (instanceUrl && !url) setUrl(instanceUrl);
-  }, [instanceUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnChange(instanceUrl, (stored) => {
+    if (stored && !url) setUrl(stored);
+  });
 
   const clearHideTimer = () => {
     if (hideTimer.current) {

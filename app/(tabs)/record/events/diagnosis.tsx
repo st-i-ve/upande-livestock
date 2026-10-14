@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -59,10 +59,8 @@ export default function Diagnosis() {
   // Free-text fields that map directly into Animal Diagnosis.
   // Defaults to whoever is signed in; editable when somebody else examined.
   const signedInName = useAuthStore((st) => st.fullname);
-  const [examiner, setExaminer] = useState<string>("");
-  useEffect(() => {
-    if (signedInName && !examiner) setExaminer(signedInName);
-  }, [signedInName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [examinerEdit, setExaminer] = useState<string | null>(null);
+  const examiner = examinerEdit ?? signedInName ?? "";
   const [weight, setWeight] = useState("");
   const [temp, setTemp] = useState("");
   const [hr, setHr] = useState("");

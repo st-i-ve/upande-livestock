@@ -34,7 +34,7 @@ export default function Movement() {
 
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
-  const [toHerd, setToHerd] = useState<string>("");
+  const [toHerdPick, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
   const [selected, setSelected] = useState<Animal[]>([]);
@@ -59,11 +59,7 @@ export default function Movement() {
   // to a different herd. Defaulting to herds[0] meant the form opened proposing
   // an alphabetically-first herd that was almost never the right one.
   const [toHerdTouched, setToHerdTouched] = useState(false);
-  React.useEffect(() => {
-    if (toHerdTouched) return;
-    if (suggested) setToHerd(suggested);
-    else if (!toHerd && herds.length) setToHerd(herds[0].n);
-  }, [suggested, herds, toHerd, toHerdTouched]);
+  const toHerd = toHerdTouched ? toHerdPick : suggested || herds[0]?.n || "";
 
   const mutation = useCreateAnimalEvent();
   const removeOne = (id: string) => setSelected((prev) => prev.filter((a) => a.id !== id));
