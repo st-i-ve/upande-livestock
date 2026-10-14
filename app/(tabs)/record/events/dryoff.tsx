@@ -6,8 +6,9 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
@@ -15,6 +16,7 @@ import { VetPicker } from "@/components/VetPicker";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
@@ -23,7 +25,7 @@ import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 type DCTRow = {
@@ -44,6 +46,8 @@ export default function Dryoff() {
   const { operator, missingMessage } = useOperator();
   const { vets, vet, setVet } = useVetChoice();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [toHerdPick, setToHerd] = useState<string>("");
   const dryHerd = herds.find((h) => h.isDry)?.n ?? herds.find((h) => /steamer|dry/i.test(h.n))?.n ?? herds[0]?.n ?? "";
@@ -102,7 +106,6 @@ export default function Dryoff() {
 
 
     let succeeded = 0;
-    let queued = 0;
     const replies: any[] = [];
     for (const a of selected) {
       try {
@@ -112,15 +115,12 @@ export default function Dryoff() {
           currentHerd: a.herd,
           operator,
           vet: vet || undefined,
-          eventDate: isBackdating ? backdateDate : todayISO(),
+          eventDate: isBackdating ? backdateDate : serverToday,
           toHerd,
           drugIssues: drugIssues.length ? drugIssues : undefined,
         });
-        if (r.queued) queued += 1;
-        else {
-          succeeded += 1;
-          replies.push(r.data);
-        }
+        succeeded += 1;
+        replies.push(r);
       } catch (err) {
         setError(
           `${succeeded} of ${selected.length} dried off. Stopped at ${a.name}: ${extractFrappeError(err)}`,
@@ -130,7 +130,6 @@ export default function Dryoff() {
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
-    if (queued) parts.push(`${queued} queued (offline)`);
     const stockNote = stockOutcomeText(replies);
     Alert.alert(
       stockNote ? "Drying off saved — stock issue pending" : "Drying off recorded",
@@ -169,10 +168,10 @@ export default function Dryoff() {
       <VetPicker vets={vets} value={vet} onChange={setVet} />
       {isBackdating ? (
         <Field label="Date it happened">
-          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
         </Field>
       ) : (
-        <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+        <Field label="Date"><Input value={serverToday} editable={false} /></Field>
       )}
 
       <Field
@@ -227,9 +226,10 @@ export default function Dryoff() {
       {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit dry-off"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

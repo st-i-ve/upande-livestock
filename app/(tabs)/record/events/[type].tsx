@@ -6,8 +6,9 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { VetPicker } from "@/components/VetPicker";
@@ -20,11 +21,12 @@ import {
 import { findShortage, stockOutcomeText, type StockChoice } from "@/src/frappe/eventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useColors } from "@/src/hooks/useColors";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 type Spec = {
@@ -60,6 +62,8 @@ export default function GenericEvent() {
   const { operator, missingMessage } = useOperator();
   const { vets, vet, setVet, isInternal } = useVetChoice();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [weight, setWeight] = useState("");
   const [bcs, setBcs] = useState("");
@@ -123,12 +127,11 @@ export default function GenericEvent() {
       if (shortage) setWarning(shortage);
     }
 
-    const eventDate = isBackdating ? backdateDate : todayISO();
+    const eventDate = isBackdating ? backdateDate : serverToday;
     const note = remarks.trim() || undefined;
 
     const replies: any[] = [];
     let succeededEvents = 0;
-    let queuedEvents = 0;
 
     if (spec.isRound) {
       // One call for the whole round: the server books an event per animal and
@@ -158,11 +161,8 @@ export default function GenericEvent() {
               }))
             : undefined,
         });
-        if (r.queued) queuedEvents = selected.length;
-        else {
-          succeededEvents = r.data?.animals ?? selected.length;
-          replies.push(r.data);
-        }
+        succeededEvents = r?.animals ?? selected.length;
+        replies.push(r);
       } catch (err) {
         setError(`Nothing was recorded. ${extractFrappeError(err)}`);
         return;
@@ -182,14 +182,11 @@ export default function GenericEvent() {
             : { ...common, eventType: "Heat Detection" };
         try {
           const r = await eventMutation.mutateAsync(payload);
-          if (r.queued) queuedEvents += 1;
-          else {
-            succeededEvents += 1;
-            replies.push(r.data);
-          }
+          succeededEvents += 1;
+          replies.push(r);
         } catch (err) {
           setError(
-            `${succeededEvents + queuedEvents} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+            `${succeededEvents} of ${selected.length} submitted. Stopped at ${a.name}: ${extractFrappeError(err)}`,
           );
           return;
         }
@@ -200,7 +197,6 @@ export default function GenericEvent() {
     // with the stock issue pending, and what became of the vet fee.
     const eventParts: string[] = [];
     if (succeededEvents) eventParts.push(`${succeededEvents} submitted`);
-    if (queuedEvents) eventParts.push(`${queuedEvents} queued (offline)`);
 
     const notes: string[] = [];
     const stockNote = stockOutcomeText(replies);
@@ -258,10 +254,10 @@ export default function GenericEvent() {
 
       {isBackdating ? (
         <Field label="Done on">
-          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
         </Field>
       ) : (
-        <Field label="Done on"><Input value={todayISO()} editable={false} /></Field>
+        <Field label="Done on"><Input value={serverToday} editable={false} /></Field>
       )}
 
       {spec.needsWeight ? (
@@ -294,9 +290,10 @@ export default function GenericEvent() {
       {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={submitting ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
-        disabled={submitting || selected.length === 0}
+        disabled={offline || submitting || selected.length === 0}
         loading={submitting}
         onPress={handleSubmit}
       />

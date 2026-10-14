@@ -124,12 +124,12 @@ export default function Profile() {
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
-          {/* The offline queue still runs; this row only reports it. Tapping it
+          {/* The offline queue holds milkings only; this row only reports it. Tapping it
               went to a pending-submissions screen that no longer exists, so the
               count is shown here as plain status. */}
           <Row
             icon="cloud-upload-outline"
-            label={online === false ? "Offline · pending submissions" : "Pending submissions"}
+            label={online === false ? "Offline · milkings waiting to sync" : "Milkings waiting to sync"}
             right={
               <Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>
             }

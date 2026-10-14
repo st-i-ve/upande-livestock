@@ -3,11 +3,16 @@ import { router } from "expo-router";
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { Banner } from "@/components/Banner";
+import { Pill } from "@/components/Pill";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useColors } from "@/src/hooks/useColors";
+import { useOffline } from "@/components/OnlineOnlyNotice";
 
 type Item = { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; href: string };
+
+const MILKING = "/(tabs)/record/events/milk";
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   { title: "Daily routine", items: [
@@ -36,22 +41,39 @@ const SECTIONS: { title: string; items: Item[] }[] = [
 export default function Record() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
+  const offline = useOffline();
   return (
     <Screen title="Livestock events" subtitle="Pick what you observed or did">
+      {offline ? (
+        <Banner tone="warning" icon="wifi-off">
+          You are offline. Only milking can be recorded without a connection; everything else
+          needs one because it moves stock or is checked by the server live.
+        </Banner>
+      ) : null}
       {SECTIONS.map((sec) => (
         <View key={sec.title}>
           <SectionTitle>{sec.title}</SectionTitle>
-          {sec.items.map((it) => (
+          {sec.items.map((it) => {
+            const onlineOnly = offline && it.href !== MILKING;
+            return (
             <Pressable
               key={it.href + it.label}
               onPress={() => router.push(it.href as any)}
-              style={({ pressed }) => [s.item, pressed && { backgroundColor: c.bgMuted }]}
+              style={({ pressed }) => [
+                s.item,
+                onlineOnly && { opacity: 0.55 },
+                pressed && { backgroundColor: c.bgMuted },
+              ]}
             >
               <MaterialCommunityIcons name={it.icon} size={18} color={c.textMuted} />
               <Text style={s.text}>{it.label}</Text>
+              {offline ? (
+                <Pill label={onlineOnly ? "online only" : "works offline"} tone={onlineOnly ? "default" : "success"} />
+              ) : null}
               <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
             </Pressable>
-          ))}
+            );
+          })}
         </View>
       ))}
     </Screen>

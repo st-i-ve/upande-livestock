@@ -7,9 +7,10 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
@@ -17,12 +18,13 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { Animal } from "@/types";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 
 const REASONS = ["Routine age-out", "Repro status", "Other"] as const;
 
@@ -34,6 +36,8 @@ export default function Movement() {
 
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [toHerdPick, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
@@ -84,20 +88,18 @@ export default function Movement() {
     // current_herd. We sequence rather than parallelize so a partial failure
     // gives the user a clear "X of Y moved" message.
     let succeeded = 0;
-    let queued = 0;
     for (const a of selected) {
       try {
-        const r = await mutation.mutateAsync({
+        await mutation.mutateAsync({
           eventType: "Movement",
           animal: a.id,
           currentHerd: a.herd,
           toHerd,
           operator,
-          eventDate: isBackdating ? backdateDate : todayISO(),
+          eventDate: isBackdating ? backdateDate : serverToday,
           remarks,
         });
-        if (r.queued) queued += 1;
-        else succeeded += 1;
+        succeeded += 1;
       } catch (err) {
         setError(
           `${succeeded} of ${selected.length} moved. Stopped at ${a.name}: ${extractFrappeError(err)}`,
@@ -107,7 +109,6 @@ export default function Movement() {
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
-    if (queued) parts.push(`${queued} queued (offline)`);
     Alert.alert("Movement recorded", parts.join(" · "));
     router.replace(`/(tabs)/record/success?name=Movement`);
   };
@@ -173,10 +174,10 @@ export default function Movement() {
       </FieldRow>
       {isBackdating ? (
         <Field label="Date it happened">
-          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
         </Field>
       ) : (
-        <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+        <Field label="Date"><Input value={serverToday} editable={false} /></Field>
       )}
 
       <Field label="Reason">
@@ -194,9 +195,10 @@ export default function Movement() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit move"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

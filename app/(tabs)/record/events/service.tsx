@@ -6,8 +6,9 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
@@ -16,14 +17,17 @@ import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 export default function Service() {
 
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
@@ -56,7 +60,6 @@ export default function Service() {
     }
 
     let succeeded = 0;
-    let queued = 0;
     const replies: any[] = [];
     for (const a of selected) {
       try {
@@ -65,20 +68,17 @@ export default function Service() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
-          eventDate: isBackdating ? backdateDate : todayISO(),
+          eventDate: isBackdating ? backdateDate : serverToday,
           serviceType: type,
           semenItem: type === "A.I." ? straw || undefined : undefined,
           semenWarehouse: type === "A.I." && semenWarehouse ? semenWarehouse : undefined,
           remarks: remarks || undefined,
         });
-        if (r.queued) queued += 1;
-        else {
-          succeeded += 1;
-          replies.push(r.data);
-        }
+        succeeded += 1;
+        replies.push(r);
       } catch (err) {
         setError(
-          `${succeeded + queued} of ${selected.length} served. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+          `${succeeded} of ${selected.length} served. Stopped at ${a.name}: ${extractFrappeError(err)}`,
         );
         return;
       }
@@ -86,7 +86,6 @@ export default function Service() {
 
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} served`);
-    if (queued) parts.push(`${queued} queued (offline)`);
     // The server issues one straw per service in the same call; what it says
     // happened (posted, or a draft waiting for stock) is shown as-is.
     const stockNote = stockOutcomeText(replies);
@@ -124,9 +123,9 @@ export default function Service() {
       <FieldRow>
         <Field label="Service date" style={{ flex: 1 }}>
           {isBackdating ? (
-            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
           ) : (
-            <Input value={todayISO()} editable={false} />
+            <Input value={serverToday} editable={false} />
           )}
         </Field>
         <Field label="Type" style={{ flex: 1 }}>
@@ -156,9 +155,10 @@ export default function Service() {
       {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit service"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

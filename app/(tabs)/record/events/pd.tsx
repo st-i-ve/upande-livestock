@@ -6,18 +6,20 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { VetPicker } from "@/components/VetPicker";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 type Result = "Confirmed" | "Not Pregnant" | "Aborted";
@@ -26,6 +28,8 @@ export default function PD() {
 
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
@@ -48,31 +52,28 @@ export default function PD() {
     if (selected.length === 0) return setError("Pick at least one cow.");
 
     let succeeded = 0;
-    let queued = 0;
     for (const a of selected) {
       try {
-        const r = await mutation.mutateAsync({
+        await mutation.mutateAsync({
           eventType: "Pregnancy Diagnosis",
           animal: a.id,
           currentHerd: a.herd,
           operator,
           vet: vet || undefined,
-          eventDate: isBackdating ? backdateDate : todayISO(),
+          eventDate: isBackdating ? backdateDate : serverToday,
           diagnosisResult: result,
           remarks: remarks || undefined,
         });
-        if (r.queued) queued += 1;
-        else succeeded += 1;
+        succeeded += 1;
       } catch (err) {
         setError(
-          `${succeeded + queued} of ${selected.length} diagnosed. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+          `${succeeded} of ${selected.length} diagnosed. Stopped at ${a.name}: ${extractFrappeError(err)}`,
         );
         return;
       }
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} marked ${result}`);
-    if (queued) parts.push(`${queued} queued (offline)`);
     Alert.alert(
       "PD recorded",
       `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
@@ -113,10 +114,10 @@ export default function PD() {
       </Field>
       {isBackdating ? (
         <Field label="Date it happened">
-          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
         </Field>
       ) : (
-        <Field label="Diagnosis date"><Input value={todayISO()} editable={false} /></Field>
+        <Field label="Diagnosis date"><Input value={serverToday} editable={false} /></Field>
       )}
       <Field label="Result">
         <Chips>
@@ -132,9 +133,10 @@ export default function PD() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit PD"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

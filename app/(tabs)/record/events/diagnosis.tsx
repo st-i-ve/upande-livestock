@@ -6,18 +6,20 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { VetPicker } from "@/components/VetPicker";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useCreateCheckUp } from "@/src/hooks/mutations";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 const num = (v: string): number | undefined => {
@@ -37,6 +39,8 @@ const num = (v: string): number | undefined => {
 export default function CheckUp() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const options = useHealthOptions();
   const o = options.data;
   const mutation = useCreateCheckUp();
@@ -76,7 +80,7 @@ export default function CheckUp() {
         animal: animal.id,
         operator,
         vet: vet || undefined,
-        diagnosisDate: isBackdating ? backdateDate : todayISO(),
+        diagnosisDate: isBackdating ? backdateDate : serverToday,
         reasonForCheck: reason.trim(),
         temperatureC: num(temp),
         heartRate: num(hr),
@@ -91,10 +95,8 @@ export default function CheckUp() {
         followUpDate: followUp || undefined,
         actionNotes: notes.trim() || undefined,
       });
-      const d = r.data;
-      const said = r.queued
-        ? "Queued — it will be sent when the phone is online."
-        : d?.case_opened
+      const d = r;
+      const said = d?.case_opened
           ? `${animal.name} seen — ${d.name}. A health file is open for her: ${d.case}.`
           : d?.case
             ? `${animal.name} seen — ${d.name}. Added to her open file ${d.case}.`
@@ -132,9 +134,9 @@ export default function CheckUp() {
 
       <Field label="Seen on">
         {isBackdating ? (
-          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={today} />
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
         ) : (
-          <Input value={todayISO()} editable={false} />
+          <Input value={serverToday} editable={false} />
         )}
       </Field>
 
@@ -193,10 +195,11 @@ export default function CheckUp() {
       </Field>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Recording…" : "Record the check up"}
         loading={mutation.isPending}
-        disabled={mutation.isPending || !animal}
+        disabled={offline || mutation.isPending || !animal}
         onPress={submit}
       />
     </Screen>

@@ -2,8 +2,9 @@ import { discardCalfPhoto } from "@/src/frappe/calfPhoto";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
- * Persistent queue of mutations that failed because the device was offline
- * (or the request never reached the server). Each entry is dispatched by
+ * Persistent queue of MILKINGS that failed because the device was offline
+ * (or the request never reached the server). Every other record needs a live
+ * connection; other types here are only ever left over from older builds. Each entry is dispatched by
  * type via `src/offline/dispatcher.ts`.
  *
  * State is durable across app restarts. The queue is the single source of

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { Alert, StyleSheet, Text } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
@@ -11,6 +11,7 @@ import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { useColors } from "@/src/hooks/useColors";
 import { useCreateMilkRecording } from "@/src/hooks/mutations";
+import { useOffline } from "@/components/OnlineOnlyNotice";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { extractFrappeError } from "@/src/services/api";
@@ -22,6 +23,7 @@ export default function Milk() {
   const { data: herds = [] } = useHerds();
   const { data: eligibility } = useEligibility();
   const mutation = useCreateMilkRecording();
+  const offline = useOffline();
 
   // Only herds that actually produce milk. The backend derives this list from
   // Herd Movement settings; the `custom_is_milking` flag is the fallback until
@@ -53,7 +55,7 @@ export default function Milk() {
     // field points at, even though this schema names the doc the same thing.
     const herdDoc = herds.find((h) => h.n === herd);
     try {
-      await mutation.mutateAsync({
+      const r = await mutation.mutateAsync({
         herd,
         recordingDate: date,
         milkingTime: time,
@@ -66,6 +68,12 @@ export default function Milk() {
         // which posts a Journal Entry.
         remarks: remarks.trim() || undefined,
       });
+      if (r.queued) {
+        Alert.alert(
+          "Saved on this phone",
+          "No connection. The milking is kept here and sent when you are back online. The server checks its date then.",
+        );
+      }
       router.replace("/(tabs)/record/success?name=Milk recording");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -74,6 +82,11 @@ export default function Milk() {
 
   return (
     <Screen title="Milk recording" subtitle="Record a herd's yield" back>
+      {offline ? (
+        <Banner tone="info" icon="wifi-off">
+          No connection. Milking works offline: it is kept on this phone and sent when you are back online.
+        </Banner>
+      ) : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <Field label="Herd">

@@ -7,9 +7,10 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
@@ -18,11 +19,12 @@ import { CalfPhotoField } from "@/components/CalfPhotoField";
 import type { FileAsset } from "@/src/frappe/files";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 export default function Calving() {
@@ -32,6 +34,8 @@ export default function Calving() {
 
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [dam, setDam] = useState<Animal | null>(null);
   const [outcome, setOutcome] = useState<"Live Birth" | "Still Birth" | "Abortion">("Live Birth");
   const [abortionCause, setAbortionCause] = useState<
@@ -89,7 +93,7 @@ export default function Calving() {
           animal: dam.id,
           currentHerd: dam.herd,
           operator,
-          eventDate: isBackdating ? backdateDate : todayISO(),
+          eventDate: isBackdating ? backdateDate : serverToday,
           abortionCause,
           abortionNotes: coatColour || undefined,
         });
@@ -110,7 +114,7 @@ export default function Calving() {
         animal: dam.id,
         currentHerd: dam.herd,
         operator,
-        eventDate: isBackdating ? backdateDate : todayISO(),
+        eventDate: isBackdating ? backdateDate : serverToday,
         calvingOutcome: outcome as "Live Birth" | "Still Birth",
         toHerd: toHerd || undefined,
         calfBookNumber: outcome === "Live Birth" ? calfBook.trim() : undefined,
@@ -123,23 +127,14 @@ export default function Calving() {
         calfPhoto: outcome === "Live Birth" && calfPhoto ? calfPhoto : undefined,
       });
 
-      if (r.queued) {
-        Alert.alert(
-          "Queued offline",
-          `${dam.name} saved locally. Will sync when online${calfPhoto ? ", and the calf photo will be sent with it" : ""}.`,
-        );
-        router.replace("/(tabs)/record/success?name=Calving");
-        return;
-      }
-
       // The photo (if any) was uploaded by createAnimalEvent and the server set it
       // as the calf image; a failed upload costs the photo, never the birth.
-      const calf = r.data?.calves?.[0];
+      const calf = r?.calves?.[0];
       if (outcome === "Live Birth" && calf?.animal) {
         const photoLine =
-          r.data?.photo === "attached"
+          r?.photo === "attached"
             ? "\nPhoto saved on the calf's record."
-            : r.data?.photo === "failed"
+            : r?.photo === "failed"
               ? "\nThe photo could not be uploaded, so the calf has none yet. Add it from the animal's page."
               : "";
         Alert.alert(
@@ -184,9 +179,9 @@ export default function Calving() {
       <FieldRow>
         <Field label="Calving date" style={{ flex: 1 }}>
           {isBackdating ? (
-            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+            <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
           ) : (
-            <Input value={todayISO()} editable={false} />
+            <Input value={serverToday} editable={false} />
           )}
         </Field>
         <Field label="Outcome" style={{ flex: 1 }}>
@@ -275,9 +270,10 @@ export default function Calving() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit calving"}
-        disabled={mutation.isPending || !dam}
+        disabled={offline || mutation.isPending || !dam}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

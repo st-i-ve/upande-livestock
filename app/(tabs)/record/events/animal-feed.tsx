@@ -8,7 +8,7 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Calc } from "@/components/Calc";
 import { Chip, Chips } from "@/components/Chips";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { ErrorState } from "@/components/ErrorState";
 import { Field, Input } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
@@ -29,6 +29,8 @@ import { useManualFeed } from "@/src/hooks/useManualFeed";
 import { useManufactureHerdFeed } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
 import type { HerdRecipe } from "@/src/frappe/herdRecipes";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 
 const kg = (n: number) => `${Number(n || 0).toLocaleString()} kg`;
@@ -265,6 +267,8 @@ function SystemTab({
   const portion: Portion | null =
     portionPick ?? (day.data ? (day.data.suggestedPortion === 0.5 ? 0.5 : 1) : null);
   const [date, setDate] = useState(todayISO());
+  const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // What the picker's choice actually mixes: the selected recipe's own
@@ -301,7 +305,7 @@ function SystemTab({
       const r = await manufacture.mutateAsync({
         herd,
         portion: portionNum,
-        postingDate: date,
+        postingDate: backdatingOpen ? date : undefined,
         bomNo: selectedBom || undefined,
       });
       await Promise.all([info.refetch(), day.refetch()]);
@@ -387,7 +391,11 @@ function SystemTab({
       </Field>
 
       <Field label="Date fed">
-        <DateField value={date} onChange={setDate} maximumDate={new Date()} />
+        {backdatingOpen ? (
+          <DateField value={date} onChange={setDate} maximumDate={fromISODate(serverToday)} />
+        ) : (
+          <Input value={serverToday} editable={false} />
+        )}
       </Field>
 
       <Calc
@@ -418,9 +426,10 @@ function SystemTab({
 
       {submitError ? <Banner tone="danger">{submitError}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={manufacture.isPending ? "Mixing…" : "Mix & feed"}
-        disabled={manufacture.isPending || !herd || portionNum <= 0}
+        disabled={offline || manufacture.isPending || !herd || portionNum <= 0}
         onPress={onRun}
       />
     </>
@@ -478,6 +487,8 @@ function ManualTab({
   const [headsEdit, setHeads] = useState<string | null>(null);
   const heads = headsEdit ?? (info?.heads ? String(info.heads) : "");
   const [date, setDate] = useState(todayISO());
+  const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [error, setError] = useState<string | null>(null);
 
   // Which recipe `rows` currently reflects, and a snapshot of the rows it was
@@ -569,7 +580,7 @@ function ManualTab({
         herd,
         lines,
         heads: count,
-        postingDate: date,
+        postingDate: backdatingOpen ? date : undefined,
         employee: operator ?? undefined,
         // The recipe the operator was actually tuning from — so the BOM
         // `manual_feed` builds descends from what was on screen, not from
@@ -646,15 +657,20 @@ function ManualTab({
       </Field>
 
       <Field label="Date fed">
-        <DateField value={date} onChange={setDate} maximumDate={new Date()} />
+        {backdatingOpen ? (
+          <DateField value={date} onChange={setDate} maximumDate={fromISODate(serverToday)} />
+        ) : (
+          <Input value={serverToday} editable={false} />
+        )}
       </Field>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={feed.isPending ? "Mixing…" : "Mix & feed"}
         onPress={submit}
-        disabled={feed.isPending}
+        disabled={offline || feed.isPending}
       />
     </>
   );

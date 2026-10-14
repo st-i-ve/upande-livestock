@@ -7,9 +7,10 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { DateField } from "@/components/DateTimeField";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Picker } from "@/components/Picker";
@@ -20,13 +21,14 @@ import { RADIUS } from "@/constants/theme";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { getAnimalCase } from "@/src/frappe/treatment";
 import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useColors } from "@/src/hooks/useColors";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useTreatAnimal } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
 type Dose = {
@@ -67,6 +69,8 @@ export default function Treatment() {
   const s = useMemo(() => makeStyles(c), [c]);
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const options = useHealthOptions().data;
   const { choices: stock } = useEventItems("Treatment");
   const mutation = useTreatAnimal();
@@ -131,7 +135,7 @@ export default function Treatment() {
         severity: severity || undefined,
         operator,
         vet: vet || undefined,
-        treatmentDate: isBackdating ? backdateDate : todayISO(),
+        treatmentDate: isBackdating ? backdateDate : serverToday,
         doses: given.map((d) => ({
           itemCode: d.pick.itemCode,
           qty: Number(d.qty),
@@ -143,11 +147,9 @@ export default function Treatment() {
           response: d.response || undefined,
         })),
       });
-      const d = r.data;
-      const stockNote = r.queued ? "" : stockOutcomeText([d]);
-      const said = r.queued
-        ? "Queued — it will be sent when the phone is online."
-        : d.opened
+      const d = r;
+      const stockNote = stockOutcomeText([d]);
+      const said = d.opened
           ? `A new file is open for ${d.animal} — ${d.case} — with ${d.added} treatment${d.added === 1 ? "" : "s"} in it.`
           : `${d.added} treatment${d.added === 1 ? "" : "s"} added to ${d.case}. ${d.treatments} in the file now.`;
       Alert.alert("Treatment recorded", [said, stockNote].filter(Boolean).join("\n\n"));
@@ -238,9 +240,9 @@ export default function Treatment() {
 
       <Field label="Given on">
         {isBackdating ? (
-          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
         ) : (
-          <Input value={todayISO()} editable={false} />
+          <Input value={serverToday} editable={false} />
         )}
       </Field>
 
@@ -301,10 +303,11 @@ export default function Treatment() {
         <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner>
       ) : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Recording…" : fresh ? "Open a file and record it" : "Add it to her file"}
         loading={mutation.isPending}
-        disabled={mutation.isPending || !animal}
+        disabled={offline || mutation.isPending || !animal}
         onPress={submit}
       />
     </Screen>

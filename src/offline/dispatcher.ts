@@ -59,8 +59,8 @@ async function retiredAnimalCreate(): Promise<never> {
 
 /**
  * Registry mapping each PendingMutationType to the function that submits it.
- * Adding a new offline-aware mutation: add a member to PendingMutationType,
- * wire its createXxx here, and call enqueue with that type in the hook.
+ * Only MILKING is queued by this build (see `tryDirectOrEnqueue`). The other
+ * handlers stay so an item an older build queued still drains when online.
  */
 const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
   AnimalEvent: createAnimalEvent,
@@ -113,7 +113,9 @@ export const drainQueue = async (): Promise<DrainResult> => {
       } catch (err) {
         const message = extractFrappeError(err);
         await markAttempt(item.id, message);
-        const isNetwork = !(err as any)?.response;
+        // A refusal the server wrote (OpsError: HTTP 200 + {error}) carries no
+        // `response` but is not a dead network; it must not stall the queue.
+        const isNetwork = isOfflineError(err);
         errors.push({ id: item.id, message });
         if (isNetwork) {
           // Network problem — stop draining; we'll try again on next signal.

@@ -34,17 +34,19 @@ const invalidateAll = (qc: ReturnType<typeof useQueryClient>) => {
 };
 
 /**
- * Result of an offline-aware mutation. On a clean direct submit, `queued`
- * is false and `data` is the Frappe response. If the network was down or
- * unreachable, `queued` is true and the submission is parked in the
- * persistent queue — callers should surface a "queued" message instead of
- * a hard error.
+ * Result of the one offline-aware mutation (milking). `queued` is true when the
+ * network was down and the milking was parked in the persistent queue.
  */
 export type OfflineMutationResult = {
   queued: boolean;
   data: any;
 };
 
+/**
+ * MILKING ONLY. Every other event moves stock or is checked live by the server,
+ * so it is sent directly and never queued. Milking is the one thing a parlour
+ * must be able to record without signal.
+ */
 const tryDirectOrEnqueue = async <T extends object>(
   type: PendingMutationType,
   payload: T,
@@ -69,13 +71,25 @@ const tryDirectOrEnqueue = async <T extends object>(
   }
 };
 
+/** Sent now or not at all. A dead network is reported, never queued, and the
+ *  form keeps what was typed. */
+const sendNow = async <T>(fn: () => Promise<T>): Promise<T> => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isOfflineError(err)) {
+      throw new Error(
+        "Could not reach the server. Nothing was recorded. Check your connection and try again.",
+      );
+    }
+    throw err;
+  }
+};
+
 // ---------------------------------------------------------------------------
 
-const labelEvent = (i: AnimalEventInput): string => `${i.eventType} · ${i.animal}`;
 const labelMilk = (i: CreateMilkRecordingInput): string =>
   `Milk · ${i.herd}${i.milkingTime ? ` · ${i.milkingTime}` : ""}`;
-const labelCheckUp = (i: CreateCheckUpInput): string => `Check up · ${i.animal}`;
-const labelTreatment = (i: TreatAnimalInput): string => `Treatment · ${i.animal}`;
 
 // ---------------------------------------------------------------------------
 
@@ -83,7 +97,7 @@ export const useCreateAnimalEvent = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AnimalEventInput) =>
-      tryDirectOrEnqueue("AnimalEvent", input, createAnimalEvent, labelEvent(input)),
+      sendNow(() => createAnimalEvent(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };
@@ -101,7 +115,7 @@ export const useCreateCheckUp = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateCheckUpInput) =>
-      tryDirectOrEnqueue("AnimalDiagnosis", input, createCheckUp, labelCheckUp(input)),
+      sendNow(() => createCheckUp(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };
@@ -110,7 +124,7 @@ export const useTreatAnimal = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: TreatAnimalInput) =>
-      tryDirectOrEnqueue("Treatment", input, treatAnimal, labelTreatment(input)),
+      sendNow(() => treatAnimal(input)),
     onSuccess: () => {
       invalidateAll(qc);
       qc.invalidateQueries({ queryKey: ["health-options"] });
@@ -125,7 +139,7 @@ export const useManufactureHerdFeed = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { herd: string; portion?: number; postingDate?: string; bomNo?: string }) =>
-      manufactureHerdFeed(v.herd, v.portion ?? 1, v.postingDate, v.bomNo),
+      sendNow(() => manufactureHerdFeed(v.herd, v.portion ?? 1, v.postingDate, v.bomNo)),
     onSuccess: () => invalidateAll(qc),
   });
 };

@@ -9,9 +9,11 @@ import { uploadFile, type FileAsset } from "./files";
  * filled in, is uploaded when the calving is sent, and the server makes it the
  * new calf Animal's `image` (the Attach Image field the form and lists show).
  *
- * Offline: the queued calving holds only a local file reference. When the queue
- * drains, the photo is uploaded first and the calving sent with its URL, so
- * either both go or the item stays queued for another try.
+ * Calving needs a connection (it creates an animal and moves stock), so the
+ * photo is uploaded straight from where the picker left it. The one exception
+ * is a calving an older build queued offline: it holds a durable copy under
+ * `calf-photos`, which the queue still uploads when it drains and then removes
+ * (`discardCalfPhoto`).
  */
 
 export type PickOutcome =
@@ -20,9 +22,8 @@ export type PickOutcome =
   | { status: "denied" }
   | { status: "failed"; message: string };
 
-// The picker hands back a file in the OS cache, which the system may clear
-// before a queued calving syncs. The photo is copied into the app's document
-// directory (safe from cache clearing) and that copy is what gets queued.
+// Only older builds copied the photo here (to survive the OS clearing its cache
+// while a calving sat in the queue). New photos are used where the picker put them.
 const photoDir = () => new Directory(Paths.document, "calf-photos");
 
 const isOurs = (uri?: string | null): uri is string =>
@@ -41,14 +42,9 @@ export function discardCalfPhoto(uri?: string | null): void {
 
 const toAsset = (a: ImagePicker.ImagePickerAsset): FileAsset => {
   const ext = (a.uri.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-  const name = `calf-${Date.now()}.${ext}`;
-  const dir = photoDir();
-  dir.create({ idempotent: true, intermediates: true });
-  const copy = new File(dir, name);
-  new File(a.uri).copy(copy);
   return {
-    uri: copy.uri,
-    name,
+    uri: a.uri,
+    name: `calf-${Date.now()}.${ext}`,
     mimeType: a.mimeType || `image/${ext === "png" ? "png" : "jpeg"}`,
   };
 };

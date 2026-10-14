@@ -4,14 +4,13 @@ import { Alert, Image, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
 import { RADIUS } from "@/constants/theme";
-import { discardCalfPhoto, pickCalfPhoto, type PickOutcome } from "@/src/frappe/calfPhoto";
+import { pickCalfPhoto, type PickOutcome } from "@/src/frappe/calfPhoto";
 import type { FileAsset } from "@/src/frappe/files";
 import { useColors } from "@/src/hooks/useColors";
 
 /**
  * Optional photo of one calf. Camera first, gallery as the fallback (camera
- * refused or unavailable). It only holds a local file reference; the upload
- * happens after the calving is recorded, so it works offline too.
+ * refused or unavailable). It only holds a local file reference; it is uploaded when the calving is submitted.
  */
 export function CalfPhotoField({
   value,
@@ -30,7 +29,6 @@ export function CalfPhotoField({
     setNote(null);
     const r: PickOutcome = await pickCalfPhoto(source);
     if (r.status === "picked") {
-      discardCalfPhoto(value?.uri);
       return onChange(r.asset);
     }
     if (r.status === "denied") {
@@ -43,7 +41,7 @@ export function CalfPhotoField({
   return (
     <Field
       label={label}
-      help="Optional. It becomes the calf's picture on its record. Works offline too: it is sent when the calving syncs."
+      help="Optional. It becomes the calf's picture on its record. It is uploaded when you submit."
     >
       {value ? <Image source={{ uri: value.uri }} style={s.preview} resizeMode="cover" /> : null}
       <View style={s.row}>
@@ -61,10 +59,7 @@ export function CalfPhotoField({
           onPress={() => take("gallery")}
           style={s.btn}
         />
-        {value ? <Button label="Remove" variant="link" onPress={() => {
-              discardCalfPhoto(value.uri);
-              onChange(null);
-            }} /> : null}
+        {value ? <Button label="Remove" variant="link" onPress={() => onChange(null)} /> : null}
       </View>
       {note ? <Text style={s.note}>{note}</Text> : null}
     </Field>

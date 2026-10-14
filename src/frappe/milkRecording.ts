@@ -1,3 +1,4 @@
+import { OpsError } from "@/src/frappe/opsError";
 import { getClient, todayISO } from "@/src/services/api";
 
 export { todayISO };
@@ -75,6 +76,10 @@ export const createMilkRecording = async (
   );
   const msg = res.data?.message;
   if (!msg) throw new Error("Milk recording returned nothing.");
-  if (msg.error) throw new Error(msg.error);
+  // An OpsError (not a plain Error) so a refusal from the server, such as
+  // "Backdating is closed" for a milking that was queued on an earlier day, is
+  // reported on the Pending screen instead of being mistaken for a dead network
+  // that stalls the whole drain.
+  if (msg.error) throw new OpsError(msg.error);
   return msg;
 };
