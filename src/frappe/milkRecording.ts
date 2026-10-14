@@ -89,6 +89,6 @@ export const createMilkRecording = async (
   // "Backdating is closed" for a milking that was queued on an earlier day, is
   // reported on the Pending screen instead of being mistaken for a dead network
   // that stalls the whole drain.
-  if (msg.error) throw new OpsError(msg.error);
+  if (msg.error) throw new OpsError(msg.error, msg.code);
   return msg;
 };

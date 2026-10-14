@@ -5,6 +5,7 @@ import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 
 const ICON_SIZE = 31;
@@ -38,6 +39,7 @@ function RecordTabButton(props: RecordTabButtonProps) {
 export default function TabLayout() {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { canRecord } = useCanRecord();
 
   return (
     <Tabs
@@ -73,6 +75,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="record"
         options={{
+          // No Employee, no recording: the tab is not there at all.
+          href: canRecord ? undefined : null,
           tabBarLabel: () => null,
           tabBarButton: (props) => (
             <RecordTabButton

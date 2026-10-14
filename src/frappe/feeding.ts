@@ -1,4 +1,5 @@
 import { getClient } from "@/src/services/api";
+import { OpsError } from "@/src/frappe/opsError";
 
 /**
  * Animal feeding — two-stage flow backed by whitelisted methods in
@@ -30,7 +31,7 @@ const callMethod = async <T = any>(
   // have covered) with `{error: "..."}` in the body rather than raising, so it
   // survives the desk's HTML blocks verbatim. Without this check that message
   // never surfaces here — the caller gets a 200 that looks like a result.
-  if (message?.error) throw new Error(message.error);
+  if (message?.error) throw new OpsError(message.error, message.code);
   return message as T;
 };
 

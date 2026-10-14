@@ -216,7 +216,7 @@ const callOp = async (type: string, payload: Record<string, any>): Promise<any> 
   });
   const msg = res.data?.message;
   if (!msg) throw new OpsError(`${type} returned nothing.`);
-  if (msg.error) throw new OpsError(msg.error);
+  if (msg.error) throw new OpsError(msg.error, msg.code);
   return msg;
 };
 

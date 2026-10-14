@@ -11,10 +11,12 @@ import { MetricGrid } from "@/components/MetricGrid";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { extractFrappeError } from "@/src/services/api";
+import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useHerds } from "@/src/hooks/useHerds";
 
 export default function HerdDetail() {
+  const { canRecord } = useCanRecord();
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
@@ -89,9 +91,13 @@ export default function HerdDetail() {
         <Empty text="No animals in this herd" />
       )}
 
-      <SectionTitle>Quick actions</SectionTitle>
-      <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/record/events/animal-feed")} />
-      <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/record/events/milk")} />
+      {canRecord ? (
+        <>
+          <SectionTitle>Quick actions</SectionTitle>
+          <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/record/events/animal-feed")} />
+          <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/record/events/milk")} />
+        </>
+      ) : null}
     </Screen>
   );
 }

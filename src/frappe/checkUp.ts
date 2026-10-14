@@ -73,6 +73,6 @@ export const createCheckUp = async (input: CreateCheckUpInput): Promise<any> => 
   );
   const msg = res.data?.message;
   if (!msg) throw new OpsError("create_check_up returned nothing.");
-  if (msg.error) throw new OpsError(msg.error);
+  if (msg.error) throw new OpsError(msg.error, msg.code);
   return msg;
 };

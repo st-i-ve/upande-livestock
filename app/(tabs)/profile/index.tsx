@@ -87,6 +87,7 @@ export default function Profile() {
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
+  const isEmployee = useAuthStore((s) => s.isEmployee);
   const pending = usePendingCount();
   const online = useNetworkStatus();
   const ota = useOtaUpdate();
@@ -117,6 +118,9 @@ export default function Profile() {
             <Text style={s.name} numberOfLines={1}>{displayName}</Text>
             {subtitle ? (
               <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
+            ) : null}
+            {isEmployee === false ? (
+              <Text style={s.viewOnly}>View only — not linked to an employee</Text>
             ) : null}
           </View>
         </View>
@@ -256,6 +260,12 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       color: c.textMuted,
       fontFamily: FONT_FAMILY.medium,
       marginTop: 2,
+    },
+    viewOnly: {
+      fontSize: 13,
+      color: c.danger,
+      fontFamily: FONT_FAMILY.medium,
+      marginTop: 4,
     },
     menuWrapper: {
       marginHorizontal: 16,

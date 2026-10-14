@@ -65,7 +65,7 @@ export const getAnimalCase = async (animal: string): Promise<AnimalCaseStanding>
   const client = await getClient();
   const res = await client.post(`${NS}.case_for_animal.case_for_animal`, { payload: { animal } });
   const msg = res.data?.message;
-  if (!msg || msg.error) throw new OpsError(msg?.error || "Could not read her health file.");
+  if (!msg || msg.error) throw new OpsError(msg?.error || "Could not read her health file.", msg?.code);
   return msg as AnimalCaseStanding;
 };
 
@@ -98,6 +98,6 @@ export const treatAnimal = async (input: TreatAnimalInput): Promise<any> => {
   const res = await client.post(`${NS}.treat_animal.treat_animal`, { payload: body });
   const msg = res.data?.message;
   if (!msg) throw new OpsError("treat_animal returned nothing.");
-  if (msg.error) throw new OpsError(msg.error);
+  if (msg.error) throw new OpsError(msg.error, msg.code);
   return msg;
 };

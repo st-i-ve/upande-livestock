@@ -1,4 +1,5 @@
 import { getClient } from "@/src/services/api";
+import { OpsError } from "@/src/frappe/opsError";
 import type { ManufactureResult } from "./feeding";
 
 const RECORD_FEEDING =
@@ -59,6 +60,6 @@ export const manualFeed = async (
     },
   });
   const message = res.data?.message ?? res.data;
-  if (message?.error) throw new Error(message.error);
+  if (message?.error) throw new OpsError(message.error, message.code);
   return message as ManufactureResult;
 };

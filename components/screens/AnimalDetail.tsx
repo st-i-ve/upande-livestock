@@ -16,11 +16,13 @@ import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimal, useAnimalProfile } from "@/src/hooks/useAnimal";
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
+import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
 import type { TimelineEvent } from "@/components/Timeline";
 
 export function AnimalDetail({ id }: { id: string }) {
+  const { canRecord } = useCanRecord();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   // The local copy answers first (and offline); the server adds what only it
@@ -139,6 +141,8 @@ export function AnimalDetail({ id }: { id: string }) {
         ]}
       />
 
+      {canRecord ? (
+        <>
       <SectionTitle>Quick actions</SectionTitle>
       <TileGrid>
         <Tile icon="magnify" title="Check up" onPress={() => router.push("/(tabs)/record/events/diagnosis")} />
@@ -155,6 +159,8 @@ export function AnimalDetail({ id }: { id: string }) {
           </>
         )}
       </TileGrid>
+        </>
+      ) : null}
 
       <SectionTitle>History</SectionTitle>
       {eventsLoading ? (

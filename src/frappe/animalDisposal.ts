@@ -75,6 +75,6 @@ export const createAnimalDisposal = async (
   );
   const msg = res.data?.message;
   if (!msg) throw new OpsError("record_disposal returned nothing.");
-  if (msg.error) throw new OpsError(msg.error);
+  if (msg.error) throw new OpsError(msg.error, msg.code);
   return msg;
 };

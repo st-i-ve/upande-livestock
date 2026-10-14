@@ -13,7 +13,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, AppState, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -105,6 +105,20 @@ export default function RootLayout() {
     if (!signedIn) return;
     return startAnimalSync();
   }, [signedIn]);
+
+  // Who the user is on the farm's books (view-only without an Employee): asked
+  // at sign-in, and again each time the app returns to the foreground so HR
+  // linking an Employee, or unlinking one, reaches the phone without a re-login.
+  // Offline, the last answer stands.
+  const refreshEmployeeStatus = useAuthStore((s) => s.refreshEmployeeStatus);
+  React.useEffect(() => {
+    if (!signedIn) return;
+    void refreshEmployeeStatus();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshEmployeeStatus();
+    });
+    return () => sub.remove();
+  }, [signedIn, refreshEmployeeStatus]);
 
   // Hold on a themed splash until fonts, theme preference, and the auth check
   // are all resolved — so we never flash the login screen on resume/cold start.

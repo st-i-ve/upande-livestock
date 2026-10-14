@@ -7,11 +7,24 @@
  * Error would look exactly like being offline and a refused entry would be
  * queued and retried forever. This flag is how the two are told apart.
  */
+let onNotEmployee: (() => void) | null = null;
+
+/** The auth store registers here so a server refusal for "not an employee"
+ *  flips the app to view-only without every screen having to look for it. */
+export const setNotEmployeeHandler = (fn: (() => void) | null) => {
+  onNotEmployee = fn;
+};
+
+export const NOT_EMPLOYEE_CODE = "not_employee";
+
 export class OpsError extends Error {
+  /** The server's stable reason for the refusal, when it gave one. */
+  readonly code?: string;
+
   /** Read by isOfflineError: the server answered, so this is not a network fault. */
   readonly isServerRejection = true;
 
-  constructor(message: string) {
+  constructor(message: string, code?: string) {
     // Server guards write their messages for the desk, in HTML — "<b>❌ No
     // Active Pregnancy Found!</b><br><br>...". On a phone that renders as
     // tag soup, so the markup comes out here and the text stays.
@@ -26,5 +39,7 @@ export class OpsError extends Error {
         .trim() || "The server refused the entry.",
     );
     this.name = "OpsError";
+    this.code = code;
+    if (code === NOT_EMPLOYEE_CODE) onNotEmployee?.();
   }
 }

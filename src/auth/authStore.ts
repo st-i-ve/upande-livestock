@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-import { getEmployeeForUser } from "@/src/frappe/employee";
+import { cachedEmployeeStatus, fetchEmployeeStatus } from "@/src/frappe/employee";
+import { setNotEmployeeHandler } from "@/src/frappe/opsError";
 import { clearLocalData, syncAnimals } from "@/src/db/sync";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
@@ -17,6 +18,13 @@ interface AuthState {
   employeeName: string | null;
   /** Manual override — used when no Employee is linked to the user. */
   setEmployeeName: (name: string | null) => Promise<void>;
+  /** Whether an Employee is linked to this user. A user without one is
+   *  view-only: the server refuses their records and the app hides the means.
+   *  `null` until known; treated as "may record" so a first paint never flashes
+   *  the restriction at an employee — the server decides either way. */
+  isEmployee: boolean | null;
+  /** Ask the server who this user is; offline, keep the last answer. */
+  refreshEmployeeStatus: () => Promise<void>;
 
   checkAuth: () => Promise<void>;
   login: (email: string, password: string, url?: string) => Promise<void>;
@@ -36,6 +44,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   email: null,
   fullname: null,
   employeeName: null,
+  isEmployee: null,
+
+  refreshEmployeeStatus: async () => {
+    try {
+      const st = await fetchEmployeeStatus();
+      if (st.employee) await storage.setItem(STORAGE_KEY_EMPLOYEE, st.employee);
+      else await storage.removeItem(STORAGE_KEY_EMPLOYEE);
+      set({ isEmployee: st.isEmployee, employeeName: st.employee });
+    } catch (e) {
+      // Offline or the server is busy: keep what we last knew.
+      console.warn("[auth] employee status refresh failed", e);
+    }
+  },
 
   setEmployeeName: async (name) => {
     if (name) await storage.setItem(STORAGE_KEY_EMPLOYEE, name);
@@ -46,12 +67,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkAuth: async () => {
     set({ isLoading: true });
     try {
-      const [cookie, url, email, fullname, employee] = await Promise.all([
+      const [cookie, url, email, fullname, employee, status] = await Promise.all([
         storage.getItem(STORAGE_KEYS.COOKIE),
         storage.getItem(STORAGE_KEYS.INSTANCE_URL),
         storage.getItem(STORAGE_KEYS.EMAIL),
         storage.getItem(STORAGE_KEYS.FULLNAME),
         storage.getItem(STORAGE_KEY_EMPLOYEE),
+        cachedEmployeeStatus(),
       ]);
       set({
         isAuthenticated: !!cookie,
@@ -59,6 +81,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email,
         fullname,
         employeeName: employee,
+        isEmployee: status ? status.isEmployee : null,
       });
     } catch (e) {
       console.error("[auth] checkAuth failed", e);
@@ -75,15 +98,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     const data = await api.login(email, password, target);
 
-    // Best-effort: resolve the Employee linked to this user. If none, the
-    // forms will surface an Employee picker. Either way, login still succeeds.
+    // Who this user is on the farm's books, from the server and cached for
+    // offline. No Employee means view-only. Login succeeds either way.
     let employeeName: string | null = null;
+    let isEmployee: boolean | null = null;
     try {
-      const emp = await getEmployeeForUser(email);
-      if (emp) {
-        employeeName = emp.name;
-        await storage.setItem(STORAGE_KEY_EMPLOYEE, emp.name);
-      }
+      const st = await fetchEmployeeStatus();
+      isEmployee = st.isEmployee;
+      employeeName = st.employee;
+      if (st.employee) await storage.setItem(STORAGE_KEY_EMPLOYEE, st.employee);
+      else await storage.removeItem(STORAGE_KEY_EMPLOYEE);
     } catch (e) {
       console.warn("[auth] Employee lookup failed", e);
     }
@@ -94,6 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       email,
       fullname: data?.full_name ?? null,
       employeeName,
+      isEmployee,
     });
     // The whole herd, once, so the phone works offline from here on. Not
     // awaited: a slow sync must not hold up signing in.
@@ -105,11 +130,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     queryClient.clear();
     await clearLocalData().catch((e) => console.warn("[auth] clearing local data failed", e));
     await storage.removeItem(STORAGE_KEY_EMPLOYEE);
+    await storage.removeItem(STORAGE_KEYS.EMPLOYEE_STATUS);
     set({
       isAuthenticated: false,
       email: null,
       fullname: null,
       employeeName: null,
+      isEmployee: null,
     });
   },
 
@@ -129,6 +156,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
   },
 }));
+
+// A server refusal for "not an employee" is the truth about this user: go
+// view-only now, and remember it for offline.
+setNotEmployeeHandler(() => {
+  useAuthStore.setState({ isEmployee: false, employeeName: null });
+  void storage.setItem(
+    STORAGE_KEYS.EMPLOYEE_STATUS,
+    JSON.stringify({ isEmployee: false, employee: null, employeeName: null }),
+  );
+});
 
 // Wire the api response interceptor → store so session expiry routes to login.
 setUnauthorizedHandler(() => useAuthStore.getState().handleUnauthorized());
