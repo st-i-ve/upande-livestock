@@ -74,7 +74,8 @@ export default function Treatment() {
   const options = useHealthOptions().data;
   const { choices: stock } = useEventItems("Treatment");
   const mutation = useTreatAnimal();
-  const { vets, vet, setVet } = useVetChoice();
+  const { vets, vet, setVet, isExternal } = useVetChoice();
+  const [vetFee, setVetFee] = useState("");
 
   const [animal, setAnimal] = useState<Animal | null>(null);
   const standingQ = useQuery({
@@ -135,6 +136,8 @@ export default function Treatment() {
         severity: severity || undefined,
         operator,
         vet: vet || undefined,
+        // Only an external vet is paid a fee; the server refuses one for staff.
+        vetFee: isExternal && Number(vetFee) > 0 ? Number(vetFee) : undefined,
         treatmentDate: isBackdating ? backdateDate : serverToday,
         doses: given.map((d) => ({
           itemCode: d.pick.itemCode,
@@ -152,7 +155,13 @@ export default function Treatment() {
       const said = d.opened
           ? `A new file is open for ${d.animal} — ${d.case} — with ${d.added} treatment${d.added === 1 ? "" : "s"} in it.`
           : `${d.added} treatment${d.added === 1 ? "" : "s"} added to ${d.case}. ${d.treatments} in the file now.`;
-      Alert.alert("Treatment recorded", [said, stockNote].filter(Boolean).join("\n\n"));
+      const fee = d.vet_fee;
+      const feeNote = fee
+        ? fee.posted
+          ? `Vet fee KES ${Number(fee.amount).toLocaleString()} posted.`
+          : `Vet fee KES ${Number(fee.amount).toLocaleString()} noted on the record; ${fee.reason}`
+        : "";
+      Alert.alert("Treatment recorded", [said, stockNote, feeNote].filter(Boolean).join("\n\n"));
       router.replace("/(tabs)/record/success?name=Treatment");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -237,6 +246,12 @@ export default function Treatment() {
       ) : null}
 
       <VetPicker vets={vets} value={vet} onChange={setVet} />
+
+      {isExternal ? (
+        <Field label="Vet fee for this treatment (KES)" help="The server records it, and posts it to the vet's account when it can.">
+          <Input value={vetFee} onChangeText={setVetFee} keyboardType="decimal-pad" placeholder="0" />
+        </Field>
+      ) : null}
 
       <Field label="Given on">
         {isBackdating ? (

@@ -40,6 +40,8 @@ export type TreatAnimalInput = {
   operator: string;
   /** Livestock Vet id of the vet who attended; goes on the file. */
   vet?: string;
+  /** Fee charged by an EXTERNAL vet for this treatment; the server posts or refuses it. */
+  vetFee?: number;
   treatmentDate?: string;
   doses: TreatmentDose[];
 };
@@ -78,6 +80,7 @@ export const treatAnimal = async (input: TreatAnimalInput): Promise<any> => {
     operator: input.operator,
     opened_by: input.operator,
     vet: input.vet || undefined,
+    vet_fee: input.vetFee && input.vetFee > 0 ? input.vetFee : undefined,
     treatment_date: input.treatmentDate || todayISO(),
     treatments: input.doses.map((d) => ({
       drug_item: d.itemCode,

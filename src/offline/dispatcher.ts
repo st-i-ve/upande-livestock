@@ -86,8 +86,11 @@ export const dispatchDirect = (
 
 /** A queued milking the server refuses on a closed window is more than a day
  *  old; say what to do about it. The item stays queued for retry or discard. */
+// The "late offline syncs are switched off" refusal is the server's own words and
+// passes through untouched; it is not a window problem the manager fixes by
+// opening backdating.
 const tooOldMessage = (item: PendingMutation, message: string): string =>
-  item.type === "MilkRecording" && /backdating is closed|more than a day old/i.test(message)
+  item.type === "MilkRecording" && !/switched off/i.test(message) && /backdating is closed|more than a day old/i.test(message)
     ? "This milking is more than a day old — ask the Livestock Manager to open backdating, then retry."
     : message;
 
