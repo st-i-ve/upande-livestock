@@ -3,7 +3,9 @@ import React, { type ComponentType } from "react";
 
 import { Banner } from "@/components/Banner";
 import { Screen } from "@/components/Screen";
+import { Loader } from "@/components/Loader";
 import { BackdateProvider } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 
 import Calving from "../events/calving";
 import Diagnosis from "../events/diagnosis";
@@ -43,6 +45,26 @@ const SCREENS: Record<string, ComponentType> = {
 export default function Backdate() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const ScreenComponent = SCREENS[type ?? ""];
+  const { open, ready } = useBackdatingWindow();
+
+  // The window is the manager's to open (Livestock Settings -> Backdating Open).
+  // Closed, there is no backdating form to reach, even by a stale link.
+  if (!ready) {
+    return (
+      <Screen title="Backdate" back>
+        <Loader />
+      </Screen>
+    );
+  }
+  if (!open) {
+    return (
+      <Screen title="Backdating is closed" back>
+        <Banner tone="warning">
+          Backdating is closed. Ask a manager to open it, or record this against today.
+        </Banner>
+      </Screen>
+    );
+  }
 
   if (!ScreenComponent) {
     return (

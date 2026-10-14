@@ -3,6 +3,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useScheme } from "@/src/theme/themeStore";
 
 /** Amber, because this is the control that takes you somewhere the normal
@@ -14,6 +15,9 @@ export const BACKDATE_AMBER_DARK = "#F59E0B";
 
 export function BackdateButton({ type }: { type: string }) {
   const amber = useScheme() === "dark" ? BACKDATE_AMBER_DARK : BACKDATE_AMBER_LIGHT;
+  // Closed window: no entry point at all, like the web.
+  const { open } = useBackdatingWindow();
+  if (!open) return null;
   return (
     <Pressable
       accessibilityRole="button"

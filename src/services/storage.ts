@@ -8,6 +8,8 @@ export const STORAGE_KEYS = {
   EMAIL: "email",
   FULLNAME: "fullname",
   PENDING_QUEUE: "pending_queue",
+  /** Last `posting_day` answer: server today + whether backdating is open. */
+  POSTING_DAY: "posting_day",
   /** Last manufacturing warehouse used for TMR feeding Work Orders. */
   FEED_WIP_WAREHOUSE: "feed_wip_warehouse",
 } as const;

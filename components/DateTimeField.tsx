@@ -17,7 +17,7 @@ export const toISODate = (d: Date): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-const fromISODate = (iso: string): Date => {
+export const fromISODate = (iso: string): Date => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 };
