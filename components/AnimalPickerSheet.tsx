@@ -4,10 +4,10 @@ import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextIn
 import { RADIUS } from "@/constants/theme";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useColors } from "@/src/hooks/useColors";
-import { avatarToneFor, initials, pillFor } from "@/services/utils";
+import { pillFor } from "@/services/utils";
 import type { Animal } from "@/types";
 
-import { Avatar } from "./Avatar";
+import { AnimalImage } from "./AnimalImage";
 import { Button } from "./Button";
 import { Pill } from "./Pill";
 
@@ -44,16 +44,10 @@ export function AnimalPickerSheet({
   const [view, setView] = useState<"all" | "herd">("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // The search runs in the local SQLite store, so the picker works offline.
   const { data: ALL = [], isLoading } = useAnimals();
-
-  const list = useMemo(() => {
-    let l = include ? ALL.filter(include) : ALL;
-    if (query) {
-      const q = query.toLowerCase();
-      l = l.filter((a) => a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
-    }
-    return l;
-  }, [ALL, include, query]);
+  const { data: found = ALL } = useAnimals(query);
+  const list = useMemo(() => (include ? found.filter(include) : found), [found, include]);
 
   // Group rows for the herd view: header → child animal rows.
   const herdRows = useMemo<GroupRow[]>(() => {
@@ -131,7 +125,7 @@ export function AnimalPickerSheet({
             {isSel ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
           </View>
         ) : null}
-        <Avatar text={initials(a.name)} tone={avatarToneFor(a)} size={30} />
+        <AnimalImage image={a.image} style={{ width: 30, height: 30, borderRadius: 15 }} iconSize={15} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={s.itemName} numberOfLines={1}>{a.name}</Text>
           <Text style={s.itemMeta} numberOfLines={1}>{a.id} · {a.herd}</Text>

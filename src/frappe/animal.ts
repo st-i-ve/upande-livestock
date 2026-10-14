@@ -1,22 +1,6 @@
 import type { Animal } from "@/types";
 import { getClient } from "@/src/services/api";
 
-// Fields that exist on the Animal doctype. `days_in_milk`, `milk_safe_date`,
-// `in_treatment` and `insured_value` were trimmed off it (a lactation's day count
-// is worked out from her events, a withdrawal date lives on her health case and
-// insurance on its policy), so asking for them fails the whole list with "Field
-// not permitted in query".
-export const ANIMAL_LIST_FIELDS = [
-  "name",
-  "burn_name",
-  "sex",
-  "date_of_birth",
-  "current_herd",
-  "repro_status",
-  "parity",
-  "last_weight_kg",
-] as const;
-
 type AnimalRow = Record<string, any>;
 
 export type AnimalDetail = Animal & {
@@ -55,44 +39,43 @@ const mapAnimalDetail = (row: AnimalRow): AnimalDetail => ({
   sire: row.sire_name ?? null,
   dam: row.dam ?? null,
   status: row.status ?? null,
+  tag: row.tag_number ?? null,
+  breed: row.breed ?? null,
+  image: row.image ?? null,
 });
-
-const safeMap = <T>(rows: any[], mapper: (r: any) => T): T[] => {
-  const out: T[] = [];
-  for (const r of rows) {
-    try {
-      out.push(mapper(r));
-    } catch (e) {
-      console.warn("[frappe/animal] row mapping failed", e, r);
-    }
-  }
-  return out;
-};
-
-export const getAnimals = async (): Promise<Animal[]> => {
-  const client = await getClient();
-  const res = await client.get("/api/resource/Animal", {
-    params: {
-      fields: JSON.stringify(ANIMAL_LIST_FIELDS),
-      // Retired animals (sold, dead, culled) are not offered to a form.
-      filters: JSON.stringify([["disabled", "=", 0]]),
-      limit_page_length: 1000,
-      order_by: "name asc",
-    },
-  });
-  const rows = (res.data?.data ?? []) as any[];
-  return safeMap(rows, mapAnimal);
-};
 
 const ANIMAL_PROFILE =
   "/api/method/upande_livestock.serverscripts.animals.animal_profile.animal_profile";
 
+export type AnimalProfile = {
+  id: string;
+  name: string;
+  sex: string | null;
+  herd: string;
+  breed: string | null;
+  bornOn: string | null;
+  stage: "heifer" | "fresh" | "open" | "served" | "confirmed" | "dry" | "retired";
+  photo: string | null;
+  dam: string | null;
+  sire: string | null;
+  cycle: { daysInMilk: number | null };
+};
+
 /**
- * One animal, with what the server works out about her.
- *
- * Days in milk comes from `animal_profile` (her calving history decides it, not
- * a column), and the withdrawal date and "in treatment" from her open health
- * file. Both are best effort: a user without health permissions simply sees no
+ * What the desk's Animals page shows about her — the same `animal_profile` call,
+ * so the stage and the facts read the same on both. Online only; the phone's
+ * local copy answers when there is no signal.
+ */
+export const getAnimalProfile = async (id: string): Promise<AnimalProfile | null> => {
+  const client = await getClient();
+  const res = await client.post(ANIMAL_PROFILE, { payload: { animal: id } });
+  const m = res.data?.message;
+  return m && !m.error ? (m as AnimalProfile) : null;
+};
+
+/**
+ * One animal's online extras: the open health file's withdrawal date and "in
+ * treatment". Best effort: a user without health permissions simply sees no
  * treatment banner, and the screen still opens.
  */
 export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
@@ -108,24 +91,19 @@ export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
   if (!row) return null;
   const detail = mapAnimalDetail(row);
 
-  const [profile, cases] = await Promise.all([
-    client.post(ANIMAL_PROFILE, { payload: { animal: id } }).catch(() => null),
-    client
-      .get("/api/resource/Livestock Health Case", {
-        params: {
-          fields: JSON.stringify(["name", "milk_safe_date"]),
-          filters: JSON.stringify([
-            ["animal", "=", id],
-            ["docstatus", "=", 1],
-            ["case_status", "in", ["Open", "Under Treatment"]],
-          ]),
-          limit_page_length: 1,
-        },
-      })
-      .catch(() => null),
-  ]);
-  const dim = profile?.data?.message?.cycle?.daysInMilk;
-  if (typeof dim === "number") detail.dim = dim;
+  const cases = await client
+    .get("/api/resource/Livestock Health Case", {
+      params: {
+        fields: JSON.stringify(["name", "milk_safe_date"]),
+        filters: JSON.stringify([
+          ["animal", "=", id],
+          ["docstatus", "=", 1],
+          ["case_status", "in", ["Open", "Under Treatment"]],
+        ]),
+        limit_page_length: 1,
+      },
+    })
+    .catch(() => null);
   const open = cases?.data?.data?.[0];
   if (open) {
     detail.inTreatment = 1;

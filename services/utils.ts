@@ -38,3 +38,27 @@ export function pillFor(a: Animal): PillSpec {
 export function fmtKES(n: number) {
   return n.toLocaleString();
 }
+
+/** The desk's wording for where an animal stands (frontend/src/lib/animals.ts, STAGES). */
+export const STAGE_LABELS: Record<string, string> = {
+  heifer: "Heifer",
+  fresh: "Fresh",
+  open: "Open",
+  served: "Served",
+  confirmed: "In calf",
+  dry: "Dry",
+  retired: "Left the herd",
+};
+
+/** Age the way the desk's portrait writes it: "12d", "6w", "14m", "2y 3m". */
+export function ageFrom(bornOn: string | null | undefined, now = new Date()): string {
+  if (!bornOn) return "—";
+  const b = new Date(bornOn);
+  if (Number.isNaN(b.getTime())) return "—";
+  const days = Math.max(0, Math.round((now.getTime() - b.getTime()) / 86400000));
+  if (days < 21) return `${days}d`;
+  if (days < 90) return `${Math.round(days / 7)}w`;
+  const months = Math.round(days / 30.44);
+  if (months < 24) return `${months}m`;
+  return `${Math.floor(months / 12)}y ${months % 12}m`;
+}

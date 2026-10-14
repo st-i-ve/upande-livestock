@@ -2,9 +2,9 @@ import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
 import type { Animal } from "@/types";
-import { avatarToneFor, initials, pillFor } from "@/services/utils";
+import { pillFor } from "@/services/utils";
 
-import { Avatar } from "./Avatar";
+import { AnimalImage } from "./AnimalImage";
 import { Pill } from "./Pill";
 import { Row } from "./Row";
 
@@ -14,7 +14,7 @@ export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => voi
   const p = pillFor(a);
   return (
     <Row
-      left={<Avatar text={initials(a.name)} tone={avatarToneFor(a)} />}
+      left={<AnimalImage image={a.image} style={{ width: 38, height: 38, borderRadius: 19 }} />}
       title={
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
           <Text style={s.name}>{a.name}</Text>
