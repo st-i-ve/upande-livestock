@@ -12,12 +12,12 @@ import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
-import { findStoreShortage } from "@/src/frappe/stock";
-import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { StockItemFields } from "@/components/StockItemFields";
+import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
+import { useEventItems } from "@/src/hooks/useEventItems";
+import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
-import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
-import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -28,25 +28,18 @@ export default function Service() {
   const [selected, setSelected] = useState<Animal[]>([]);
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
+  const [strawUom, setStrawUom] = useState<string>("");
   const [semenWarehouse, setSemenWarehouse] = useState<string>("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
-  const batchMutation = useBatchDrugIssue();
-  const { data: company } = useDefaultCompany();
-
-  // Live straws-on-hand at the chosen store, shown while picking.
-  const semenAvailQuery = useStoreQtyMap(
-    straw && semenWarehouse ? [{ itemCode: straw, warehouse: semenWarehouse }] : [],
-  );
-  const semenAvail =
-    straw && semenWarehouse
-      ? semenAvailQuery.data?.[storeQtyKey(straw, semenWarehouse)]
-      : undefined;
+  const { choices: semenChoices } = useEventItems("Service");
 
   const handleSubmit = async () => {
     setError(null);
+    setWarning(null);
     if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to service.");
     // For A.I. with a semen straw, we issue it from a store — need the source.
@@ -54,20 +47,18 @@ export default function Service() {
     if (willIssueSemen && !semenWarehouse) {
       return setError("Pick the store the semen straws come from.");
     }
-    if (willIssueSemen && !company) {
-      return setError("Default company not loaded yet. Try again in a moment.");
-    }
-    // Block over-issue: one straw per cow is issued from the store.
+    // Heads-up only, never a block: the server saves a short issue as a draft.
+    // One straw per cow is issued from the store.
     if (willIssueSemen) {
-      const shortage = await findStoreShortage([
+      const shortage = await findShortage(semenChoices, [
         { itemCode: straw, warehouse: semenWarehouse, qtyNeeded: selected.length },
       ]);
-      if (shortage) return setError(shortage);
+      if (shortage) setWarning(shortage);
     }
 
     let succeeded = 0;
     let queued = 0;
-    const eventNames: string[] = [];
+    const replies: any[] = [];
     for (const a of selected) {
       try {
         const r = await mutation.mutateAsync({
@@ -77,13 +68,14 @@ export default function Service() {
           operator,
           eventDate: isBackdating ? backdateDate : todayISO(),
           serviceType: type,
-          semenItem: straw || undefined,
+          semenItem: type === "A.I." ? straw || undefined : undefined,
+          semenWarehouse: type === "A.I." && semenWarehouse ? semenWarehouse : undefined,
           remarks: remarks || undefined,
         });
         if (r.queued) queued += 1;
         else {
           succeeded += 1;
-          if (r.data?.name) eventNames.push(r.data.name);
+          replies.push(r.data);
         }
       } catch (err) {
         setError(
@@ -93,38 +85,19 @@ export default function Service() {
       }
     }
 
-    // One Material Issue for the semen: one straw per inseminated cow, out of
-    // the chosen store, attributed to the operator (satisfies the site's
-    // Material Issue employee rule).
-    let semenIssued = false;
-    let semenError = "";
-    if (willIssueSemen && company) {
-      try {
-        await batchMutation.mutateAsync({
-          drugRows: [{ itemCode: straw, qty: selected.length, sourceWarehouse: semenWarehouse }],
-          eventNames,
-          batchId: `service_${Date.now()}`,
-          remarks: `Service/AI · ${selected.length} cows · ${todayISO()}`,
-          company,
-          employee: operator,
-        });
-        semenIssued = true;
-      } catch (err) {
-        semenError = extractFrappeError(err);
-      }
-    }
-
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} served`);
     if (queued) parts.push(`${queued} queued (offline)`);
-    if (willIssueSemen) {
-      parts.push(
-        semenIssued
-          ? `${selected.length} straw(s) issued from ${semenWarehouse}`
-          : `semen issue FAILED: ${semenError}`,
-      );
+    // The server issues one straw per service in the same call; what it says
+    // happened (posted, or a draft waiting for stock) is shown as-is.
+    const stockNote = stockOutcomeText(replies);
+    if (willIssueSemen && !stockNote && succeeded) {
+      parts.push(`${succeeded} straw(s) issued from ${semenWarehouse}`);
     }
-    Alert.alert("Service recorded", parts.join(" · "));
+    Alert.alert(
+      stockNote ? "Service saved — stock issue pending" : "Service recorded",
+      [parts.join(" · "), stockNote].filter(Boolean).join("\n\n"),
+    );
     router.replace("/(tabs)/record/success?name=Service");
   };
 
@@ -161,53 +134,33 @@ export default function Service() {
           <Picker value={type} onChange={(v) => setType(v as "A.I." | "Natural")} options={["A.I.", "Natural"]} />
         </Field>
       </FieldRow>
-      <Field label="Semen straw (Item)" help="Search Frappe Items. 1 straw issued per cow on submit.">
-        <FrappeSearchPicker
-          doctype="Item"
-          value={straw || null}
-          onChange={(name) => setStraw(name)}
-          fields={["name", "item_name", "item_code"]}
-          displayField="item_name"
-          metaField="item_code"
-          searchField="item_name"
-          filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
-          icon="test-tube"
-        />
-      </Field>
-      {type === "A.I." && straw ? (
-        <Field
-          label="Semen store"
-          help={
-            `One straw per cow (${selected.length || 0}) is issued from here as a Material Issue.` +
-            (semenWarehouse
-              ? semenAvailQuery.isLoading || semenAvail == null
-                ? " Checking stock…"
-                : ` Available: ${semenAvail} straw(s)${selected.length > semenAvail ? " — not enough" : ""}`
-              : "")
-          }
-        >
-          <FrappeSearchPicker
-            doctype="Warehouse"
-            value={semenWarehouse || null}
-            onChange={(name) => setSemenWarehouse(name)}
-            fields={["name", "warehouse_name"]}
-            displayField="warehouse_name"
-            searchField="warehouse_name"
-            filters={[["disabled", "=", 0]]}
-            icon="warehouse"
+      {type === "A.I." ? (
+        <>
+          <StockItemFields
+            choices={semenChoices}
+            itemLabel="Semen straw (Item)"
+            icon="test-tube"
+            value={{ itemCode: straw, uom: strawUom, warehouse: semenWarehouse }}
+            onChange={(v) => {
+              setStraw(v.itemCode);
+              setStrawUom(v.uom);
+              setSemenWarehouse(v.warehouse);
+            }}
+            qtyNeeded={selected.length}
           />
-        </Field>
+        </>
       ) : null}
       <Field label="Remarks">
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Heat signs, technician notes..." />
       </Field>
 
+      {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <Button
-        label={mutation.isPending || batchMutation.isPending ? "Submitting…" : "Submit service"}
-        disabled={mutation.isPending || batchMutation.isPending || selected.length === 0}
-        loading={mutation.isPending || batchMutation.isPending}
+        label={mutation.isPending ? "Submitting…" : "Submit service"}
+        disabled={mutation.isPending || selected.length === 0}
+        loading={mutation.isPending}
         onPress={handleSubmit}
       />
     </Screen>

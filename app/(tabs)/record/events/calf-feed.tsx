@@ -1,3 +1,4 @@
+import { useOnChange } from "@/src/hooks/useOnChange";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
@@ -9,7 +10,7 @@ import { Button } from "@/components/Button";
 import { Calc } from "@/components/Calc";
 import { Chip, Chips } from "@/components/Chips";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
-import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
+import { StockItemFields } from "@/components/StockItemFields";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { ageDays, initials } from "@/services/utils";
@@ -20,6 +21,7 @@ import {
   CalfFeedingSession,
 } from "@/src/frappe/calfFeeding";
 import { useCreateCalfFeeding } from "@/src/hooks/mutations";
+import { useEventItems } from "@/src/hooks/useEventItems";
 import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -59,6 +61,8 @@ export default function CalfFeed() {
   const [feedType, setFeedType] = useState<CalfFeedType>("Whole Milk");
   const [item, setItem] = useState<string>("");
   const [wh, setWh] = useState<string>("");
+  const [itemUom, setItemUom] = useState<string>("");
+  const { choices: feedChoices } = useEventItems("Feeding");
   const [qty, setQty] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,12 +73,12 @@ export default function CalfFeed() {
   const days = calf?.dob ? ageDays(calf.dob) : null;
 
   // When the user picks a calf, seed the recommended quantity + type once.
-  React.useEffect(() => {
-    if (rec && !qty) {
-      setQty(rec.kg);
-      setFeedType(rec.type);
+  useOnChange(rec, (r) => {
+    if (r && !qty) {
+      setQty(r.kg);
+      setFeedType(r.type);
     }
-  }, [rec]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
 
   const handleSubmit = async () => {
     setError(null);
@@ -145,35 +149,18 @@ export default function CalfFeed() {
       <Field label="Feed type">
         <Picker value={feedType} onChange={(v) => setFeedType(v as CalfFeedType)} options={FEED_TYPES} />
       </Field>
-      <Field
-        label="Feed item (stock)"
-        help="Search live Frappe Items. Stock issued from source warehouse on submit."
-      >
-        <FrappeSearchPicker
-          doctype="Item"
-          value={item || null}
-          onChange={(name) => setItem(name)}
-          fields={["name", "item_name", "item_code", "stock_uom"]}
-          displayField="item_name"
-          metaField="item_code"
-          searchField="item_name"
-          filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
-          icon="package-variant"
-        />
-      </Field>
+      <StockItemFields
+        choices={feedChoices}
+        itemLabel="Feed item (stock)"
+        icon="package-variant"
+        value={{ itemCode: item, uom: itemUom, warehouse: wh }}
+        onChange={(v) => {
+          setItem(v.itemCode);
+          setItemUom(v.uom);
+          setWh(v.warehouse);
+        }}
+      />
       <FieldRow>
-        <Field label="Source warehouse" style={{ flex: 1 }}>
-          <FrappeSearchPicker
-            doctype="Warehouse"
-            value={wh || null}
-            onChange={(name) => setWh(name)}
-            fields={["name", "warehouse_name"]}
-            displayField="warehouse_name"
-            searchField="warehouse_name"
-            filters={[["disabled", "=", 0]]}
-            icon="warehouse"
-          />
-        </Field>
         <Field label="Session" style={{ flex: 1 }}>
           <Chips>
             {SESSIONS.map((sx) => (

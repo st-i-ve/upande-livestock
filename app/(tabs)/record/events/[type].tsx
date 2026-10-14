@@ -23,12 +23,11 @@ import {
   AnimalEventInput,
   AnimalEventType,
 } from "@/src/frappe/animalEvent";
-import { BatchDrugRow } from "@/src/frappe/batchDrugIssue";
-import { findStoreShortage, getItemValuationRate } from "@/src/frappe/stock";
-import { useBatchDrugIssue, useCreateAnimalEvent } from "@/src/hooks/mutations";
-import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
-import { useDefaultCompany } from "@/src/hooks/useDefaultCompany";
-import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
+import { getItemValuationRate } from "@/src/frappe/stock";
+import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { StockItemFields } from "@/components/StockItemFields";
+import { findShortage, stockOutcomeText, type StockChoice } from "@/src/frappe/eventItems";
+import { useEventItems } from "@/src/hooks/useEventItems";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -77,15 +76,13 @@ export default function GenericEvent() {
   const [drugs, setDrugs] = useState<DrugRow[]>([]);
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
-  const { data: settings } = useLivestockSettings();
-  const { data: company } = useDefaultCompany();
-  const defaultDrugWarehouse = settings?.drug_warehouse || "";
+  // The store comes from the event type's own stock rule (items_by_event), not Settings.
+  const { choices: stockChoices } = useEventItems(spec?.eventType ?? "");
 
   const eventMutation = useCreateAnimalEvent();
-  const batchMutation = useBatchDrugIssue();
-
-  const submitting = eventMutation.isPending || batchMutation.isPending;
+  const submitting = eventMutation.isPending;
 
   const filledDrugRows = useMemo(
     () => drugs.filter((d) => d.itemCode.trim() && Number(d.qty) > 0),
@@ -98,7 +95,7 @@ export default function GenericEvent() {
     queryKey: [
       "drugCost",
       filledDrugRows
-        .map((d) => `${d.itemCode.trim()}@${d.sourceWarehouse || defaultDrugWarehouse}:${d.qty}`)
+        .map((d) => `${d.itemCode.trim()}@${d.sourceWarehouse}:${d.qty}`)
         .join("|"),
       // Per-animal rows x headcount: without this the cached total survives a
       // change in the selection and quotes the wrong figure.
@@ -110,7 +107,7 @@ export default function GenericEvent() {
       for (const d of filledDrugRows) {
         const rate = await getItemValuationRate(
           d.itemCode.trim(),
-          d.sourceWarehouse || defaultDrugWarehouse,
+          d.sourceWarehouse || undefined,
         );
         total += rate * Number(d.qty) * selected.length;
       }
@@ -135,6 +132,7 @@ export default function GenericEvent() {
 
   const handleSubmit = async () => {
     setError(null);
+    setWarning(null);
 
     // ----- validation --------------------------------------------------------
     if (selected.length === 0) return setError("Pick at least one animal.");
@@ -142,7 +140,6 @@ export default function GenericEvent() {
     if (spec.isVetProcedure) {
       if (!vetName.trim()) return setError("Enter the vet's name.");
       if (!operator) return setError(missingMessage);
-      if (!company) return setError("Default company not loaded yet. Try again in a moment.");
     } else {
       if (!operator) return setError(missingMessage);
     }
@@ -155,23 +152,19 @@ export default function GenericEvent() {
     }
 
     if (spec.needsDrugs && filledDrugRows.length > 0) {
-      const missing = filledDrugRows.find((d) => !d.sourceWarehouse);
-      if (missing) {
-        return setError(
-          "Pick a source warehouse on every drug row (or set Drug warehouse in Livestock Settings to apply a default).",
-        );
-      }
-      // Block over-issue before anything is recorded. The rows are per animal,
-      // so what actually leaves the store is qty x headcount — checking the
-      // per-animal figure would wave through a round 20x the shelf.
-      const shortage = await findStoreShortage(
+      // A heads-up, never a block: the server decides what the store can bear
+      // (today's short round is saved with a draft issue; a backdated one is
+      // refused with its own message). The rows are per animal, so what leaves
+      // the store is qty x headcount.
+      const shortage = await findShortage(
+        stockChoices,
         filledDrugRows.map((d) => ({
           itemCode: d.itemCode.trim(),
-          warehouse: d.sourceWarehouse || defaultDrugWarehouse,
+          warehouse: d.sourceWarehouse,
           qtyNeeded: Number(d.qty) * selected.length,
         })),
       );
-      if (shortage) return setError(shortage);
+      if (shortage) setWarning(shortage);
     }
 
 
@@ -202,7 +195,7 @@ export default function GenericEvent() {
         ? spec.eventType
         : null;
 
-    const eventNames: string[] = [];
+    const replies: any[] = [];
     let succeededEvents = 0;
     let queuedEvents = 0;
 
@@ -218,19 +211,20 @@ export default function GenericEvent() {
           remarks: baseRemarks,
           vetName: vetName.trim(),
           handlerIds: handlerIds.length ? handlerIds : undefined,
+          vetFee:
+            spec.isVetProcedure && Number(activityCost) > 0 ? Number(activityCost) : undefined,
           drugIssues: filledDrugRows.map((d) => ({
             itemCode: d.itemCode.trim(),
             qty: Number(d.qty),
             uom: d.uom || undefined,
-            sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse,
+            sourceWarehouse: d.sourceWarehouse || undefined,
             withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
           })),
-          sourceWarehouse: defaultDrugWarehouse || undefined,
         });
         if (r.queued) queuedEvents = selected.length;
         else {
           succeededEvents = r.data?.animals ?? selected.length;
-          if (r.data?.names?.length) eventNames.push(...r.data.names);
+          replies.push(r.data);
         }
       } catch (err) {
         setError(`Nothing was recorded. ${extractFrappeError(err)}`);
@@ -267,7 +261,7 @@ export default function GenericEvent() {
           if (r.queued) queuedEvents += 1;
           else {
             succeededEvents += 1;
-            if (r.data?.name) eventNames.push(r.data.name);
+            replies.push(r.data);
           }
         } catch (err) {
           setError(
@@ -278,45 +272,28 @@ export default function GenericEvent() {
       }
     }
 
-    // ----- vet fee -----------------------------------------------------------
-    // The drug issue is the server's job now; only the vet fee is left here,
-    // because Livestock Event has no column for it and it posts as its own
-    // Journal Entry. drugRows is deliberately empty.
-    let batchOutcome: "ok" | "skipped" | "failed" = "skipped";
-    let batchError = "";
-
-    if (spec.isVetProcedure && activityCost && Number(activityCost) > 0 && company) {
-      try {
-        await batchMutation.mutateAsync({
-          drugRows: [],
-          activityCost: Number(activityCost),
-          eventNames,
-          batchId,
-          remarks: `${spec.title} · ${selected.length} animals · ${todayISO()}`,
-          company,
-          employee: operator || undefined,
-        });
-        batchOutcome = "ok";
-      } catch (err) {
-        batchOutcome = "failed";
-        batchError = extractFrappeError(err);
-      }
-    }
-
-    // ----- success / partial messaging --------------------------------------
+    // ----- outcome -----------------------------------------------------------
+    // What the server did, not what the phone assumes: drugs posted, or saved
+    // with the stock issue pending, and what became of the vet fee.
     const eventParts: string[] = [];
     if (succeededEvents) eventParts.push(`${succeededEvents} submitted`);
     if (queuedEvents) eventParts.push(`${queuedEvents} queued (offline)`);
 
-    if (batchOutcome === "failed") {
-      Alert.alert(
-        `${spec.title} — partial`,
-        `${eventParts.join(" · ") || "Events recorded"}, and the drugs were issued, but the vet fee did not post: ${batchError}\n\nEnter the fee as a Journal Entry from desktop.`,
+    const notes: string[] = [];
+    const stockNote = stockOutcomeText(replies);
+    if (stockNote) notes.push(stockNote);
+    const fee = replies.map((r) => r?.vet_fee).find(Boolean);
+    if (fee) {
+      notes.push(
+        fee.posted
+          ? `Vet fee KES ${Number(fee.amount).toLocaleString()} posted.`
+          : `Vet fee KES ${Number(fee.amount).toLocaleString()} noted on the record; ${fee.reason}`,
       );
-    } else {
-      const extra = batchOutcome === "ok" ? "\nVet fee posted." : "";
-      Alert.alert(`${spec.title} recorded`, `${eventParts.join(" · ")}${extra}`);
     }
+    Alert.alert(
+      stockNote ? `${spec.title} saved — stock issue pending` : `${spec.title} recorded`,
+      [eventParts.join(" · "), ...notes].filter(Boolean).join("\n\n"),
+    );
     router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
   };
 
@@ -420,7 +397,8 @@ export default function GenericEvent() {
         <DrugRows
           rows={drugs}
           onChange={setDrugs}
-          defaultWarehouse={defaultDrugWarehouse}
+          choices={stockChoices}
+          headcount={selected.length}
         />
       ) : null}
 
@@ -456,8 +434,8 @@ export default function GenericEvent() {
             }
           />
           <KV
-            k="Vet Expense JE"
-            v={activityCost && Number(activityCost) > 0 ? `1 entry · KES ${Number(activityCost).toLocaleString()}` : "—"}
+            k="Vet fee"
+            v={activityCost && Number(activityCost) > 0 ? `KES ${Number(activityCost).toLocaleString()} · recorded by the server` : "—"}
           />
         </View>
       ) : null}
@@ -466,6 +444,7 @@ export default function GenericEvent() {
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Optional notes" />
       </Field>
 
+      {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <Button
@@ -492,11 +471,13 @@ type DrugRow = {
 function DrugRows({
   rows,
   onChange,
-  defaultWarehouse,
+  choices,
+  headcount,
 }: {
   rows: DrugRow[];
   onChange: (rows: DrugRow[]) => void;
-  defaultWarehouse: string;
+  choices: StockChoice[] | undefined;
+  headcount: number;
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
@@ -508,7 +489,7 @@ function DrugRows({
         itemCode: "",
         qty: "1",
         uom: "",
-        sourceWarehouse: defaultWarehouse,
+        sourceWarehouse: "",
         withdrawalDays: "",
       },
     ]);
@@ -516,22 +497,10 @@ function DrugRows({
     onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const remove = (id: number) => onChange(rows.filter((r) => r.id !== id));
 
-  // Live on-hand stock per row, so the operator sees what's in the store.
-  const availQuery = useStoreQtyMap(
-    rows.map((r) => ({
-      itemCode: r.itemCode.trim(),
-      warehouse: r.sourceWarehouse || defaultWarehouse,
-    })),
-  );
-
   return (
     <Field
       label="Drugs / vaccines (optional)"
-      help={
-        defaultWarehouse
-          ? `Quantities are per animal — 2 ml a cow across 20 cows leaves the store as one 40 ml line. Source warehouse defaults to ${defaultWarehouse}.`
-          : "Quantities are per animal. Pick a source warehouse for each row — set a default via Livestock Settings → Drug warehouse."
-      }
+      help="Quantities are per animal — 2 ml a cow across 20 cows leaves the store as one 40 ml line. Picking an item picks the store that holds it; change the store if another has stock."
     >
       {rows.length === 0 ? (
         <Text style={s.drugEmpty}>
@@ -540,33 +509,14 @@ function DrugRows({
       ) : null}
       {rows.map((r) => (
         <View key={r.id} style={s.drugBox}>
-          <Field label="Item">
-            <FrappeSearchPicker
-              doctype="Item"
-              value={r.itemCode || null}
-              onChange={(name, row) =>
-                update(r.id, { itemCode: name, uom: row?.stock_uom || "" })
-              }
-              fields={["name", "item_name", "item_code", "stock_uom"]}
-              displayField="item_name"
-              metaField="item_code"
-              searchField="item_name"
-              filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
-              icon="pill"
-            />
-          </Field>
-          <Field label="Issue from warehouse">
-            <FrappeSearchPicker
-              doctype="Warehouse"
-              value={r.sourceWarehouse || null}
-              onChange={(name) => update(r.id, { sourceWarehouse: name })}
-              fields={["name", "warehouse_name"]}
-              displayField="warehouse_name"
-              searchField="warehouse_name"
-              filters={[["disabled", "=", 0]]}
-              icon="warehouse"
-            />
-          </Field>
+          <StockItemFields
+            choices={choices}
+            value={{ itemCode: r.itemCode, uom: r.uom, warehouse: r.sourceWarehouse }}
+            onChange={(v) =>
+              update(r.id, { itemCode: v.itemCode, uom: v.uom, sourceWarehouse: v.warehouse })
+            }
+            qtyNeeded={Number(r.qty) * Math.max(headcount, 1)}
+          />
           <FieldRow>
             <Field label="Qty per animal" style={{ flex: 1 }}>
               <Input
@@ -580,27 +530,6 @@ function DrugRows({
               <Input value={r.uom} editable={false} placeholder="—" />
             </Field>
           </FieldRow>
-          {r.itemCode.trim() && (r.sourceWarehouse || defaultWarehouse)
-            ? (() => {
-                const wh = r.sourceWarehouse || defaultWarehouse;
-                const avail = availQuery.data?.[storeQtyKey(r.itemCode.trim(), wh)];
-                const short = avail != null && Number(r.qty) > avail;
-                return (
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      marginTop: -4,
-                      marginBottom: 8,
-                      color: short ? c.danger : c.textMuted,
-                    }}
-                  >
-                    {availQuery.isLoading || avail == null
-                      ? `Checking stock in ${wh}…`
-                      : `Available in ${wh}: ${avail}${r.uom ? " " + r.uom : ""}${short ? " — not enough" : ""}`}
-                  </Text>
-                );
-              })()
-            : null}
           <Field label="Withdrawal days">
             <Input
               value={r.withdrawalDays}

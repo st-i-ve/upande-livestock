@@ -28,10 +28,6 @@ import {
   createMilkRecording,
 } from "@/src/frappe/milkRecording";
 import { feedHerd, manufactureHerdFeed } from "@/src/frappe/feeding";
-import {
-  BatchDrugIssueInput,
-  submitBatchDrugIssue,
-} from "@/src/frappe/batchDrugIssue";
 import { isOfflineError } from "@/src/offline/dispatcher";
 import {
   PendingMutationType,
@@ -107,8 +103,6 @@ const labelCase = (i: CreateAnimalHealthCaseInput): string =>
   `Health case · ${i.animal}`;
 const labelCaseUpdate = (i: UpdateAnimalHealthCaseInput): string =>
   `Case close · ${i.name} · ${i.caseStatus}`;
-const labelBatchDrug = (i: BatchDrugIssueInput): string =>
-  `Batch drug issue · ${i.eventNames.length} animals`;
 
 // ---------------------------------------------------------------------------
 
@@ -192,15 +186,6 @@ export const useFeedHerd = () => {
   return useMutation({
     mutationFn: (input: { herd: string; qty: number; employee?: string }) =>
       feedHerd(input.herd, input.qty, input.employee),
-    onSuccess: () => invalidateAll(qc),
-  });
-};
-
-export const useBatchDrugIssue = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: BatchDrugIssueInput) =>
-      tryDirectOrEnqueue("BatchDrugIssue", input, submitBatchDrugIssue, labelBatchDrug(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };

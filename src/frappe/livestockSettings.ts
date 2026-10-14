@@ -42,8 +42,8 @@ export type LivestockSettingsDoc = {
   custom_milking_stock_entry_type?: string;
 
   // --- stores --------------------------------------------------------------
-  drug_warehouse?: string;
-  semen_warehouse?: string;
+  // No drug/semen warehouse here: each Livestock Event Type owns its Default Store,
+  // served per event by `items_by_event` (see src/frappe/eventItems.ts).
   semen_item?: string;
   custom_feed_wip_warehouse?: string;
 
@@ -82,8 +82,6 @@ export type LivestockSettingsDoc = {
  * names back onto the type.
  */
 export const SETTING_ALIASES: Record<string, keyof LivestockSettingsDoc> = {
-  custom_drug_warehouse: "drug_warehouse",
-  custom_semen_warehouse: "semen_warehouse",
   custom_default_heifer_herd: "female_calf_herd",
   custom_default_bull_herd: "male_calf_herd",
   custom_incalf_heifer_herd: "incalf_heifer_herd",

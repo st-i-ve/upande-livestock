@@ -5,7 +5,6 @@ import { createAnimalDisposal } from "@/src/frappe/animalDisposal";
 import { createAnimalHealthCase, updateAnimalHealthCase } from "@/src/frappe/animalHealthCase";
 import { createCalfFeeding } from "@/src/frappe/calfFeeding";
 import { createMilkRecording } from "@/src/frappe/milkRecording";
-import { submitBatchDrugIssue } from "@/src/frappe/batchDrugIssue";
 import { extractFrappeError } from "@/src/services/api";
 
 import {
@@ -15,6 +14,20 @@ import {
   markAttempt,
   remove,
 } from "./queue";
+
+/**
+ * Items an older build queued before stock and vet fees became the server's job.
+ * Rejected as an application-level error (it carries a `response`), so the
+ * drain reports it on the Pending screen and moves on rather than treating it
+ * as a dead network and stalling everything behind it.
+ */
+async function retiredBatchDrugIssue(): Promise<never> {
+  const err: any = new Error(
+    "This drug / vet-fee entry was queued by an older version of the app, which posted stock from the phone. Re-enter it on the web, then discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
 
 /**
  * Registry mapping each PendingMutationType to the function that submits it.
@@ -29,7 +42,7 @@ const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
   CalfFeeding: createCalfFeeding,
   AnimalDiagnosis: createAnimalDiagnosis,
   AnimalHealthCase: createAnimalHealthCase,
-  BatchDrugIssue: submitBatchDrugIssue,
+  BatchDrugIssue: retiredBatchDrugIssue,
   AnimalHealthCaseUpdate: updateAnimalHealthCase,
 };
 
