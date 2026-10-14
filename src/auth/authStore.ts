@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { getEmployeeForUser } from "@/src/frappe/employee";
+import { clearLocalData, syncAnimals } from "@/src/db/sync";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
@@ -94,11 +95,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       fullname: data?.full_name ?? null,
       employeeName,
     });
+    // The whole herd, once, so the phone works offline from here on. Not
+    // awaited: a slow sync must not hold up signing in.
+    void syncAnimals({ full: true });
   },
 
   logout: async () => {
     await api.logout();
     queryClient.clear();
+    await clearLocalData().catch((e) => console.warn("[auth] clearing local data failed", e));
     await storage.removeItem(STORAGE_KEY_EMPLOYEE);
     set({
       isAuthenticated: false,

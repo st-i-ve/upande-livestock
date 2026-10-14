@@ -30,16 +30,13 @@ export default function Animals() {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const { data: animals = [], isLoading, isRefetching, error, refetch } = useAnimals();
+  // Search runs in the local SQLite store (tag, name, herd), so it works offline.
+  const { data: found = animals } = useAnimals(query);
 
   const list = useMemo(() => {
-    let l = animals;
-    if (filter !== "all") l = l.filter((a) => (a.repro || "").includes(filter));
-    if (query) {
-      const q = query.toLowerCase();
-      l = l.filter((a) => a.id.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
-    }
-    return l;
-  }, [animals, filter, query]);
+    if (filter === "all") return found;
+    return found.filter((a) => (a.repro || "").includes(filter));
+  }, [found, filter]);
 
   // Group the filtered list by herd for the collapsible tree.
   const groups = useMemo(() => {
@@ -69,7 +66,7 @@ export default function Animals() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search by tag or name"
+          placeholder="Search by tag, name or herd"
           placeholderTextColor={c.textSubtle}
           style={s.input}
         />

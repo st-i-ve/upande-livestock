@@ -121,14 +121,22 @@ await step("read", "mobile.get_bootstrap_bundle (useHerds)", async () => {
   ctx.herds = m.herds;
   return `${m.herds.length} herds`;
 });
-const ANIMAL_FIELDS = ["name", "burn_name", "sex", "date_of_birth", "current_herd", "repro_status", "parity", "last_weight_kg"];
-await step("read", "GET Animal list (useAnimals)", async () => {
-  const m = msgOf(await get("/api/resource/Animal", {
-    fields: ANIMAL_FIELDS, filters: [["disabled", "=", 0]], limit_page_length: 1000, order_by: "name asc",
-  }));
-  need(m[0], ANIMAL_FIELDS, "animal row");
-  ctx.animal = m[0].name;
-  return `${m.length} animals`;
+const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified"];
+await step("read", "mobile.animals_since full (offline store, login)", async () => {
+  const m = msgOf(await get(`${M}.mobile.animals_since.animals_since`));
+  need(m, ["server_time", "animals", "removed"], "animals_since");
+  if (m.removed.length) throw new Error("a full sync must not name removed animals");
+  need(m.animals[0], SYNC_FIELDS, "animal row");
+  ctx.animal = m.animals[0].name;
+  ctx.syncTime = m.server_time;
+  ctx.syncCount = m.animals.length;
+  return `${m.animals.length} animals, ${JSON.stringify(m).length} bytes`;
+});
+await step("read", "mobile.animals_since delta (foreground / pull-to-refresh)", async () => {
+  const m = msgOf(await get(`${M}.mobile.animals_since.animals_since`, { since: ctx.syncTime }));
+  need(m, ["server_time", "animals", "removed"], "animals_since delta");
+  if (m.animals.length > ctx.syncCount) throw new Error("a delta returned more than the full set");
+  return `${m.animals.length} changed, ${m.removed.length} removed`;
 });
 await step("read", "GET Animal/<name> (useAnimal)", async () => {
   const m = msgOf(await get(`/api/resource/Animal/${encodeURIComponent(ctx.animal)}`));

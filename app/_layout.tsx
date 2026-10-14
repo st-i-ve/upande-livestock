@@ -22,6 +22,7 @@ import "react-native-reanimated";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
+import { startAnimalSync } from "@/src/db/sync";
 import { startAutoDrain } from "@/src/offline/autoDrain";
 import { queryClient } from "@/src/services/queryClient";
 import { useScheme, useThemeStore } from "@/src/theme/themeStore";
@@ -81,6 +82,7 @@ export default function RootLayout() {
   const hydrated = useThemeStore((s) => s.hydrated);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const authLoading = useAuthStore((s) => s.isLoading);
+  const signedIn = useAuthStore((s) => s.isAuthenticated);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -96,6 +98,13 @@ export default function RootLayout() {
     const stop = startAutoDrain();
     return stop;
   }, [hydrate, checkAuth]);
+
+  // Keep the local animals current while signed in: a sync now (the full set
+  // on a first run) and a delta each time the app returns to the foreground.
+  React.useEffect(() => {
+    if (!signedIn) return;
+    return startAnimalSync();
+  }, [signedIn]);
 
   // Hold on a themed splash until fonts, theme preference, and the auth check
   // are all resolved — so we never flash the login screen on resume/cold start.

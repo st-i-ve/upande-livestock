@@ -11,6 +11,14 @@ export type Animal = {
   milkSafe: string | null;
   inTreatment: 0 | 1;
   pregnant: 0 | 1;
+  /** Set when the animal comes from the local store (animals_since). */
+  tag?: string | null;
+  breed?: string | null;
+  /** Server-relative file URL (`/files/...`) of the Animal image field. */
+  image?: string | null;
+  dam?: string | null;
+  sire?: string | null;
+  status?: string | null;
 };
 
 
