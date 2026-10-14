@@ -90,16 +90,6 @@ export type ManufactureResult = {
   manufacture_stock_entry: string;
 };
 
-export type FeedResult = {
-  stock_entry: string;
-  herd: string;
-  production_item: string;
-  issued_qty: number;
-  uom: string;
-  store: string;
-  employee: string | null;
-};
-
 /** Preview: the herd's BOM scaled by head count + how much finished feed is in
  *  the store. Backed by `feeding_program()`, which is what the "info" action
  *  actually resolves to — see the mapping note on `lines` below. */
@@ -193,18 +183,3 @@ export const manufactureHerdFeed = (
   bomNo?: string,
 ): Promise<ManufactureResult> =>
   callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo });
-
-/** Issue `qty` of feed already sitting in the store, without mixing.
- *
- *  No screen calls this, and one should think before adding one:
- *  `manufactureHerdFeed` already issues everything it mixes, so calling this
- *  after it feeds the herd a second time out of whatever else the store holds.
- *  That was a real bug on the feeding screen, which ran the two as stages.
- *
- *  It remains because the endpoint does — a store balance left over from
- *  before mixing-and-feeding became one action still has to be issuable. */
-export const feedHerd = (
-  herd: string,
-  qty: number,
-  employee?: string,
-): Promise<FeedResult> => callMethod("issue", { herd, qty, employee });

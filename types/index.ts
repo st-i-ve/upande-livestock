@@ -13,7 +13,6 @@ export type Animal = {
   pregnant: 0 | 1;
 };
 
-export type RationItem = { name: string; pct: number };
 
 export type Herd = {
   n: string;
@@ -25,8 +24,6 @@ export type Herd = {
   cnt: number;
   cc: string;
   bom: string;
-  ration: RationItem[];
-  kgPerHeadPerDay: number;
   isMilking?: boolean;
   isDry?: boolean;
 };

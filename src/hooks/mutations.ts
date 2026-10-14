@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { CreateAnimalInput, createAnimal } from "@/src/frappe/animal";
 import {
   AnimalEventInput,
   createAnimalEvent,
@@ -10,16 +9,6 @@ import {
   createAnimalDiagnosis,
 } from "@/src/frappe/animalDiagnosis";
 import {
-  CreateAnimalDisposalInput,
-  createAnimalDisposal,
-} from "@/src/frappe/animalDisposal";
-import {
-  CreateAnimalHealthCaseInput,
-  UpdateAnimalHealthCaseInput,
-  createAnimalHealthCase,
-  updateAnimalHealthCase,
-} from "@/src/frappe/animalHealthCase";
-import {
   CreateCalfFeedingInput,
   createCalfFeeding,
 } from "@/src/frappe/calfFeeding";
@@ -27,7 +16,7 @@ import {
   CreateMilkRecordingInput,
   createMilkRecording,
 } from "@/src/frappe/milkRecording";
-import { feedHerd, manufactureHerdFeed } from "@/src/frappe/feeding";
+import { manufactureHerdFeed } from "@/src/frappe/feeding";
 import { isOfflineError } from "@/src/offline/dispatcher";
 import {
   PendingMutationType,
@@ -91,18 +80,10 @@ const tryDirectOrEnqueue = async <T extends object>(
 const labelEvent = (i: AnimalEventInput): string => `${i.eventType} · ${i.animal}`;
 const labelMilk = (i: CreateMilkRecordingInput): string =>
   `Milk · ${i.herd}${i.milkingTime ? ` · ${i.milkingTime}` : ""}`;
-const labelDisposal = (i: CreateAnimalDisposalInput): string =>
-  `${i.disposalType} · ${i.animalName || i.animal}`;
-const labelAnimal = (i: CreateAnimalInput): string =>
-  `New animal · ${i.burnName || i.tagNumber}`;
 const labelCalfFeed = (i: CreateCalfFeedingInput): string =>
   `Calf feeding · ${i.calf}`;
 const labelDx = (i: CreateAnimalDiagnosisInput): string =>
   `Diagnosis · ${i.animal}`;
-const labelCase = (i: CreateAnimalHealthCaseInput): string =>
-  `Health case · ${i.animal}`;
-const labelCaseUpdate = (i: UpdateAnimalHealthCaseInput): string =>
-  `Case close · ${i.name} · ${i.caseStatus}`;
 
 // ---------------------------------------------------------------------------
 
@@ -120,24 +101,6 @@ export const useCreateMilkRecording = () => {
   return useMutation({
     mutationFn: (input: CreateMilkRecordingInput) =>
       tryDirectOrEnqueue("MilkRecording", input, createMilkRecording, labelMilk(input)),
-    onSuccess: () => invalidateAll(qc),
-  });
-};
-
-export const useCreateAnimalDisposal = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateAnimalDisposalInput) =>
-      tryDirectOrEnqueue("AnimalDisposal", input, createAnimalDisposal, labelDisposal(input)),
-    onSuccess: () => invalidateAll(qc),
-  });
-};
-
-export const useCreateAnimal = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateAnimalInput) =>
-      tryDirectOrEnqueue("Animal", input, createAnimal, labelAnimal(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };
@@ -160,15 +123,6 @@ export const useCreateAnimalDiagnosis = () => {
   });
 };
 
-export const useCreateAnimalHealthCase = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateAnimalHealthCaseInput) =>
-      tryDirectOrEnqueue("AnimalHealthCase", input, createAnimalHealthCase, labelCase(input)),
-    onSuccess: () => invalidateAll(qc),
-  });
-};
-
 // Animal feeding is a two-stage, server-orchestrated flow (Work Order + stock
 // entries, then Material Issue) that needs a live connection and current stock
 // — so these run directly rather than through the offline queue.
@@ -181,20 +135,3 @@ export const useManufactureHerdFeed = () => {
   });
 };
 
-export const useFeedHerd = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { herd: string; qty: number; employee?: string }) =>
-      feedHerd(input.herd, input.qty, input.employee),
-    onSuccess: () => invalidateAll(qc),
-  });
-};
-
-export const useUpdateAnimalHealthCase = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: UpdateAnimalHealthCaseInput) =>
-      tryDirectOrEnqueue("AnimalHealthCaseUpdate", input, updateAnimalHealthCase, labelCaseUpdate(input)),
-    onSuccess: () => invalidateAll(qc),
-  });
-};
