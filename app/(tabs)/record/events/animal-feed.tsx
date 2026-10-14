@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -28,6 +28,7 @@ import { useHerds } from "@/src/hooks/useHerds";
 import { useManualFeed } from "@/src/hooks/useManualFeed";
 import { useManufactureHerdFeed } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useFinishRecording } from "@/src/hooks/useRecordContext";
 import type { HerdRecipe } from "@/src/frappe/herdRecipes";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
@@ -257,6 +258,7 @@ function SystemTab({
   selectedBom: string;
   onSelectBom: (bomNo: string) => void;
 }) {
+  const finish = useFinishRecording();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const info = useHerdFeedInfo(herd);
@@ -314,7 +316,7 @@ function SystemTab({
         `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
           `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
       );
-      router.replace("/(tabs)/record/success?name=Animal feeding");
+      finish("Animal feeding");
     } catch (err) {
       setSubmitError(extractFrappeError(err));
     }
@@ -476,6 +478,7 @@ function ManualTab({
   selectedBom: string;
   onSelectBom: (bomNo: string) => void;
 }) {
+  const finish = useFinishRecording();
   const c = useColors();
   const amber = useScheme() === "dark" ? BACKDATE_AMBER_DARK : BACKDATE_AMBER_LIGHT;
   const s = useMemo(() => makeStyles(c), [c]);
@@ -592,7 +595,7 @@ function ManualTab({
         `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
           `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
       );
-      router.replace("/(tabs)/record/success?name=Animal feeding");
+      finish("Animal feeding");
     } catch (e) {
       setError(extractFrappeError(e));
     }

@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+
 import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -20,6 +20,7 @@ import { useColors } from "@/src/hooks/useColors";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import type { Animal } from "@/types";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
@@ -42,6 +43,9 @@ export default function Movement() {
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [error, setError] = useState<string | null>(null);
 
   // Where the herd structure says these animals should go next. The ladder is
@@ -110,12 +114,12 @@ export default function Movement() {
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
     Alert.alert("Movement recorded", parts.join(" · "));
-    router.replace(`/(tabs)/record/success?name=Movement`);
+    finish("Movement");
   };
 
   return (
     <Screen
-      title="Movement"
+      title={titleFor("Movement", preset)}
       subtitle="Move animals between herds"
       back
       headerRight={isBackdating ? undefined : <BackdateButton type="movement" />}

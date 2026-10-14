@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { BottomTabBarButtonProps } from "expo-router/js-tabs";
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,6 +74,17 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="record"
+        listeners={{
+          // Tapping Record always lands on the menu, never on whichever record
+          // screen was left open in its stack.
+          tabPress: () => {
+            try {
+              router.dismissTo("/(tabs)/record");
+            } catch {
+              // not mounted yet: the tab opens on its menu anyway
+            }
+          },
+        }}
         options={{
           // No Employee, no recording: the tab is not there at all.
           href: canRecord ? undefined : null,

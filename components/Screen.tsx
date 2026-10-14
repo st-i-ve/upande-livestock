@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONT_FAMILY } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
 
 export function Screen({
@@ -33,6 +34,7 @@ export function Screen({
   const s = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();
   const nav = useNavigation();
+  const recheckEmployee = useAuthStore((st) => st.refreshEmployeeStatus);
   const canGoBack = nav.canGoBack();
   const showBack = !!back && canGoBack;
 
@@ -56,7 +58,16 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           refreshControl={
             onRefresh ? (
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.text} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  // Pull-to-refresh also re-checks the employee link, so HR
+                  // linking a user reaches the phone without a log-out.
+                  void recheckEmployee();
+                  onRefresh();
+                }}
+                tintColor={c.text}
+              />
             ) : undefined
           }
         >

@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+
 import React, { useState } from "react";
 import { Alert } from "react-native";
 
@@ -19,6 +19,7 @@ import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -29,6 +30,9 @@ export default function Service() {
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [type, setType] = useState<"A.I." | "Natural">("A.I.");
   const [straw, setStraw] = useState<string>("");
   const [strawUom, setStrawUom] = useState<string>("");
@@ -96,12 +100,12 @@ export default function Service() {
       stockNote ? "Service saved — stock issue pending" : "Service recorded",
       [parts.join(" · "), stockNote].filter(Boolean).join("\n\n"),
     );
-    router.replace("/(tabs)/record/success?name=Service");
+    finish("Service");
   };
 
   return (
     <Screen
-      title="Service / AI"
+      title={titleFor("Service / AI", preset)}
       subtitle="Issue semen straw"
       back
       headerRight={isBackdating ? undefined : <BackdateButton type="service" />}

@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text } from "react-native";
 
@@ -14,9 +14,11 @@ import { useCreateMilkRecording } from "@/src/hooks/mutations";
 import { useOffline } from "@/components/OnlineOnlyNotice";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
+import { useFinishRecording } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
 
 export default function Milk() {
+  const finish = useFinishRecording();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
 
@@ -74,7 +76,7 @@ export default function Milk() {
           "No connection. The milking is kept here and sent when you are back online. The server checks its date then.",
         );
       }
-      router.replace("/(tabs)/record/success?name=Milk recording");
+      finish("Milk recording");
     } catch (err) {
       setError(extractFrappeError(err));
     }

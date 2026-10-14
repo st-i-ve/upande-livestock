@@ -1,12 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
+import { LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
 import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // Scout-style expandable section: a header row with a chevron that rotates
 // 0°→90° on open, and body content indented beneath it.

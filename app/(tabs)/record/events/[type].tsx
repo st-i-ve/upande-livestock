@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
@@ -25,6 +25,7 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useColors } from "@/src/hooks/useColors";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useOperator } from "@/src/hooks/useOperator";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -65,6 +66,9 @@ export default function GenericEvent() {
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [weight, setWeight] = useState("");
   const [bcs, setBcs] = useState("");
   const [vetFee, setVetFee] = useState("");
@@ -213,12 +217,12 @@ export default function GenericEvent() {
       stockNote ? `${spec.title} saved — stock issue pending` : `${spec.title} recorded`,
       [eventParts.join(" · "), ...notes].filter(Boolean).join("\n\n"),
     );
-    router.replace(`/(tabs)/record/success?name=${encodeURIComponent(spec.title)}`);
+    finish(spec.title);
   };
 
   return (
     <Screen
-      title={spec.title}
+      title={titleFor(spec.title, preset)}
       subtitle="New event"
       back
       headerRight={isBackdating ? undefined : <BackdateButton type={type ?? ""} />}

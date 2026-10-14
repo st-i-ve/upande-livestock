@@ -1,7 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useMemo, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text } from "react-native";
 
@@ -48,11 +46,10 @@ export function DateField({
   const s = useMemo(() => makeStyles(c), [c]);
   const [open, setOpen] = useState(false);
 
-  const handle = (event: DateTimePickerEvent, picked?: Date) => {
-    // Android fires "dismissed" on cancel and hands back no date; iOS keeps the
-    // spinner mounted, so it closes on the first committed value either way.
+  // Android calls onDismiss on cancel and hands back no date; iOS keeps the
+  // spinner mounted, so it closes on the first committed value either way.
+  const handle = (_event: unknown, picked: Date) => {
     setOpen(false);
-    if (event.type === "dismissed" || !picked) return;
     onChange(toISODate(picked));
   };
 
@@ -72,7 +69,8 @@ export function DateField({
           display={Platform.OS === "ios" ? "inline" : "default"}
           maximumDate={maximumDate}
           minimumDate={minimumDate}
-          onChange={handle}
+          onValueChange={handle}
+          onDismiss={() => setOpen(false)}
           themeVariant={c.bg === "#FFFFFF" ? "light" : "dark"}
           accentColor={c.text}
         />

@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams, useSegments } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +17,9 @@ export function BackdateButton({ type }: { type: string }) {
   const amber = useScheme() === "dark" ? BACKDATE_AMBER_DARK : BACKDATE_AMBER_LIGHT;
   // Closed window: no entry point at all, like the web.
   const { open } = useBackdatingWindow();
+  // Opened from an animal: stay in the Animals stack, and keep the animal.
+  const fromAnimals = (useSegments() as string[]).includes("animals");
+  const { animal } = useLocalSearchParams<{ animal?: string }>();
   if (!open) return null;
   return (
     <Pressable
@@ -25,8 +28,8 @@ export function BackdateButton({ type }: { type: string }) {
       hitSlop={8}
       onPress={() =>
         router.push({
-          pathname: "/(tabs)/record/backdate/[type]",
-          params: { type },
+          pathname: fromAnimals ? "/(tabs)/animals/act/backdate/[type]" : "/(tabs)/record/backdate/[type]",
+          params: fromAnimals && animal ? { type, animal } : { type },
         })
       }
       style={({ pressed }) => [

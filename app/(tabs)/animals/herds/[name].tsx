@@ -94,8 +94,8 @@ export default function HerdDetail() {
       {canRecord ? (
         <>
           <SectionTitle>Quick actions</SectionTitle>
-          <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/record/events/animal-feed")} />
-          <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/record/events/milk")} />
+          <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />
+          <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/animals/act/milk")} />
         </>
       ) : null}
     </Screen>

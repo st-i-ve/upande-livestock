@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+
 import React, { useState } from "react";
 import { Alert } from "react-native";
 
@@ -18,6 +18,7 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useCreateCheckUp } from "@/src/hooks/mutations";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useOperator } from "@/src/hooks/useOperator";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -47,6 +48,9 @@ export default function CheckUp() {
   const { vets, vet, setVet } = useVetChoice();
 
   const [animal, setAnimal] = useState<Animal | null>(null);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, animal, setAnimal);
+  const finish = useFinishRecording();
   const [reason, setReason] = useState("");
   const [temp, setTemp] = useState("");
   const [hr, setHr] = useState("");
@@ -102,7 +106,7 @@ export default function CheckUp() {
             ? `${animal.name} seen — ${d.name}. Added to her open file ${d.case}.`
             : `${animal.name} seen — ${d?.name}.`;
       Alert.alert("Check up recorded", said);
-      router.replace("/(tabs)/record/success?name=Check up");
+      finish("Check up");
     } catch (err) {
       setError(extractFrappeError(err));
     }
@@ -110,7 +114,7 @@ export default function CheckUp() {
 
   return (
     <Screen
-      title="Check up"
+      title={titleFor("Check up", preset)}
       subtitle="One look at one animal"
       back
       headerRight={isBackdating ? undefined : <BackdateButton type="diagnosis" />}

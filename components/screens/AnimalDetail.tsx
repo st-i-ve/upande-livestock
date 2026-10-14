@@ -145,17 +145,17 @@ export function AnimalDetail({ id }: { id: string }) {
         <>
       <SectionTitle>Quick actions</SectionTitle>
       <TileGrid>
-        <Tile icon="magnify" title="Check up" onPress={() => router.push("/(tabs)/record/events/diagnosis")} />
+        <Tile icon="magnify" title="Check up" onPress={() => router.push(`/(tabs)/animals/act/diagnosis?animal=${encodeURIComponent(id)}`)} />
         {a.repro === "Calf" ? (
           <>
-            <Tile icon="scale" title="Weigh" onPress={() => router.push("/(tabs)/record/events/weight")} />
-            <Tile icon="arrow-left-right" title="Move" onPress={() => router.push("/(tabs)/record/events/movement")} />
+            <Tile icon="scale" title="Weigh" onPress={() => router.push(`/(tabs)/animals/act/weight?animal=${encodeURIComponent(id)}`)} />
+            <Tile icon="arrow-left-right" title="Move" onPress={() => router.push(`/(tabs)/animals/act/movement?animal=${encodeURIComponent(id)}`)} />
           </>
         ) : (
           <>
-            <Tile icon="needle" title="Vaccinate" onPress={() => router.push("/(tabs)/record/events/vaccination")} />
-            <Tile icon="heart" title="Service" onPress={() => router.push("/(tabs)/record/events/service")} />
-            <Tile icon="arrow-left-right" title="Move" onPress={() => router.push("/(tabs)/record/events/movement")} />
+            <Tile icon="needle" title="Vaccinate" onPress={() => router.push(`/(tabs)/animals/act/vaccination?animal=${encodeURIComponent(id)}`)} />
+            <Tile icon="heart" title="Service" onPress={() => router.push(`/(tabs)/animals/act/service?animal=${encodeURIComponent(id)}`)} />
+            <Tile icon="arrow-left-right" title="Move" onPress={() => router.push(`/(tabs)/animals/act/movement?animal=${encodeURIComponent(id)}`)} />
           </>
         )}
       </TileGrid>
