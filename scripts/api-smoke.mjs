@@ -140,7 +140,7 @@ await step("read", "settings.posting_day (server today + backdating open?)", asy
   need(m, ["today", "backdating_open"], "posting_day");
   return `today ${m.today}, backdating ${m.backdating_open ? "OPEN" : "closed"}`;
 });
-const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified"];
+const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage", "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified"];
 await step("read", "mobile.animals_since full (offline store, login)", async () => {
   const m = msgOf(await get(`${M}.mobile.animals_since.animals_since`));
   need(m, ["server_time", "animals", "removed"], "animals_since");
@@ -383,18 +383,32 @@ async function writes() {
     same(doc, { herd: HERD, total_yield_kg: 120, discarded_kg: 5, cows_milked: 10 }, "milk recording");
     return m.name;
   });
-  await step("write", "mobile.record_milking: offline yesterday (grace), 2 days ago refused", async () => {
+  await step("write", "mobile.record_milking: offline late-sync is a manager setting", async () => {
     const pd = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+    if (pd.backdating_open) return "skipped: backdating is open on this site";
+    const setGrace = async (v) => msgOf(await post("/api/method/frappe.client.set_value", { doctype: "Livestock Settings", name: "Livestock Settings", fieldname: "allow_offline_milking_grace", value: v }));
+    const was = msgOf(await get("/api/method/frappe.client.get_single_value", { doctype: "Livestock Settings", field: "allow_offline_milking_grace" }));
     const day = (n) => new Date(Date.parse(pd.today) - n * 864e5).toISOString().slice(0, 10);
     const base = { herd: HERD, milking_time: "05:30", total_yield_kg: 10, cows_milked: 1, operator: op, remarks: "smoke offline", offline: 1, captured_at: `${day(1)} 05:35:00` };
-    const old = (await post(`${M}.mobile.record_milking.record_milking`, { payload: { ...base, recording_date: day(3) } })).data?.message;
-    if (!old?.error || !/more than a day old/i.test(old.error)) throw new Error(`an offline milking 3 days old was not refused clearly: ${JSON.stringify(old)}`);
-    if (pd.backdating_open) return "skipped: backdating is open on this site";
-    const m = msgOf(await post(`${M}.mobile.record_milking.record_milking`, { payload: { ...base, recording_date: day(1) } }));
-    track("Milk Recording", m.name);
-    const doc = await got("Milk Recording", m.name);
-    same(doc, { captured_offline: 1 }, "offline milking");
-    return m.name;
+    const send = async (n) => (await post(`${M}.mobile.record_milking.record_milking`, { payload: { ...base, recording_date: day(n) } })).data?.message;
+    try {
+      await setGrace(1);
+      const old = await send(3);
+      if (!old?.error || !/more than a day old/i.test(old.error)) throw new Error(`an offline milking 3 days old was not refused clearly: ${JSON.stringify(old)}`);
+      await setGrace(0);
+      const off = await send(1);
+      if (!off?.error || !/late offline syncs are switched off/i.test(off.error)) throw new Error(`grace off did not refuse with the manager message: ${JSON.stringify(off)}`);
+      await setGrace(1);
+      const m = await send(1);
+      if (m?.error) throw new Error(m.error);
+      track("Milk Recording", m.name);
+      const doc = await got("Milk Recording", m.name);
+      same(doc, { captured_offline: 1, late_sync_grace: 1 }, "offline milking");
+      if (!doc.posted_by_user) throw new Error("who posted the late sync was not stored");
+      return `${m.name} posted by ${doc.posted_by_name || doc.posted_by_user}`;
+    } finally {
+      await setGrace(was ? 1 : 0);
+    }
   });
   await step("write", "feeding: manufacture (system)", async () => {
     const m = msgOf(await post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "manufacture", herd: ctx.feedHerd, portion: 0.01, posting_date: today } }));
@@ -470,6 +484,28 @@ async function writes() {
     if (m.treatments !== 2) throw new Error(`file has ${m.treatments} treatments`);
     if (m.stock_entry) track("Stock Entry", m.stock_entry);
   });
+  if (VET_EXT) {
+    await step("write", "health.treat_animal: an external vet's fee (posts or says why)", async () => {
+      const c = ctx.opts.items_by_event.Treatment?.[0];
+      const m = msgOf(await post(`${M}.health.treat_animal.treat_animal`, { payload: {
+        animal: F1, case: ctx.case1, operator: op, vet: VET_EXT, vet_fee: 900, treatment_date: today,
+        treatments: [{ drug_item: c.value, qty: 1, administered_by: op, source_warehouse: c.warehouse }] } }));
+      if (m.stock_entry) track("Stock Entry", m.stock_entry);
+      if (!m.vet_fee || m.vet_fee.amount !== 900) throw new Error("vet_fee not echoed");
+      if (m.vet_fee.journal_entry) track("Journal Entry", m.vet_fee.journal_entry);
+      if (VET_POSTS && !m.vet_fee.posted) throw new Error(`fee not posted: ${m.vet_fee.reason}`);
+      if (!m.vet_fee.posted && !m.vet_fee.reason) throw new Error("an unposted fee must say why");
+      return m.vet_fee.posted ? m.vet_fee.journal_entry : m.vet_fee.reason;
+    });
+  }
+  if (VET_INT) {
+    await step("write", "health.treat_animal: an internal vet with a fee is refused", async () => {
+      const r = await post(`${M}.health.treat_animal.treat_animal`, { payload: { animal: F1, case: ctx.case1, operator: op, vet: VET_INT, vet_fee: 700, treatment_date: today, treatments: [{ drug_name_text: "smoke", qty: 1, administered_by: op }] } });
+      const m = r.data?.message;
+      if (!m?.error || !/no vet fee/i.test(m.error)) throw new Error(`unexpected: ${JSON.stringify(m)?.slice(0, 120)}`);
+      return m.error.slice(0, 60);
+    });
+  }
   await step("write", "health.close_health_case", async () => {
     const m = msgOf(await post(`${M}.health.close_health_case.close_health_case`, { payload: { case: ctx.case1, case_status: "Recovered", outcome_notes: "smoke", closed_date: today } }));
     const doc = await got("Livestock Health Case", ctx.case1);
