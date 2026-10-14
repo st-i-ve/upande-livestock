@@ -54,7 +54,7 @@ export default function Milk() {
     const herdDoc = herds.find((h) => h.n === herd);
     try {
       await mutation.mutateAsync({
-        herd: herdDoc?.herdName ?? herd,
+        herd,
         recordingDate: date,
         milkingTime: time,
         totalYieldKg: kg,

@@ -1,6 +1,11 @@
 import type { Animal } from "@/types";
-import { frappeCreateAndSubmit, getClient } from "@/src/services/api";
+import { getClient } from "@/src/services/api";
 
+// Fields that exist on the Animal doctype. `days_in_milk`, `milk_safe_date`,
+// `in_treatment` and `insured_value` were trimmed off it (a lactation's day count
+// is worked out from her events, a withdrawal date lives on her health case and
+// insurance on its policy), so asking for them fails the whole list with "Field
+// not permitted in query".
 export const ANIMAL_LIST_FIELDS = [
   "name",
   "burn_name",
@@ -8,23 +13,11 @@ export const ANIMAL_LIST_FIELDS = [
   "date_of_birth",
   "current_herd",
   "repro_status",
-  "days_in_milk",
   "parity",
   "last_weight_kg",
-  "milk_safe_date",
-  "in_treatment",
 ] as const;
 
-type AnimalRow = Record<(typeof ANIMAL_LIST_FIELDS)[number], any> &
-  Record<string, any>;
-
-export type AnimalWeightRecord = {
-  recordingDate: string;
-  weightKg: number;
-  bcs: number;
-  dailyGainG: number;
-  eventRef: string | null;
-};
+type AnimalRow = Record<string, any>;
 
 export type AnimalDetail = Animal & {
   acquisitionDate: string | null;
@@ -32,8 +25,6 @@ export type AnimalDetail = Animal & {
   sire: string | null;
   dam: string | null;
   status: string | null;
-  insuredValue: number;
-  weightHistory: AnimalWeightRecord[];
 };
 
 const sexFromFrappe = (raw: any): "F" | "M" =>
@@ -49,20 +40,12 @@ export const mapAnimal = (row: AnimalRow): Animal => ({
   dob: row.date_of_birth ?? "",
   herd: row.current_herd ?? "",
   repro: row.repro_status ?? "",
-  dim: row.days_in_milk ?? null,
+  dim: null,
   parity: row.parity ?? 0,
   lastWt: row.last_weight_kg ?? 0,
-  milkSafe: row.milk_safe_date ?? null,
-  inTreatment: row.in_treatment ? 1 : 0,
+  milkSafe: null,
+  inTreatment: 0,
   pregnant: pregnantFromRepro(row.repro_status),
-});
-
-const mapWeightRow = (row: any): AnimalWeightRecord => ({
-  recordingDate: row?.recording_date ?? "",
-  weightKg: Number(row?.weight_kg ?? 0),
-  bcs: Number(row?.bcs ?? 0),
-  dailyGainG: Number(row?.daily_gain_g ?? 0),
-  eventRef: row?.event_ref ?? null,
 });
 
 const mapAnimalDetail = (row: AnimalRow): AnimalDetail => ({
@@ -72,10 +55,6 @@ const mapAnimalDetail = (row: AnimalRow): AnimalDetail => ({
   sire: row.sire_name ?? null,
   dam: row.dam ?? null,
   status: row.status ?? null,
-  insuredValue: Number(row.insured_value ?? 0),
-  weightHistory: Array.isArray(row.weight_history)
-    ? row.weight_history.map(mapWeightRow)
-    : [],
 });
 
 const safeMap = <T>(rows: any[], mapper: (r: any) => T): T[] => {
@@ -95,6 +74,8 @@ export const getAnimals = async (): Promise<Animal[]> => {
   const res = await client.get("/api/resource/Animal", {
     params: {
       fields: JSON.stringify(ANIMAL_LIST_FIELDS),
+      // Retired animals (sold, dead, culled) are not offered to a form.
+      filters: JSON.stringify([["disabled", "=", 0]]),
       limit_page_length: 1000,
       order_by: "name asc",
     },
@@ -103,67 +84,52 @@ export const getAnimals = async (): Promise<Animal[]> => {
   return safeMap(rows, mapAnimal);
 };
 
-export type CreateAnimalInput = {
-  tagNumber: string;
-  burnName: string;
-  sex: "Female" | "Male";
-  currentHerd: string;
-  company: string;
-  dateOfBirth?: string;
-  origin?: "Born on Farm" | "Purchased" | "Transferred In";
-  acquisitionDate?: string;
-  birthWeightKg?: number;
-  dam?: string;
-  sireName?: string;
-  coatColour?: string;
-  isCapitalised?: boolean;
-  purchaseValue?: number;
-  insuredValue?: number;
-  reproStatus?: string;
-  remarks?: string;
-};
+const ANIMAL_PROFILE =
+  "/api/method/upande_livestock.serverscripts.animals.animal_profile.animal_profile";
 
 /**
- * Create + submit a new Animal record. If `isCapitalised` + `purchaseValue`
- * are set, the After Submit server script creates the capitalisation JE
- * (see livestock_server_scripts §6).
+ * One animal, with what the server works out about her.
+ *
+ * Days in milk comes from `animal_profile` (her calving history decides it, not
+ * a column), and the withdrawal date and "in treatment" from her open health
+ * file. Both are best effort: a user without health permissions simply sees no
+ * treatment banner, and the screen still opens.
  */
-export const createAnimal = async (input: CreateAnimalInput): Promise<any> => {
-  const body: Record<string, any> = {
-    tag_number: input.tagNumber,
-    burn_name: input.burnName,
-    sex: input.sex,
-    current_herd: input.currentHerd,
-    company: input.company,
-    status: "Active",
-  };
-  if (input.dateOfBirth) body.date_of_birth = input.dateOfBirth;
-  if (input.origin) body.origin = input.origin;
-  if (input.acquisitionDate) body.acquisition_date = input.acquisitionDate;
-  if (input.birthWeightKg != null) body.birth_weight_kg = input.birthWeightKg;
-  if (input.dam) body.dam = input.dam;
-  if (input.sireName) body.sire_name = input.sireName;
-  if (input.coatColour) body.coat_colour = input.coatColour;
-  if (input.isCapitalised) body.is_capitalised = 1;
-  if (input.purchaseValue != null) body.purchase_value = input.purchaseValue;
-  if (input.insuredValue != null) body.insured_value = input.insuredValue;
-  if (input.reproStatus) body.repro_status = input.reproStatus;
-  if (input.remarks) body.remarks = input.remarks;
-
-  return frappeCreateAndSubmit("Animal", body);
-};
-
 export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
   const client = await getClient();
+  let row: AnimalRow | undefined;
   try {
-    const res = await client.get(
-      `/api/resource/Animal/${encodeURIComponent(id)}`,
-    );
-    const row = res.data?.data;
-    if (!row) return null;
-    return mapAnimalDetail(row);
+    const res = await client.get(`/api/resource/Animal/${encodeURIComponent(id)}`);
+    row = res.data?.data;
   } catch (err: any) {
     if (err?.response?.status === 404) return null;
     throw err;
   }
+  if (!row) return null;
+  const detail = mapAnimalDetail(row);
+
+  const [profile, cases] = await Promise.all([
+    client.post(ANIMAL_PROFILE, { payload: { animal: id } }).catch(() => null),
+    client
+      .get("/api/resource/Livestock Health Case", {
+        params: {
+          fields: JSON.stringify(["name", "milk_safe_date"]),
+          filters: JSON.stringify([
+            ["animal", "=", id],
+            ["docstatus", "=", 1],
+            ["case_status", "in", ["Open", "Under Treatment"]],
+          ]),
+          limit_page_length: 1,
+        },
+      })
+      .catch(() => null),
+  ]);
+  const dim = profile?.data?.message?.cycle?.daysInMilk;
+  if (typeof dim === "number") detail.dim = dim;
+  const open = cases?.data?.data?.[0];
+  if (open) {
+    detail.inTreatment = 1;
+    detail.milkSafe = open.milk_safe_date ?? null;
+  }
+  return detail;
 };

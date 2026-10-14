@@ -3,14 +3,13 @@ import React, { useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Field } from "@/components/Field";
-import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { qtyAt, type StockChoice } from "@/src/frappe/eventItems";
+import { useBatchPlan } from "@/src/hooks/useBatchPlan";
 import { useColors } from "@/src/hooks/useColors";
-import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
 
-export type StockPick = { itemCode: string; uom: string; warehouse: string };
+export type StockPick = { itemCode: string; uom: string; warehouse: string; batch?: string };
 
 const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
 
@@ -20,9 +19,10 @@ const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
  * Same contract as the web StockPicker: `choices` are the event type's
  * in-stock items (`items_by_event`), each carrying the store holding the most
  * of it and every store holding any. Picking an item picks its store; the store
- * can be moved to another that genuinely has the item. With no choices (the
- * event type is not mapped to post stock, or the list did not load) it falls
- * back to free item / warehouse search with a live Bin read.
+ * can be moved to another that genuinely has the item. With no choices the event
+ * type has no stock set up (or the list did not load): the phone offers nothing
+ * to pick, because the stores are not readable by field staff and which items an
+ * event may use is configured on the web.
  */
 export function StockItemFields({
   choices,
@@ -44,88 +44,76 @@ export function StockItemFields({
   const mapped = !!choices?.length;
   const chosen = mapped ? choices!.find((x) => x.value === value.itemCode) : undefined;
 
-  // Live Bin read, only for the free-pick fallback.
-  const live = useStoreQtyMap(
-    !mapped && value.itemCode && value.warehouse
-      ? [{ itemCode: value.itemCode, warehouse: value.warehouse }]
-      : [],
-  );
-  const avail = mapped
-    ? chosen
-      ? (qtyAt(chosen, value.warehouse) ?? 0)
-      : undefined
-    : live.data?.[storeQtyKey(value.itemCode, value.warehouse)];
+  const plan = useBatchPlan(value.itemCode, value.warehouse);
+  const avail = chosen ? (qtyAt(chosen, value.warehouse) ?? 0) : undefined;
 
   const stores = chosen?.locations ?? [];
   const storeText = (l: { warehouse: string; qty: number }) =>
     `${l.warehouse} · ${fmt(l.qty)} ${chosen?.uom ?? value.uom}`.trim();
 
+  if (!mapped) {
+    return (
+      <Text style={{ fontSize: 12, color: c.textSubtle, marginBottom: 8 }}>
+        No stock is set up for this on the web yet, so there is nothing to pick. Ask the office
+        to map items to this event type.
+      </Text>
+    );
+  }
+
   return (
     <>
       <Field label={itemLabel}>
-        {mapped ? (
-          <ChoicePicker
-            choices={choices!}
-            value={value.itemCode}
-            icon={icon}
-            onPick={(ch) =>
-              onChange({ itemCode: ch.value, uom: ch.uom ?? "", warehouse: ch.warehouse ?? "" })
-            }
-          />
-        ) : (
-          <FrappeSearchPicker
-            doctype="Item"
-            value={value.itemCode || null}
-            onChange={(name, row) => onChange({ ...value, itemCode: name, uom: row?.stock_uom || "" })}
-            fields={["name", "item_name", "item_code", "stock_uom"]}
-            displayField="item_name"
-            metaField="item_code"
-            searchField="item_name"
-            filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
-            icon={icon}
-          />
-        )}
+        <ChoicePicker
+          choices={choices!}
+          value={value.itemCode}
+          icon={icon}
+          onPick={(ch) =>
+            onChange({ itemCode: ch.value, uom: ch.uom ?? "", warehouse: ch.warehouse ?? "", batch: "" })
+          }
+        />
       </Field>
       <Field label="Issue from store">
-        {mapped ? (
-          stores.length ? (
-            <Picker
-              value={storeText(stores.find((l) => l.warehouse === value.warehouse) ?? stores[0])}
-              options={stores.map(storeText)}
-              onChange={(text) => {
-                const hit = stores.find((l) => storeText(l) === text);
-                if (hit) onChange({ ...value, warehouse: hit.warehouse });
-              }}
-            />
-          ) : (
-            <Text style={{ fontSize: 12, color: c.textSubtle }}>Pick an item first.</Text>
-          )
-        ) : (
-          <FrappeSearchPicker
-            doctype="Warehouse"
-            value={value.warehouse || null}
-            onChange={(name) => onChange({ ...value, warehouse: name })}
-            fields={["name", "warehouse_name"]}
-            displayField="warehouse_name"
-            searchField="warehouse_name"
-            filters={[["disabled", "=", 0]]}
-            icon="warehouse"
+        {stores.length ? (
+          <Picker
+            value={storeText(stores.find((l) => l.warehouse === value.warehouse) ?? stores[0])}
+            options={stores.map(storeText)}
+            onChange={(text) => {
+              const hit = stores.find((l) => storeText(l) === text);
+              if (hit) onChange({ ...value, warehouse: hit.warehouse, batch: "" });
+            }}
           />
+        ) : (
+          <Text style={{ fontSize: 12, color: c.textSubtle }}>Pick an item first.</Text>
         )}
       </Field>
-      {value.itemCode && value.warehouse ? (
+      {plan?.tracked && plan.available.length ? (
+        <Field label="Batch" help="Left blank, the store picks first-expiry-first-out.">
+          <Picker
+            value={
+              plan.available
+                .map((b) => `${b.batch_no} · ${fmt(b.qty)}${b.expiry_date ? ` · exp ${b.expiry_date}` : ""}`)
+                .find((t) => t.startsWith(`${value.batch} ·`)) ?? ""
+            }
+            placeholder="Chosen by the store"
+            clearable
+            options={plan.available.map(
+              (b) => `${b.batch_no} · ${fmt(b.qty)}${b.expiry_date ? ` · exp ${b.expiry_date}` : ""}`,
+            )}
+            onChange={(t) => onChange({ ...value, batch: t ? t.split(" · ")[0] : "" })}
+          />
+        </Field>
+      ) : null}
+      {value.itemCode && value.warehouse && avail != null ? (
         <Text
           style={{
             fontSize: 11,
             marginBottom: 8,
-            color: avail != null && qtyNeeded != null && qtyNeeded > avail ? c.danger : c.textMuted,
+            color: qtyNeeded != null && qtyNeeded > avail ? c.danger : c.textMuted,
           }}
         >
-          {avail == null
-            ? `Checking stock in ${value.warehouse}…`
-            : `Available in ${value.warehouse}: ${fmt(avail)}${value.uom ? " " + value.uom : ""}${
-                qtyNeeded != null && qtyNeeded > avail ? " — not enough" : ""
-              }`}
+          {`Available in ${value.warehouse}: ${fmt(avail)}${value.uom ? " " + value.uom : ""}${
+            qtyNeeded != null && qtyNeeded > avail ? " — not enough" : ""
+          }`}
         </Text>
       ) : null}
     </>

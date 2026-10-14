@@ -363,44 +363,6 @@ export const extractFrappeMessage = (response: any): string | null => {
   return msg ? msg.replace(/<[^>]+>/g, "") : null;
 };
 
-/**
- * Create + submit a Frappe doc in two steps. Returns the submitted doc.
- * Server scripts fire on submit.
- */
-export const frappeCreateAndSubmit = async <T = any>(
-  doctype: string,
-  fields: Record<string, any>,
-): Promise<T> => {
-  const client = await getClient();
-  const insertRes = await client.post("/api/method/frappe.client.insert", {
-    doc: { doctype, ...fields },
-  });
-  const draft = insertRes.data?.message;
-  if (!draft) throw new Error(`Frappe insert returned no document for ${doctype}`);
-  const submitRes = await client.post("/api/method/frappe.client.submit", {
-    doc: draft,
-  });
-  return (submitRes.data?.message ?? submitRes.data) as T;
-};
-
-/**
- * Insert a Frappe doc as Draft (docstatus=0). No submit step. Useful when
- * the caller wants to surface a draft for the user to review and submit
- * manually (e.g. Work Orders with insufficient stock).
- */
-export const frappeInsertDraft = async <T = any>(
-  doctype: string,
-  fields: Record<string, any>,
-): Promise<T> => {
-  const client = await getClient();
-  const insertRes = await client.post("/api/method/frappe.client.insert", {
-    doc: { doctype, ...fields },
-  });
-  const draft = insertRes.data?.message;
-  if (!draft) throw new Error(`Frappe insert returned no document for ${doctype}`);
-  return draft as T;
-};
-
 export const api = {
   /**
    * Logs in to a Frappe site and persists the cookie + sid.

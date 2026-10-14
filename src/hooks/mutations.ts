@@ -4,14 +4,8 @@ import {
   AnimalEventInput,
   createAnimalEvent,
 } from "@/src/frappe/animalEvent";
-import {
-  CreateAnimalDiagnosisInput,
-  createAnimalDiagnosis,
-} from "@/src/frappe/animalDiagnosis";
-import {
-  CreateCalfFeedingInput,
-  createCalfFeeding,
-} from "@/src/frappe/calfFeeding";
+import { CreateCheckUpInput, createCheckUp } from "@/src/frappe/checkUp";
+import { TreatAnimalInput, treatAnimal } from "@/src/frappe/treatment";
 import {
   CreateMilkRecordingInput,
   createMilkRecording,
@@ -80,10 +74,8 @@ const tryDirectOrEnqueue = async <T extends object>(
 const labelEvent = (i: AnimalEventInput): string => `${i.eventType} · ${i.animal}`;
 const labelMilk = (i: CreateMilkRecordingInput): string =>
   `Milk · ${i.herd}${i.milkingTime ? ` · ${i.milkingTime}` : ""}`;
-const labelCalfFeed = (i: CreateCalfFeedingInput): string =>
-  `Calf feeding · ${i.calf}`;
-const labelDx = (i: CreateAnimalDiagnosisInput): string =>
-  `Diagnosis · ${i.animal}`;
+const labelCheckUp = (i: CreateCheckUpInput): string => `Check up · ${i.animal}`;
+const labelTreatment = (i: TreatAnimalInput): string => `Treatment · ${i.animal}`;
 
 // ---------------------------------------------------------------------------
 
@@ -105,21 +97,24 @@ export const useCreateMilkRecording = () => {
   });
 };
 
-export const useCreateCalfFeeding = () => {
+export const useCreateCheckUp = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateCalfFeedingInput) =>
-      tryDirectOrEnqueue("CalfFeeding", input, createCalfFeeding, labelCalfFeed(input)),
+    mutationFn: (input: CreateCheckUpInput) =>
+      tryDirectOrEnqueue("AnimalDiagnosis", input, createCheckUp, labelCheckUp(input)),
     onSuccess: () => invalidateAll(qc),
   });
 };
 
-export const useCreateAnimalDiagnosis = () => {
+export const useTreatAnimal = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateAnimalDiagnosisInput) =>
-      tryDirectOrEnqueue("AnimalDiagnosis", input, createAnimalDiagnosis, labelDx(input)),
-    onSuccess: () => invalidateAll(qc),
+    mutationFn: (input: TreatAnimalInput) =>
+      tryDirectOrEnqueue("Treatment", input, treatAnimal, labelTreatment(input)),
+    onSuccess: () => {
+      invalidateAll(qc);
+      qc.invalidateQueries({ queryKey: ["health-options"] });
+    },
   });
 };
 

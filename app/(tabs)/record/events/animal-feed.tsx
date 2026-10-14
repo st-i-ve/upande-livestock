@@ -65,7 +65,7 @@ type Mode = "system" | "manual";
 export default function AnimalFeed() {
   const { data: herds = [], isLoading, error, refetch } = useHerds();
 
-  const feedable = useMemo(() => herds.filter((h) => !!h.bom), [herds]);
+  const feedable = useMemo(() => herds.filter((h) => h.hasBom), [herds]);
   const [herdPick, setHerdName] = useState<string>("");
   const herdName = herdPick || feedable[0]?.n || "";
   const [mode, setMode] = useState<Mode>("system");

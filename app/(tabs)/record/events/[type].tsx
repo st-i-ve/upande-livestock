@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
@@ -8,25 +7,21 @@ import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
-import { Chip, Chips } from "@/components/Chips";
 import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
-import { HandlersPicker } from "@/components/HandlersPicker";
-import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";
+import { StockItemFields } from "@/components/StockItemFields";
 import { RADIUS } from "@/constants/theme";
-import { useColors } from "@/src/hooks/useColors";
-import { useBackdate } from "@/src/hooks/useBackdate";
-import { useOperator } from "@/src/hooks/useOperator";
 import {
   AnimalEventInput,
   AnimalEventType,
 } from "@/src/frappe/animalEvent";
-import { getItemValuationRate } from "@/src/frappe/stock";
-import { useCreateAnimalEvent } from "@/src/hooks/mutations";
-import { StockItemFields } from "@/components/StockItemFields";
 import { findShortage, stockOutcomeText, type StockChoice } from "@/src/frappe/eventItems";
+import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { useBackdate } from "@/src/hooks/useBackdate";
+import { useColors } from "@/src/hooks/useColors";
 import { useEventItems } from "@/src/hooks/useEventItems";
+import { useOperator } from "@/src/hooks/useOperator";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -34,51 +29,47 @@ type Spec = {
   title: string;
   eventType: AnimalEventType;
   needsWeight?: boolean;
-  needsDrugs?: boolean;
-  needsActivityCost?: boolean;
-  needsMethod?: boolean;
-  needsFeet?: boolean;
-  needsHeatSigns?: boolean;
-  /** Vet-procedure screens hide the Operator picker, show a Vet text field instead. */
-  isVetProcedure?: boolean;
-  /** Dehorning also collects Handlers. */
-  needsHandlers?: boolean;
+  /** A routine round (Vaccination, Deworming, Hoof Trimming, Dehorning): one
+   *  call books an event per animal and one drug issue for the batch. */
+  isRound?: boolean;
 };
 
 const SPECS: Record<string, Spec> = {
   weight:      { title: "Weight recording",  eventType: "Weight Recording",  needsWeight: true },
-  vaccination: { title: "Vaccination",       eventType: "Vaccination",       needsDrugs: true, needsActivityCost: true, isVetProcedure: true },
-  deworming:   { title: "Deworming",         eventType: "Deworming",         needsDrugs: true, needsActivityCost: true, isVetProcedure: true },
-  dehorning:   { title: "Dehorning",         eventType: "Dehorning",         needsMethod: true, needsActivityCost: true, isVetProcedure: true, needsHandlers: true },
-  hoof:        { title: "Hoof trimming",     eventType: "Hoof Trimming",     needsFeet: true, needsActivityCost: true, isVetProcedure: true },
-  heat:        { title: "Heat detection",    eventType: "Heat Detection",    needsHeatSigns: true },
+  vaccination: { title: "Vaccination",       eventType: "Vaccination",       isRound: true },
+  deworming:   { title: "Deworming",         eventType: "Deworming",         isRound: true },
+  dehorning:   { title: "Dehorning",         eventType: "Dehorning",         isRound: true },
+  hoof:        { title: "Hoof trimming",     eventType: "Hoof Trimming",     isRound: true },
+  heat:        { title: "Heat detection",    eventType: "Heat Detection" },
 };
 
+/**
+ * The routine health and husbandry events. For the rounds the fields are the web
+ * Husbandry page's: the job, the date, the animals, what each animal got (item,
+ * store, quantity per animal, batch) and notes — plus the two things the server
+ * also records for a round, the vet fee and each drug's withdrawal days. A vet's
+ * name, the dehorning method or which feet were trimmed are not fields on the
+ * record, so they are not asked for; put them in Notes if they matter.
+ */
 export default function GenericEvent() {
-  const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
   const { type } = useLocalSearchParams<{ type: string }>();
   const spec = SPECS[type || ""];
 
-
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
-  const [vetName, setVetName] = useState("");
-  const [handlerIds, setHandlerIds] = useState<string[]>([]);
   const [selected, setSelected] = useState<Animal[]>([]);
   const [weight, setWeight] = useState("");
   const [bcs, setBcs] = useState("");
-  const [activityCost, setActivityCost] = useState("");
-  const [method, setMethod] = useState("Hot iron");
-  const [feet, setFeet] = useState("All four");
-  const [heatSigns, setHeatSigns] = useState("");
+  const [vetFee, setVetFee] = useState("");
   const [drugs, setDrugs] = useState<DrugRow[]>([]);
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
-  // The store comes from the event type's own stock rule (items_by_event), not Settings.
-  const { choices: stockChoices } = useEventItems(spec?.eventType ?? "");
+  // The drugs come from the event type's own stock rule (items_by_event). A type
+  // the farm has not set to issue stock shows no drug section at all.
+  const { choices: stockChoices, consumes } = useEventItems(spec?.eventType ?? "");
+  const takesDrugs = !!spec?.isRound && consumes;
 
   const eventMutation = useCreateAnimalEvent();
   const submitting = eventMutation.isPending;
@@ -88,39 +79,10 @@ export default function GenericEvent() {
     [drugs],
   );
 
-  // FIFO cost preview — valuation rate per drug × qty, so the operator sees
-  // what the vaccination/deworming will cost before submitting.
-  const drugCostQuery = useQuery({
-    queryKey: [
-      "drugCost",
-      filledDrugRows
-        .map((d) => `${d.itemCode.trim()}@${d.sourceWarehouse}:${d.qty}`)
-        .join("|"),
-      // Per-animal rows x headcount: without this the cached total survives a
-      // change in the selection and quotes the wrong figure.
-      selected.length,
-    ],
-    enabled: !!spec?.needsDrugs && filledDrugRows.length > 0,
-    queryFn: async () => {
-      let total = 0;
-      for (const d of filledDrugRows) {
-        const rate = await getItemValuationRate(
-          d.itemCode.trim(),
-          d.sourceWarehouse || undefined,
-        );
-        total += rate * Number(d.qty) * selected.length;
-      }
-      return total;
-    },
-  });
-
-  // Guard below every hook, never between them. This one screen serves six
+  // Guard below every hook, never between them. This one screen serves several
   // event types off a single `[type]` route, so expo-router keeps the same
   // component mounted when only the param changes, and a deep link can arrive
-  // with a type that has no spec. Returning early up where `spec` is read meant
-  // a valid type rendered two hooks that an unknown one did not, and React
-  // matches hooks by call order: going from one to the other threw "rendered
-  // fewer hooks than expected" rather than showing this banner.
+  // with a type that has no spec.
   if (!spec) {
     return (
       <Screen title="Unknown event" back>
@@ -133,16 +95,8 @@ export default function GenericEvent() {
     setError(null);
     setWarning(null);
 
-    // ----- validation --------------------------------------------------------
     if (selected.length === 0) return setError("Pick at least one animal.");
-
-    if (spec.isVetProcedure) {
-      if (!vetName.trim()) return setError("Enter the vet's name.");
-      if (!operator) return setError(missingMessage);
-    } else {
-      if (!operator) return setError(missingMessage);
-    }
-
+    if (!operator) return setError(missingMessage);
     if (spec.needsWeight) {
       if (!weight) return setError("Enter the weight (kg).");
       if (selected.length > 1) {
@@ -150,7 +104,7 @@ export default function GenericEvent() {
       }
     }
 
-    if (spec.needsDrugs && filledDrugRows.length > 0) {
+    if (takesDrugs && filledDrugRows.length > 0) {
       // A heads-up, never a block: the server decides what the store can bear
       // (today's short round is saved with a draft issue; a backdated one is
       // refused with its own message). The rows are per animal, so what leaves
@@ -166,59 +120,38 @@ export default function GenericEvent() {
       if (shortage) setWarning(shortage);
     }
 
-
-    // ----- compose per-cow events -------------------------------------------
-    const remarksBits: string[] = [];
-    if (spec.needsMethod) remarksBits.push(`Method: ${method}`);
-    if (spec.needsFeet) remarksBits.push(`Feet: ${feet}`);
-    if (spec.needsHeatSigns && heatSigns) remarksBits.push(`Heat signs: ${heatSigns}`);
-    if (remarks) remarksBits.push(remarks);
-    const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const baseRemarks = [remarksBits.join(" · ") || null, `Batch ${batchId}`]
-      .filter(Boolean)
-      .join(" · ");
-
-    // ----- submit ------------------------------------------------------------
-    // Husbandry rounds go over in ONE call. create_husbandry_event books an
-    // event per animal and posts a single drug issue for the batch, stamped
-    // with the named Stock Entry Type — "Vaccination", "Deworming" — instead of
-    // the bare "Material Issue" this screen used to build client-side. Drug
-    // quantities below are therefore PER ANIMAL; the server multiplies them.
-    // A narrowed value rather than a boolean, so the payload below is typed as
-    // the husbandry variant of AnimalEventInput.
-    const husbandryType =
-      spec.eventType === "Vaccination" ||
-      spec.eventType === "Deworming" ||
-      spec.eventType === "Hoof Trimming" ||
-      spec.eventType === "Dehorning"
-        ? spec.eventType
-        : null;
+    const eventDate = isBackdating ? backdateDate : todayISO();
+    const note = remarks.trim() || undefined;
 
     const replies: any[] = [];
     let succeededEvents = 0;
     let queuedEvents = 0;
 
-    if (husbandryType) {
+    if (spec.isRound) {
+      // One call for the whole round: the server books an event per animal and
+      // posts a single drug issue for the batch, stamped with the named Stock
+      // Entry Type. Drug quantities are PER ANIMAL; the server multiplies.
+      const husbandryType = spec.eventType as "Vaccination" | "Deworming" | "Hoof Trimming" | "Dehorning";
       try {
         const r = await eventMutation.mutateAsync({
           eventType: husbandryType,
           animal: selected[0].id,
           animals: selected.map((a) => a.id),
           currentHerd: selected[0].herd,
-          operator: operator!,
-          eventDate: isBackdating ? backdateDate : todayISO(),
-          remarks: baseRemarks,
-          vetName: vetName.trim(),
-          handlerIds: handlerIds.length ? handlerIds : undefined,
-          vetFee:
-            spec.isVetProcedure && Number(activityCost) > 0 ? Number(activityCost) : undefined,
-          drugIssues: filledDrugRows.map((d) => ({
-            itemCode: d.itemCode.trim(),
-            qty: Number(d.qty),
-            uom: d.uom || undefined,
-            sourceWarehouse: d.sourceWarehouse || undefined,
-            withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
-          })),
+          operator,
+          eventDate,
+          remarks: note,
+          vetFee: Number(vetFee) > 0 ? Number(vetFee) : undefined,
+          drugIssues: takesDrugs
+            ? filledDrugRows.map((d) => ({
+                itemCode: d.itemCode.trim(),
+                qty: Number(d.qty),
+                uom: d.uom || undefined,
+                sourceWarehouse: d.sourceWarehouse || undefined,
+                batchNo: d.batchNo || undefined,
+                withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
+              }))
+            : undefined,
         });
         if (r.queued) queuedEvents = selected.length;
         else {
@@ -234,27 +167,14 @@ export default function GenericEvent() {
         const common = {
           animal: a.id,
           currentHerd: a.herd,
-          operator: operator!, // checked above
-          eventDate: isBackdating ? backdateDate : todayISO(),
-          remarks: baseRemarks,
+          operator,
+          eventDate,
+          remarks: note,
         } as const;
-
-        const payload: AnimalEventInput = (() => {
-          switch (spec.eventType) {
-            case "Weight Recording":
-              return {
-                ...common,
-                eventType: "Weight Recording",
-                weightKg: Number(weight),
-                bcs: bcs ? Number(bcs) : undefined,
-              };
-            case "Heat Detection":
-              return { ...common, eventType: "Heat Detection" };
-            default:
-              throw new Error(`Unhandled event type ${spec.eventType}`);
-          }
-        })();
-
+        const payload: AnimalEventInput =
+          spec.eventType === "Weight Recording"
+            ? { ...common, eventType: "Weight Recording", weightKg: Number(weight), bcs: bcs ? Number(bcs) : undefined }
+            : { ...common, eventType: "Heat Detection" };
         try {
           const r = await eventMutation.mutateAsync(payload);
           if (r.queued) queuedEvents += 1;
@@ -271,7 +191,6 @@ export default function GenericEvent() {
       }
     }
 
-    // ----- outcome -----------------------------------------------------------
     // What the server did, not what the phone assumes: drugs posted, or saved
     // with the stock issue pending, and what became of the vet fee.
     const eventParts: string[] = [];
@@ -304,18 +223,13 @@ export default function GenericEvent() {
       headerRight={isBackdating ? undefined : <BackdateButton type={type ?? ""} />}
     >
       {isBackdating ? <BackdateBanner /> : null}
-      {spec.isVetProcedure ? (
-        <Field label="Vet" help="Free-text — the vet who performed the procedure.">
-          <Input value={vetName} onChangeText={setVetName} placeholder="Dr. Mwangi" />
-        </Field>
-      ) : null}
 
       <Field
         label={spec.needsWeight ? "Animal" : "Animal(s)"}
         help={
           spec.needsWeight
             ? "Pick one animal — weight is per-animal."
-            : spec.isVetProcedure
+            : spec.isRound
               ? "Pick one cow, several, or a whole herd. Drug quantities below are per animal."
               : "Pick one cow, several, or a whole herd. Same details applied per animal."
         }
@@ -338,109 +252,36 @@ export default function GenericEvent() {
       </Field>
 
       {isBackdating ? (
-        <Field label="Date it happened">
+        <Field label="Done on">
           <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />
         </Field>
       ) : (
-        <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+        <Field label="Done on"><Input value={todayISO()} editable={false} /></Field>
       )}
 
       {spec.needsWeight ? (
         <FieldRow>
           <Field label="Weight (kg)" style={{ flex: 1 }}>
-            <Input value={weight} onChangeText={setWeight} keyboardType="numeric" placeholder="480" />
+            <Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="480" />
           </Field>
           <Field label="BCS (1-5)" style={{ flex: 1 }}>
-            <Input value={bcs} onChangeText={setBcs} keyboardType="numeric" placeholder="3.5" />
+            <Input value={bcs} onChangeText={setBcs} keyboardType="decimal-pad" placeholder="3.5" />
           </Field>
         </FieldRow>
       ) : null}
 
-      {spec.needsMethod ? (
-        <Field label="Method">
-          <Chips>
-            {["Hot iron", "Caustic paste", "Surgical"].map((m) => (
-              <Chip key={m} label={m} active={method === m} onPress={() => setMethod(m)} />
-            ))}
-          </Chips>
+      {takesDrugs ? (
+        <DrugRows rows={drugs} onChange={setDrugs} choices={stockChoices} headcount={selected.length} />
+      ) : null}
+
+      {spec.isRound ? (
+        <Field label="Vet fee for the round (KES)" help="The whole round's fee, once — the server records it.">
+          <Input value={vetFee} onChangeText={setVetFee} keyboardType="decimal-pad" placeholder="0" />
         </Field>
       ) : null}
 
-      {spec.needsHandlers ? (
-        <Field label="Handlers" help="Farmhands assisting the vet.">
-          <HandlersPicker value={handlerIds} onChange={setHandlerIds} />
-        </Field>
-      ) : null}
-
-      {spec.needsFeet ? (
-        <Field label="Feet">
-          <Chips>
-            {["Front-L", "Front-R", "Hind-L", "Hind-R", "All four"].map((f) => (
-              <Chip key={f} label={f} active={feet === f} onPress={() => setFeet(f)} />
-            ))}
-          </Chips>
-        </Field>
-      ) : null}
-
-      {spec.needsHeatSigns ? (
-        <Field label="Heat signs">
-          <Textarea
-            value={heatSigns}
-            onChangeText={setHeatSigns}
-            placeholder="Mounting, mucus, restless, vulva swelling..."
-          />
-        </Field>
-      ) : null}
-
-      {spec.needsDrugs ? (
-        <DrugRows
-          rows={drugs}
-          onChange={setDrugs}
-          choices={stockChoices}
-          headcount={selected.length}
-        />
-      ) : null}
-
-      {spec.needsActivityCost ? (
-        <Field label="Activity cost (KES)" help="Total vet fee for the batch.">
-          <Input
-            value={activityCost}
-            onChangeText={setActivityCost}
-            keyboardType="numeric"
-            placeholder="0"
-          />
-        </Field>
-      ) : null}
-
-      {spec.isVetProcedure && (filledDrugRows.length > 0 || (activityCost && Number(activityCost) > 0)) ? (
-        <View style={s.summary}>
-          <KV
-            k="Stock Entry"
-            v={
-              filledDrugRows.length > 0
-                ? `1 ${spec.eventType} issue for ${selected.length || "—"} animals`
-                : "—"
-            }
-          />
-          <KV
-            k="Est. drug cost (FIFO)"
-            v={
-              filledDrugRows.length === 0
-                ? "—"
-                : drugCostQuery.isLoading
-                  ? "…"
-                  : `KES ${Math.round(drugCostQuery.data ?? 0).toLocaleString()}`
-            }
-          />
-          <KV
-            k="Vet fee"
-            v={activityCost && Number(activityCost) > 0 ? `KES ${Number(activityCost).toLocaleString()} · recorded by the server` : "—"}
-          />
-        </View>
-      ) : null}
-
-      <Field label="Remarks">
-        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Optional notes" />
+      <Field label="Notes">
+        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Optional" />
       </Field>
 
       {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
@@ -464,6 +305,7 @@ type DrugRow = {
   qty: string;
   uom: string;
   sourceWarehouse: string;
+  batchNo: string;
   withdrawalDays: string;
 };
 
@@ -483,14 +325,7 @@ function DrugRows({
   const add = () =>
     onChange([
       ...rows,
-      {
-        id: Date.now() + rows.length,
-        itemCode: "",
-        qty: "1",
-        uom: "",
-        sourceWarehouse: "",
-        withdrawalDays: "",
-      },
+      { id: Date.now() + rows.length, itemCode: "", qty: "", uom: "", sourceWarehouse: "", batchNo: "", withdrawalDays: "" },
     ]);
   const update = (id: number, patch: Partial<DrugRow>) =>
     onChange(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -498,42 +333,35 @@ function DrugRows({
 
   return (
     <Field
-      label="Drugs / vaccines (optional)"
-      help="Quantities are per animal — 2 ml a cow across 20 cows leaves the store as one 40 ml line. Picking an item picks the store that holds it; change the store if another has stock."
+      label="What each animal got"
+      help="Quantities are per animal — 2 ml a cow across 20 cows leaves the store as one 40 ml line. Picking an item picks the store that holds it."
     >
       {rows.length === 0 ? (
-        <Text style={s.drugEmpty}>
-          No drug rows. Tap &quot;Add drug&quot; if any drug was used.
-        </Text>
+        <Text style={s.drugEmpty}>No drug rows. Tap &quot;Add drug&quot; if any drug was used.</Text>
       ) : null}
       {rows.map((r) => (
         <View key={r.id} style={s.drugBox}>
           <StockItemFields
             choices={choices}
-            value={{ itemCode: r.itemCode, uom: r.uom, warehouse: r.sourceWarehouse }}
+            value={{ itemCode: r.itemCode, uom: r.uom, warehouse: r.sourceWarehouse, batch: r.batchNo }}
             onChange={(v) =>
-              update(r.id, { itemCode: v.itemCode, uom: v.uom, sourceWarehouse: v.warehouse })
+              update(r.id, { itemCode: v.itemCode, uom: v.uom, sourceWarehouse: v.warehouse, batchNo: v.batch ?? "" })
             }
             qtyNeeded={Number(r.qty) * Math.max(headcount, 1)}
           />
           <FieldRow>
             <Field label="Qty per animal" style={{ flex: 1 }}>
-              <Input
-                value={r.qty}
-                onChangeText={(t) => update(r.id, { qty: t })}
-                keyboardType="numeric"
-                placeholder="1"
-              />
+              <Input value={r.qty} onChangeText={(t) => update(r.id, { qty: t })} keyboardType="decimal-pad" />
             </Field>
             <Field label="UOM" style={{ flex: 1 }}>
               <Input value={r.uom} editable={false} placeholder="—" />
             </Field>
           </FieldRow>
-          <Field label="Withdrawal days">
+          <Field label="Withdrawal (days)">
             <Input
               value={r.withdrawalDays}
               onChangeText={(t) => update(r.id, { withdrawalDays: t })}
-              keyboardType="numeric"
+              keyboardType="number-pad"
               placeholder="0"
             />
           </Field>
@@ -557,12 +385,5 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       color: c.textSubtle,
       fontSize: 12,
       paddingVertical: 4,
-    },
-    summary: {
-      backgroundColor: c.bgMuted,
-      padding: 11,
-      borderRadius: RADIUS.md,
-      marginBottom: 10,
-      gap: 4,
     },
   });

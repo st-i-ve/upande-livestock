@@ -119,7 +119,7 @@ export default function HerdsList() {
             key={h.n}
             left={<Avatar icon="fence" />}
             title={h.n}
-            meta={`${h.cat || "—"} · ${h.cnt} head${h.cc ? ` · ${h.cc}` : ""}`}
+            meta={`${h.cat || "—"} · ${h.cnt} head`}
             chevron
             onPress={() => router.push(`/(tabs)/animals/herds/${encodeURIComponent(h.n)}`)}
           />

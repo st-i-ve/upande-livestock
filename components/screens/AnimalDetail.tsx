@@ -83,7 +83,7 @@ export function AnimalDetail({ id }: { id: string }) {
     >
       {a.inTreatment ? (
         <Banner tone="danger">
-          In treatment · milk withdrawal until {a.milkSafe ?? "—"}
+          Under treatment{a.milkSafe ? ` · milk safe from ${a.milkSafe}` : ""}
         </Banner>
       ) : null}
 
@@ -102,22 +102,14 @@ export function AnimalDetail({ id }: { id: string }) {
             value: `${a.parity}${a.dim !== null ? ` / ${a.dim}d` : ""}`,
             small: true,
           },
-          ...(a.insuredValue > 0
-            ? [{
-                label: "Insured value",
-                value: `KES ${a.insuredValue.toLocaleString()}`,
-                small: true,
-              }]
-            : []),
         ]}
       />
 
       <SectionTitle>Quick actions</SectionTitle>
       <TileGrid>
-        <Tile icon="magnify" title="Diagnose" onPress={() => router.push("/(tabs)/record/events/diagnosis")} />
+        <Tile icon="magnify" title="Check up" onPress={() => router.push("/(tabs)/record/events/diagnosis")} />
         {a.repro === "Calf" ? (
           <>
-            <Tile icon="baby-bottle-outline" title="Feed" onPress={() => router.push("/(tabs)/record/events/calf-feed")} />
             <Tile icon="scale" title="Weigh" onPress={() => router.push("/(tabs)/record/events/weight")} />
             <Tile icon="arrow-left-right" title="Move" onPress={() => router.push("/(tabs)/record/events/movement")} />
           </>

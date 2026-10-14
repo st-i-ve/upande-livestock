@@ -46,8 +46,8 @@ export type AnimalDrugIssueInput = {
   qty: number;
   uom?: string;
   sourceWarehouse?: string;
+  batchNo?: string;
   withdrawalDays?: number;
-  milkSafeDate?: string;
 };
 
 type EventSpecificInput =
@@ -98,9 +98,6 @@ type EventSpecificInput =
     }
   | {
       eventType: "Vaccination" | "Deworming" | "Hoof Trimming" | "Dehorning";
-      /** Free-text name of the vet who performed the procedure. Livestock Event
-       *  has no column for it, so it is folded into the remarks. */
-      vetName: string;
       /** The whole round in one call. When set, the server books an event per
        *  animal and one drug issue for the batch. */
       animals?: string[];
@@ -111,8 +108,6 @@ type EventSpecificInput =
       /** The round's total vet fee. The server records it; the phone posts nothing. */
       vetFee?: number;
       sourceWarehouse?: string;
-      /** Employee IDs of farmhands holding the animal (Dehorning). */
-      handlerIds?: string[];
     }
   | { eventType: "Heat Detection" }
   | {
@@ -233,8 +228,8 @@ const mapDrugRows = (rows?: AnimalDrugIssueInput[]) =>
       qty: Number(d.qty),
       uom: d.uom,
       source_warehouse: d.sourceWarehouse,
+      batch_no: d.batchNo,
       withdrawal_days: d.withdrawalDays,
-      milk_safe_date: d.milkSafeDate,
     }));
 
 /** Fold detail the Livestock Event has no column for into the remarks, so the
@@ -369,11 +364,7 @@ export const createAnimalEvent = async (
         drugs: mapDrugRows(input.drugIssues),
         vet_fee: input.vetFee,
         source_warehouse: input.sourceWarehouse,
-        remarks: withNote(
-          input.remarks,
-          input.vetName ? `Vet: ${input.vetName}` : undefined,
-          input.handlerIds?.length ? `Handlers: ${input.handlerIds.join(", ")}` : undefined,
-        ),
+        remarks: input.remarks,
       });
 
     case "Heat Detection":

@@ -8,10 +8,16 @@ export function Picker<T extends string>({
   value,
   onChange,
   options,
+  placeholder,
+  clearable,
 }: {
   value: T;
   onChange: (next: T) => void;
   options: T[];
+  /** Shown while nothing is chosen (value is ""). */
+  placeholder?: string;
+  /** Adds a first row that puts the field back to "" — for an optional field. */
+  clearable?: boolean;
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
@@ -19,12 +25,20 @@ export function Picker<T extends string>({
   return (
     <>
       <Pressable onPress={() => setOpen(true)} style={s.box}>
-        <Text style={s.value} numberOfLines={1}>{value}</Text>
+        <Text style={[s.value, !value && { color: c.textSubtle }]} numberOfLines={1}>{value || placeholder || "—"}</Text>
         <MaterialCommunityIcons name="chevron-down" size={18} color={c.textMuted} />
       </Pressable>
       <Modal visible={open} transparent statusBarTranslucent navigationBarTranslucent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
+            {clearable ? (
+              <Pressable
+                onPress={() => { onChange("" as T); setOpen(false); }}
+                style={({ pressed }) => [s.option, pressed && { backgroundColor: c.bgMuted }]}
+              >
+                <Text style={[s.optText, { color: c.textSubtle }]}>{placeholder || "—"}</Text>
+              </Pressable>
+            ) : null}
             {options.map((o) => (
               <Pressable
                 key={o}

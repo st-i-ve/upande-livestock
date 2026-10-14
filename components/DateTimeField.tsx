@@ -33,11 +33,16 @@ export function DateField({
   value,
   onChange,
   maximumDate,
+  minimumDate,
+  placeholder,
 }: {
-  /** ISO `YYYY-MM-DD`. */
+  /** ISO `YYYY-MM-DD`; "" for none (an optional date). */
   value: string;
   onChange: (iso: string) => void;
   maximumDate?: Date;
+  minimumDate?: Date;
+  /** Shown while `value` is "". */
+  placeholder?: string;
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
@@ -57,15 +62,16 @@ export function DateField({
         onPress={() => setOpen(true)}
         style={({ pressed }) => [s.box, pressed && { backgroundColor: c.bgMuted }]}
       >
-        <Text style={s.value}>{LABEL.format(fromISODate(value))}</Text>
+        <Text style={[s.value, !value && { color: c.textSubtle }]}>{value ? LABEL.format(fromISODate(value)) : (placeholder ?? "Pick a date")}</Text>
         <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={c.textMuted} />
       </Pressable>
       {open ? (
         <DateTimePicker
-          value={fromISODate(value)}
+          value={value ? fromISODate(value) : (minimumDate ?? new Date())}
           mode="date"
           display={Platform.OS === "ios" ? "inline" : "default"}
           maximumDate={maximumDate}
+          minimumDate={minimumDate}
           onChange={handle}
           themeVariant={c.bg === "#FFFFFF" ? "light" : "dark"}
           accentColor={c.text}

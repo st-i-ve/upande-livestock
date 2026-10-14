@@ -15,7 +15,8 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     { icon: "grain", label: "Animal feeding (TMR)", href: "/(tabs)/record/events/animal-feed" },
   ]},
   { title: "Health & breeding", items: [
-    { icon: "magnify", label: "Diagnosis (random check)", href: "/(tabs)/record/events/diagnosis" },
+    { icon: "magnify", label: "Check up", href: "/(tabs)/record/events/diagnosis" },
+    { icon: "medical-bag", label: "Treatment (health file)", href: "/(tabs)/record/events/treatment" },
     { icon: "needle", label: "Vaccination", href: "/(tabs)/record/events/vaccination" },
     { icon: "bug", label: "Deworming", href: "/(tabs)/record/events/deworming" },
     { icon: "fire", label: "Heat detection", href: "/(tabs)/record/events/heat" },

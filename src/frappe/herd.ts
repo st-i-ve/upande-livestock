@@ -1,44 +1,34 @@
 import type { Herd } from "@/types";
 import { getClient } from "@/src/services/api";
 
-// Field names verified against the live `Herds` DocType on
-// upande-kaitet2.c.frappe.cloud (see get_doctype_info("Herds")).
-// `custom_herd_category` values: Milking, Dry, Youngstock > 12m, Youngstock < 12m.
-export const HERD_LIST_FIELDS = [
-  "name",
-  "herd_name",
-  "custom_herd_category",
-  "number_of_animals",
-  "cost_center",
-  "custom_cost_center",
-  "bom",
-  "custom_is_milking",
-  "custom_is_dry",
-  "custom_is_calf_rearing",
-] as const;
+/**
+ * Every herd, as the server describes it.
+ *
+ * This used to read /api/resource/Herds with `custom_herd_category`,
+ * `custom_is_milking`, `custom_is_dry` and `custom_cost_center`. None of them
+ * exist on the Herds doctype any more — which herds are milking or dry is
+ * answered by Livestock Settings, and a category is worked out from that — so
+ * the whole list failed with "Field not permitted in query". The bootstrap
+ * bundle returns each herd already classified, in one call, so the phone does
+ * not decide what a milking herd is.
+ */
+const BOOTSTRAP =
+  "/api/method/upande_livestock.serverscripts.mobile.get_bootstrap_bundle.get_bootstrap_bundle";
 
-type HerdRow = Record<string, any>;
-
-export const mapHerd = (row: HerdRow): Herd => ({
+export const mapHerd = (row: Record<string, any>): Herd => ({
   n: row.name,
-  herdName: row.herd_name || row.name,
-  cat: row.custom_herd_category ?? "",
-  cnt: Number(row.number_of_animals ?? 0),
-  cc: row.cost_center ?? row.custom_cost_center ?? "",
-  bom: row.bom ?? "",
-  isMilking: !!row.custom_is_milking,
-  isDry: !!row.custom_is_dry,
+  herdName: row.label || row.name,
+  cat: row.category ?? "",
+  cnt: Number(row.heads ?? 0),
+  hasBom: !!row.has_bom,
+  isMilking: !!row.is_milking,
+  isDry: !!row.is_dry,
 });
 
 export const getHerds = async (): Promise<Herd[]> => {
   const client = await getClient();
-  const res = await client.get("/api/resource/Herds", {
-    params: {
-      fields: JSON.stringify(HERD_LIST_FIELDS),
-      limit_page_length: 500,
-      order_by: "name asc",
-    },
-  });
-  const rows = (res.data?.data ?? []) as any[];
-  return rows.map(mapHerd);
+  const res = await client.post(BOOTSTRAP, {});
+  const msg = res.data?.message;
+  if (!msg || msg.error) throw new Error(msg?.error || "Could not load herds.");
+  return ((msg.herds ?? []) as any[]).map(mapHerd);
 };

@@ -70,7 +70,6 @@ export default function HerdDetail() {
       <MetricGrid
         items={[
           { label: "Animals", value: h.cnt },
-          { label: "Cost centre", value: h.cc || "—", small: true },
         ]}
       />
 

@@ -1,9 +1,7 @@
-import { createAnimal } from "@/src/frappe/animal";
 import { createAnimalEvent } from "@/src/frappe/animalEvent";
-import { createAnimalDiagnosis } from "@/src/frappe/animalDiagnosis";
+import { createCheckUp } from "@/src/frappe/checkUp";
+import { treatAnimal } from "@/src/frappe/treatment";
 import { createAnimalDisposal } from "@/src/frappe/animalDisposal";
-import { createAnimalHealthCase, updateAnimalHealthCase } from "@/src/frappe/animalHealthCase";
-import { createCalfFeeding } from "@/src/frappe/calfFeeding";
 import { createMilkRecording } from "@/src/frappe/milkRecording";
 import { extractFrappeError } from "@/src/services/api";
 
@@ -29,6 +27,36 @@ async function retiredBatchDrugIssue(): Promise<never> {
   throw err;
 }
 
+/** Health files are opened through a treatment, and closed on the web. Anything an
+ *  older build queued is reported on the Pending screen rather than replayed. */
+async function retiredHealthCase(): Promise<never> {
+  const err: any = new Error(
+    "Health files are opened by recording a treatment and closed on the web. Record it again there, then discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
+/** Per-session calf feeding never had a home on this backend. Reported, not posted. */
+async function retiredCalfFeeding(): Promise<never> {
+  const err: any = new Error(
+    "Per-session calf feeding is not recorded from the phone. Discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
+/** The phone no longer creates animals: a purchase is `buy_in_animal` and a calf
+ *  is made by the birth, both on the server. Anything queued by an old build is
+ *  surfaced on the Pending screen rather than posted to fields that are gone. */
+async function retiredAnimalCreate(): Promise<never> {
+  const err: any = new Error(
+    "New animals are no longer created from the phone. Register this one on the web, then discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
 /**
  * Registry mapping each PendingMutationType to the function that submits it.
  * Adding a new offline-aware mutation: add a member to PendingMutationType,
@@ -38,12 +66,13 @@ const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
   AnimalEvent: createAnimalEvent,
   MilkRecording: createMilkRecording,
   AnimalDisposal: createAnimalDisposal,
-  Animal: createAnimal,
-  CalfFeeding: createCalfFeeding,
-  AnimalDiagnosis: createAnimalDiagnosis,
-  AnimalHealthCase: createAnimalHealthCase,
+  Animal: retiredAnimalCreate,
+  CalfFeeding: retiredCalfFeeding,
+  AnimalDiagnosis: createCheckUp,
+  Treatment: treatAnimal,
+  AnimalHealthCase: retiredHealthCase,
   BatchDrugIssue: retiredBatchDrugIssue,
-  AnimalHealthCaseUpdate: updateAnimalHealthCase,
+  AnimalHealthCaseUpdate: retiredHealthCase,
 };
 
 /**

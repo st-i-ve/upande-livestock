@@ -22,8 +22,7 @@ export type Herd = {
   herdName?: string;
   cat: string;
   cnt: number;
-  cc: string;
-  bom: string;
+  hasBom: boolean;
   isMilking?: boolean;
   isDry?: boolean;
 };

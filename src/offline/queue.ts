@@ -17,6 +17,8 @@ export type PendingMutationType =
   | "Animal"
   | "CalfFeeding"
   | "AnimalDiagnosis"
+  | "Treatment"
+  /** Retired: the phone opens files only through a treatment now. */
   | "AnimalHealthCase"
   /** Retired: the phone no longer posts stock or vet fees. Kept so an item
    *  queued by an older build is reported rather than crashing the drain. */
