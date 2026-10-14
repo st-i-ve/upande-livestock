@@ -1,5 +1,6 @@
+import { useOnChange } from "@/src/hooks/useOnChange";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -13,7 +14,8 @@ import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { captureAndAttachCalfPhoto } from "@/src/frappe/calfPhoto";
+import { CalfPhotoField } from "@/components/CalfPhotoField";
+import type { FileAsset } from "@/src/frappe/files";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
@@ -43,36 +45,29 @@ export default function Calving() {
   const [health, setHealth] = useState<"Healthy" | "Weak" | "Needs Attention" | "Critical">(
     "Healthy",
   );
-  const [toHerd, setToHerd] = useState<string>("");
-  const [calfTargetHerd, setCalfTargetHerd] = useState<string>("");
+  const [calfPhoto, setCalfPhoto] = useState<FileAsset | null>(null);
+  const [toHerdPick, setToHerd] = useState<string>("");
+  const [calfHerdPick, setCalfTargetHerd] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const pregnantCount = animals.filter((a) => a.pregnant).length;
 
-  // Default dam destination: Livestock Settings → custom_lactating_herd if set,
+  // Default dam destination: Livestock Settings → high_yield_herd if set,
   // otherwise the first milking herd, otherwise the first available herd.
-  useEffect(() => {
-    if (toHerd || !herds.length) return;
-    const fromSettings = settings?.high_yield_herd;
-    if (fromSettings && herds.some((h) => h.n === fromSettings)) {
-      setToHerd(fromSettings);
-      return;
-    }
-    const milking = herds.find((h) => h.isMilking);
-    setToHerd(milking?.n ?? herds[0].n);
-  }, [herds, toHerd, settings]);
+  const fromSettings = settings?.high_yield_herd;
+  const defaultToHerd =
+    fromSettings && herds.some((h) => h.n === fromSettings)
+      ? fromSettings
+      : (herds.find((h) => h.isMilking)?.n ?? herds[0]?.n ?? "");
+  const toHerd = toHerdPick || defaultToHerd;
 
-  // Default calf target herd: Female → custom_default_heifer_herd (the 0-2 group),
-  // Male → custom_default_bull_herd. Refreshes when sex flips.
-  useEffect(() => {
-    if (outcome !== "Live Birth") return;
-    const target =
-      sex === "Female"
-        ? settings?.female_calf_herd
-        : settings?.male_calf_herd;
-    if (target && herds.some((h) => h.n === target)) setCalfTargetHerd(target);
-    else if (!calfTargetHerd && herds.length) setCalfTargetHerd(herds[0].n);
-  }, [sex, outcome, settings, herds]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Default calf target herd: Female → female_calf_herd,
+  // Male → male_calf_herd. Refreshes when sex flips.
+  const sexTarget = sex === "Female" ? settings?.female_calf_herd : settings?.male_calf_herd;
+  const settingsCalfHerd = sexTarget && herds.some((h) => h.n === sexTarget) ? sexTarget : "";
+  // A change of sex or outcome puts the default back, as before.
+  useOnChange(`${outcome}|${sex}|${settingsCalfHerd}`, () => setCalfTargetHerd(""));
+  const calfTargetHerd = calfHerdPick || settingsCalfHerd || herds[0]?.n || "";
 
   const mutation = useCreateAnimalEvent();
 
@@ -125,50 +120,33 @@ export default function Calving() {
         calfHealthStatus: outcome === "Live Birth" ? health : undefined,
         birthWeightKg: birthWt ? Number(birthWt) : undefined,
         coatColour: coatColour || undefined,
+        calfPhoto: outcome === "Live Birth" && calfPhoto ? calfPhoto : undefined,
       });
 
       if (r.queued) {
-        Alert.alert("Queued offline", `${dam.name} saved locally. Will sync when online.`);
+        Alert.alert(
+          "Queued offline",
+          `${dam.name} saved locally. Will sync when online${calfPhoto ? ", and the calf photo will be sent with it" : ""}.`,
+        );
         router.replace("/(tabs)/record/success?name=Calving");
         return;
       }
 
-      // The calf only exists now, so the photo can only be offered now. The
-      // birth is already recorded and submitted — declining, or a camera that
-      // fails, costs nothing.
+      // The photo (if any) was uploaded by createAnimalEvent and the server set it
+      // as the calf image; a failed upload costs the photo, never the birth.
       const calf = r.data?.calves?.[0];
       if (outcome === "Live Birth" && calf?.animal) {
+        const photoLine =
+          r.data?.photo === "attached"
+            ? "\nPhoto saved on the calf's record."
+            : r.data?.photo === "failed"
+              ? "\nThe photo could not be uploaded, so the calf has none yet. Add it from the animal's page."
+              : "";
         Alert.alert(
           "Calving recorded",
-          `${dam.name} calved. Calf ${calf.tag} created in ${calf.herd || "—"}.\n\nPhotograph the calf for its record?`,
-          [
-            {
-              text: "Not now",
-              style: "cancel",
-              onPress: () => router.replace("/(tabs)/record/success?name=Calving"),
-            },
-            {
-              text: "Take photo",
-              onPress: async () => {
-                const outcomePhoto = await captureAndAttachCalfPhoto(calf.animal);
-                if (outcomePhoto.status === "attached") {
-                  Alert.alert("Photo saved", `Attached to ${calf.tag}.`);
-                } else if (outcomePhoto.status === "denied") {
-                  Alert.alert(
-                    "Camera not allowed",
-                    "The birth is recorded. Allow camera access in your phone settings to add the photo later from the animal's page.",
-                  );
-                } else if (outcomePhoto.status === "failed") {
-                  Alert.alert(
-                    "Photo not saved",
-                    `The birth is recorded. ${outcomePhoto.message}`,
-                  );
-                }
-                router.replace("/(tabs)/record/success?name=Calving");
-              },
-            },
-          ],
+          `${dam.name} calved. Calf ${calf.tag} created in ${calf.herd || "—"}.${photoLine}`,
         );
+        router.replace("/(tabs)/record/success?name=Calving");
         return;
       }
 
@@ -291,10 +269,7 @@ export default function Calving() {
               options={["Healthy", "Weak", "Needs Attention", "Critical"]}
             />
           </Field>
-          <Banner tone="info">
-            After you submit, you can photograph the calf and the picture goes
-            straight onto its record.
-          </Banner>
+          <CalfPhotoField value={calfPhoto} onChange={setCalfPhoto} />
         </>
       ) : null}
 

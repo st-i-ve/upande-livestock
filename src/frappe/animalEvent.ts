@@ -1,6 +1,8 @@
 import { OpsError } from "./opsError";
 import { getClient, todayISO } from "@/src/services/api";
 import { listDocuments } from "./generic";
+import { discardCalfPhoto, uploadCalfPhoto } from "./calfPhoto";
+import type { FileAsset } from "./files";
 
 // Event types the `Livestock Event Type` master carries in upande_livestock.
 //
@@ -54,6 +56,7 @@ type EventSpecificInput =
       eventType: "Service";
       serviceType?: "A.I." | "Natural";
       semenItem?: string;
+      semenWarehouse?: string;
       sire?: string;
     }
   | {
@@ -75,6 +78,10 @@ type EventSpecificInput =
       /** Pregnancy Diagnosis this calving answers. The server walks it back to
        *  the service to stamp the sire. */
       relatedPregnancy?: string;
+      /** Local file for the calf's picture (optional). Uploaded when the
+       *  calving is sent (so, when the offline queue drains) and handed to the
+       *  server, which makes it the new calf Animal's image. */
+      calfPhoto?: FileAsset;
       calfBreed?: string;
       calfHealthStatus?: "Healthy" | "Weak" | "Needs Attention" | "Critical";
     }
@@ -101,6 +108,8 @@ type EventSpecificInput =
       herd?: string;
       /** Drug quantities are PER ANIMAL. */
       drugIssues?: AnimalDrugIssueInput[];
+      /** The round's total vet fee. The server records it; the phone posts nothing. */
+      vetFee?: number;
       sourceWarehouse?: string;
       /** Employee IDs of farmhands holding the animal (Dehorning). */
       handlerIds?: string[];
@@ -270,6 +279,9 @@ export const createAnimalEvent = async (
         service_date: common.event_date,
         sire: input.sire,
         semen_item: input.semenItem,
+        // The server issues the straw itself (Stock Entry "Livestock Service"), one per
+        // event, from this store or the event type's default store when blank.
+        semen_warehouse: input.semenWarehouse,
       });
 
     case "Pregnancy Diagnosis":
@@ -286,7 +298,22 @@ export const createAnimalEvent = async (
       // record_birth books the Calving on the dam and creates one Animal per
       // calf. `animal` here is the dam — the calf does not exist yet.
       const stillborn = input.calvingOutcome !== "Live Birth";
-      return callOp(input.eventType, {
+      // Upload first, so one server call carries the calving and the photo.
+      // A network failure rethrows — nothing is recorded yet, so the queue can
+      // safely retry the whole item. Any other failure (the file is gone, the
+      // server refused it) drops the photo, not the birth.
+      let photoUrl: string | undefined;
+      let photo: "attached" | "failed" | "none" = "none";
+      if (!stillborn && input.calfPhoto) {
+        try {
+          photoUrl = await uploadCalfPhoto(input.calfPhoto);
+          photo = "attached";
+        } catch (e) {
+          if (!(e as any)?.response) throw e;
+          photo = "failed";
+        }
+      }
+      const reply = await callOp(input.eventType, {
         dam: input.animal,
         event_date: common.event_date,
         operator: input.operator,
@@ -306,9 +333,13 @@ export const createAnimalEvent = async (
             herd: input.calfTargetHerd,
             breed: input.calfBreed,
             health_status: input.calfHealthStatus,
+            photo: photoUrl,
           },
         ],
       });
+      // The calving is recorded: the durable copy has done its job.
+      if (input.calfPhoto) discardCalfPhoto(input.calfPhoto.uri);
+      return { ...reply, photo };
     }
 
     case "Drying Off":
@@ -345,6 +376,7 @@ export const createAnimalEvent = async (
         animals: input.animals?.length ? input.animals : [input.animal],
         herd: input.herd,
         drugs: mapDrugRows(input.drugIssues),
+        vet_fee: input.vetFee,
         source_warehouse: input.sourceWarehouse,
         remarks: withNote(
           input.remarks,

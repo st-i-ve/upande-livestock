@@ -1,59 +1,100 @@
+import { Directory, File, Paths } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 
-import { attachFile } from "./files";
+import { uploadFile, type FileAsset } from "./files";
 
-export type CalfPhotoOutcome =
-  | { status: "attached"; fileUrl: string }
+/**
+ * The calf's photo. The phone only RECORDS it: the picture is chosen (camera,
+ * or the gallery when the camera is unavailable or refused) while the form is
+ * filled in, is uploaded when the calving is sent, and the server makes it the
+ * new calf Animal's `image` (the Attach Image field the form and lists show).
+ *
+ * Offline: the queued calving holds only a local file reference. When the queue
+ * drains, the photo is uploaded first and the calving sent with its URL, so
+ * either both go or the item stays queued for another try.
+ */
+
+export type PickOutcome =
+  | { status: "picked"; asset: FileAsset }
   | { status: "cancelled" }
   | { status: "denied" }
   | { status: "failed"; message: string };
 
-/**
- * Photograph a newborn calf and put the picture on its Animal record.
- *
- * Deliberately a post-submit step: the calf has no Animal to hang a photo on
- * until record_birth has created one, and a camera that fails — no permission,
- * a cancelled shot, a dead upload — must never cost the operator the birth
- * they already recorded. Every failure path therefore returns a value rather
- * than throwing.
- *
- * The picture is public (isPrivate: false): an Attach Image field renders on
- * the Animal form and in list views, and a private File will not load there.
- */
-export async function captureAndAttachCalfPhoto(
-  animalName: string,
-): Promise<CalfPhotoOutcome> {
+// The picker hands back a file in the OS cache, which the system may clear
+// before a queued calving syncs. The photo is copied into the app's document
+// directory (safe from cache clearing) and that copy is what gets queued.
+const photoDir = () => new Directory(Paths.document, "calf-photos");
+
+const isOurs = (uri?: string | null): uri is string =>
+  !!uri && uri.startsWith(photoDir().uri);
+
+/** Delete a durable photo copy. Ignores anything that is not one of ours. */
+export function discardCalfPhoto(uri?: string | null): void {
+  if (!isOurs(uri)) return;
   try {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return { status: "denied" };
-
-    const shot = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      // A calf photo is for identification, not print. Compressing on the
-      // handset keeps the upload viable on a farm connection.
-      quality: 0.6,
-      allowsEditing: false,
-      exif: false,
-    });
-    if (shot.canceled || !shot.assets?.length) return { status: "cancelled" };
-
-    const asset = shot.assets[0];
-    const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
-    const safe = animalName.replace(/[^A-Za-z0-9._-]+/g, "-");
-
-    const { fileUrl } = await attachFile({
-      doctype: "Animal",
-      docname: animalName,
-      fieldname: "image",
-      isPrivate: false,
-      asset: {
-        uri: asset.uri,
-        name: `calf-${safe}.${ext}`,
-        mimeType: asset.mimeType || `image/${ext === "png" ? "png" : "jpeg"}`,
-      },
-    });
-    return { status: "attached", fileUrl };
-  } catch (e: any) {
-    return { status: "failed", message: e?.message || "Upload failed." };
+    const f = new File(uri);
+    if (f.exists) f.delete();
+  } catch {
+    // Already gone, or not deletable: nothing left to clean up.
   }
 }
+
+const toAsset = (a: ImagePicker.ImagePickerAsset): FileAsset => {
+  const ext = (a.uri.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const name = `calf-${Date.now()}.${ext}`;
+  const dir = photoDir();
+  dir.create({ idempotent: true, intermediates: true });
+  const copy = new File(dir, name);
+  new File(a.uri).copy(copy);
+  return {
+    uri: copy.uri,
+    name,
+    mimeType: a.mimeType || `image/${ext === "png" ? "png" : "jpeg"}`,
+  };
+};
+
+// A calf photo is for identification, not print. Compressing on the handset
+// keeps the upload viable on a farm connection.
+const OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ["images"],
+  quality: 0.6,
+  allowsEditing: false,
+  exif: false,
+};
+
+/** Camera first; the gallery when the camera is refused or cannot open. */
+export async function pickCalfPhoto(source: "camera" | "gallery" = "camera"): Promise<PickOutcome> {
+  try {
+    if (source === "camera") {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (perm.granted) {
+        try {
+          const shot = await ImagePicker.launchCameraAsync(OPTIONS);
+          if (shot.canceled || !shot.assets?.length) return { status: "cancelled" };
+          return { status: "picked", asset: toAsset(shot.assets[0]) };
+        } catch {
+          // No camera on this device (or it would not open): fall through.
+        }
+      } else {
+        return { status: "denied" };
+      }
+    }
+    const lib = await ImagePicker.launchImageLibraryAsync(OPTIONS);
+    if (lib.canceled || !lib.assets?.length) return { status: "cancelled" };
+    return { status: "picked", asset: toAsset(lib.assets[0]) };
+  } catch (e: any) {
+    return { status: "failed", message: e?.message || "Could not get the photo." };
+  }
+}
+
+/**
+ * Upload the photo and return its URL, for the calving payload's `photo`.
+ *
+ * The server sets the calf's `image` from it when it creates the calf, in the
+ * same call as the calving — so there is no second step to lose. (Frappe does
+ * NOT point an Attach Image field at a file just because the File names that
+ * field; attaching after the fact would leave the calf with no picture.)
+ *
+ * Public: a private File will not render in the Animal form or its lists.
+ */
+export const uploadCalfPhoto = (asset: FileAsset): Promise<string> => uploadFile(asset, false);

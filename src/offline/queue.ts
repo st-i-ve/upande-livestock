@@ -1,3 +1,4 @@
+import { discardCalfPhoto } from "@/src/frappe/calfPhoto";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
@@ -17,6 +18,8 @@ export type PendingMutationType =
   | "CalfFeeding"
   | "AnimalDiagnosis"
   | "AnimalHealthCase"
+  /** Retired: the phone no longer posts stock or vet fees. Kept so an item
+   *  queued by an older build is reported rather than crashing the drain. */
   | "BatchDrugIssue"
   | "AnimalHealthCaseUpdate";
 
@@ -84,8 +87,14 @@ export const enqueue = async (
   return full;
 };
 
+/** A dropped or finished item no longer needs its durable calf photo copy. */
+const discardPhotos = (items: PendingMutation[]) => {
+  for (const m of items) discardCalfPhoto(m.payload?.calfPhoto?.uri);
+};
+
 export const remove = async (id: string): Promise<void> => {
   const q = await loadQueue();
+  discardPhotos(q.filter((m) => m.id === id));
   await persist(q.filter((m) => m.id !== id));
 };
 
@@ -108,6 +117,7 @@ export const markAttempt = async (
 };
 
 export const clear = async (): Promise<void> => {
+  discardPhotos(await loadQueue());
   await persist([]);
 };
 
