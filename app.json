@@ -2,7 +2,7 @@
   "expo": {
     "name": "Upande Livestock",
     "slug": "upande-livestock",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/upande_logo_no_bg.png",
     "scheme": "upandelivestock",
@@ -62,7 +62,7 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "runtimeVersion": "1.0.0-kaitetdairyfrappe16",
+    "runtimeVersion": "1.1.0-kaitetdairyfrappe16",
     "extra": {
       "router": {},
       "eas": {
