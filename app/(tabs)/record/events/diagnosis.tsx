@@ -68,7 +68,7 @@ export default function Diagnosis() {
   const [bcs, setBcs] = useState("");
   const [followUp, setFollowUp] = useState("");
   const [vetName, setVetName] = useState("");
-  const [vetConfirmed, setVetConfirmed] = useState(false);
+  const [vetConfirmed] = useState(false);
   const [freeRemarks, setFreeRemarks] = useState("");
 
   // Single-select chip groups

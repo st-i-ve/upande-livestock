@@ -12,14 +12,12 @@ import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { useAuthStore } from "@/src/auth/authStore";
 import { applyHerdMoves, computePendingHerdMoves } from "@/src/frappe/herdTransitions";
-import { useAnimals } from "@/src/hooks/useAnimals";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError } from "@/src/services/api";
 
 export default function HerdsList() {
   const { data: herds = [], isLoading, isRefetching, error, refetch } = useHerds();
-  const { data: animals = [] } = useAnimals();
   const { data: settings } = useLivestockSettings();
   const operator = useAuthStore((s) => s.employeeName);
 

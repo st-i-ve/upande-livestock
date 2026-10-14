@@ -9,7 +9,6 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
-import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { StockItemFields } from "@/components/StockItemFields";

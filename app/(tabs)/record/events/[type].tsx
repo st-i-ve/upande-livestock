@@ -11,7 +11,6 @@ import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
-import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { HandlersPicker } from "@/components/HandlersPicker";
 import { KV } from "@/components/KV";
 import { Screen } from "@/components/Screen";

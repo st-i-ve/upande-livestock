@@ -283,6 +283,7 @@ export const getClient = async (): Promise<AxiosInstance> => {
     if (m && m[1]) headers["X-Frappe-CSRF-Token"] = m[1];
   }
 
+  // eslint-disable-next-line import/no-named-as-default-member
   const client = axios.create({
     baseURL: baseUrl,
     headers,

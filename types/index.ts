@@ -43,14 +43,6 @@ export type DrawerGroup = { grp: string; its: DrawerItem[] };
 
 export type Tone = "info" | "success" | "warning" | "danger" | "muted";
 
-export type DailyMilkRow = {
-  herd: string;
-  cnt: number;
-  am: number | null;
-  pm: number | null;
-  expected: number;
-};
-
 export type Alert = {
   sev: "default" | "danger";
   ic: string;

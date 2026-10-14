@@ -1,6 +1,5 @@
 import { OpsError } from "./opsError";
 import { getClient, todayISO } from "@/src/services/api";
-import { countDocuments, getDocument, listDocuments } from "./generic";
 
 export type CaseStatus =
   | "Open"
@@ -81,65 +80,6 @@ const mapTreatment = (t: HealthTreatmentInput) => {
   };
 };
 
-export type HealthCaseListRow = {
-  name: string;
-  animal: string;
-  animalName: string;
-  caseStatus: CaseStatus;
-  severity: CaseSeverity | null;
-  openedDate: string;
-  presentingSymptoms: string;
-  totalTreatmentCost: number;
-  duration: number | null;
-  /** `custom_is_backdated` — set when the case was opened for a past day. */
-  isBackdated: boolean;
-};
-
-const mapCase = (row: any): HealthCaseListRow => ({
-  name: row.name,
-  animal: row.animal,
-  animalName: row.animal_name || row.animal,
-  caseStatus: row.case_status,
-  severity: row.severity ?? null,
-  openedDate: row.opened_date,
-  presentingSymptoms: row.presenting_symptoms ?? "",
-  totalTreatmentCost: Number(row.total_treatment_cost ?? 0),
-  duration: row.duration_days ?? null,
-  isBackdated: !!row.custom_is_backdated,
-});
-
-const HEALTH_CASE_LIST_FIELDS = [
-  "name",
-  "animal",
-  "animal_name",
-  "case_status",
-  "severity",
-  "opened_date",
-  "presenting_symptoms",
-  "total_treatment_cost",
-  "duration_days",
-  "custom_is_backdated",
-];
-
-export const getHealthCases = async (
-  filters: ["case_status" | "any", string][] = [],
-): Promise<HealthCaseListRow[]> => {
-  const f: [string, string, any][] = filters
-    .filter(([k]) => k !== "any")
-    .map(([k, v]) => [k, "=", v] as [string, string, any]);
-  const rows = await listDocuments({
-    doctype: "Livestock Health Case",
-    fields: HEALTH_CASE_LIST_FIELDS,
-    filters: f,
-    orderBy: "opened_date desc",
-    limit: 200,
-  });
-  return rows.map(mapCase);
-};
-
-export const countOpenHealthCases = (): Promise<number> =>
-  countDocuments("Livestock Health Case", [["case_status", "in", ["Open", "Under Treatment"]]]);
-
 export const createAnimalHealthCase = async (
   input: CreateAnimalHealthCaseInput,
 ): Promise<any> => {
@@ -202,54 +142,4 @@ export async function updateAnimalHealthCase(
     body,
   );
   return res.data?.data;
-}
-
-export type AnimalHealthCaseDetail = {
-  name: string;
-  animal: string;
-  animalName: string;
-  caseStatus: CaseStatus;
-  severity: CaseSeverity | null;
-  openedDate: string;
-  closingDate: string | null;
-  closingNotes: string | null;
-  presentingSymptoms: string;
-  totalTreatmentCost: number;
-  treatments: {
-    treatmentDate: string;
-    itemCode: string;
-    itemName: string;
-    qty: number;
-    uom: string;
-    rate: number;
-    amount: number;
-  }[];
-};
-
-export async function getAnimalHealthCase(name: string): Promise<AnimalHealthCaseDetail | null> {
-  const row = await getDocument<any>("Livestock Health Case", name);
-  if (!row) return null;
-  return {
-    name: row.name,
-    animal: row.animal,
-    animalName: row.animal_name || row.animal,
-    caseStatus: row.case_status,
-    severity: row.severity ?? null,
-    openedDate: row.opened_date,
-    closingDate: row.closed_date ?? null,
-    closingNotes: row.outcome_notes ?? null,
-    presentingSymptoms: row.presenting_symptoms ?? "",
-    totalTreatmentCost: Number(row.total_treatment_cost ?? 0),
-    treatments: Array.isArray(row.treatments)
-      ? row.treatments.map((t: any) => ({
-          treatmentDate: t.treatment_date ?? "",
-          itemCode: t.item_code,
-          itemName: t.item_name || t.item_code,
-          qty: Number(t.qty ?? 0),
-          uom: t.uom || "",
-          rate: Number(t.rate ?? 0),
-          amount: Number(t.amount ?? Number(t.qty ?? 0) * Number(t.rate ?? 0)),
-        }))
-      : [],
-  };
 }

@@ -132,15 +132,6 @@ type EventSpecificInput =
 
 export type AnimalEventInput = CommonInput & EventSpecificInput;
 
-const mapDrugIssue = (d: AnimalDrugIssueInput) => ({
-  item_code: d.itemCode,
-  qty: d.qty,
-  uom: d.uom,
-  source_warehouse: d.sourceWarehouse,
-  withdrawal_days: d.withdrawalDays,
-  milk_safe_date: d.milkSafeDate,
-});
-
 /**
  * Build the Frappe payload for an Animal Event and submit it. Server scripts
  * (per references/livestock_server_scripts.md §3) fire on submit and
