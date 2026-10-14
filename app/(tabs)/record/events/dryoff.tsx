@@ -11,10 +11,12 @@ import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { VetPicker } from "@/components/VetPicker";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
 import { StockItemFields } from "@/components/StockItemFields";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
@@ -40,6 +42,7 @@ export default function Dryoff() {
   const { choices: stockChoices } = useEventItems("Drying Off");
 
   const { operator, missingMessage } = useOperator();
+  const { vets, vet, setVet } = useVetChoice();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [toHerdPick, setToHerd] = useState<string>("");
@@ -108,6 +111,7 @@ export default function Dryoff() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
+          vet: vet || undefined,
           eventDate: isBackdating ? backdateDate : todayISO(),
           toHerd,
           drugIssues: drugIssues.length ? drugIssues : undefined,
@@ -162,6 +166,7 @@ export default function Dryoff() {
       <Field label="To herd">
         <Picker value={toHerd} onChange={setToHerd} options={herds.map((h) => h.n)} />
       </Field>
+      <VetPicker vets={vets} value={vet} onChange={setVet} />
       {isBackdating ? (
         <Field label="Date it happened">
           <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={new Date()} />

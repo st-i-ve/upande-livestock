@@ -39,6 +39,9 @@ type CommonInput = {
   operator: string;     // Employee name (e.g. "HR-EMP-01478")
   eventDate?: string;   // ISO date; defaults to today
   remarks?: string;
+  /** Livestock Vet id (e.g. "VET-0001") for the health events a vet does. The
+   *  server defaults to the logged-in user's vet when it is left out. */
+  vet?: string;
 };
 
 export type AnimalDrugIssueInput = {
@@ -252,6 +255,7 @@ export const createAnimalEvent = async (
     event_date: input.eventDate || todayISO(),
     operator: input.operator,
     remarks: input.remarks,
+    vet: input.vet || undefined,
   };
 
   switch (input.eventType) {
@@ -359,6 +363,7 @@ export const createAnimalEvent = async (
       return callOp(input.eventType, {
         event_date: common.event_date,
         operator: input.operator,
+        vet: input.vet || undefined,
         animals: input.animals?.length ? input.animals : [input.animal],
         herd: input.herd,
         drugs: mapDrugRows(input.drugIssues),

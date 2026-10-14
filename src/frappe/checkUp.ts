@@ -17,6 +17,8 @@ export type CreateCheckUpInput = {
   animal: string;
   /** Employee ID of whoever looked at her. */
   operator: string;
+  /** Livestock Vet id of the vet who did the check, if one did. */
+  vet?: string;
   /** ISO; today unless backdating. */
   diagnosisDate?: string;
   /** Why she was looked at (required). */
@@ -51,6 +53,7 @@ export const createCheckUp = async (input: CreateCheckUpInput): Promise<any> => 
     reason_for_check: input.reasonForCheck,
     action_taken: input.actionTaken,
   };
+  if (input.vet) body.vet = input.vet;
   if (input.temperatureC != null) body.temperature_c = input.temperatureC;
   if (input.heartRate != null) body.heart_rate = input.heartRate;
   if (input.respirationRate != null) body.respiration_rate = input.respirationRate;

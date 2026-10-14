@@ -11,10 +11,12 @@ import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { VetPicker } from "@/components/VetPicker";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useCreateCheckUp } from "@/src/hooks/mutations";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -38,6 +40,7 @@ export default function CheckUp() {
   const options = useHealthOptions();
   const o = options.data;
   const mutation = useCreateCheckUp();
+  const { vets, vet, setVet } = useVetChoice();
 
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [reason, setReason] = useState("");
@@ -72,6 +75,7 @@ export default function CheckUp() {
       const r = await mutation.mutateAsync({
         animal: animal.id,
         operator,
+        vet: vet || undefined,
         diagnosisDate: isBackdating ? backdateDate : todayISO(),
         reasonForCheck: reason.trim(),
         temperatureC: num(temp),
@@ -133,6 +137,8 @@ export default function CheckUp() {
           <Input value={todayISO()} editable={false} />
         )}
       </Field>
+
+      <VetPicker vets={vets} value={vet} onChange={setVet} />
 
       <Field label="Why she was looked at">
         <Input value={reason} onChangeText={setReason} placeholder="Off her feed since yesterday" />

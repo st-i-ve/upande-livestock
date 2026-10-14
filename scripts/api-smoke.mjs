@@ -13,6 +13,14 @@
  * print every document they created as JSON on the last line, for cleanup.
  * SMOKE_SEMEN=<item> also books the straw issue of a Service (it needs real
  * stock behind it).
+ *
+ * Vets are records on the server (Livestock Vet). With SMOKE_VET_EXTERNAL and
+ * SMOKE_VET_INTERNAL (the names of one enabled vet of each kind) the write steps
+ * also send `vet` and check it was saved, and the vet-fee branches are exercised:
+ * an internal vet with a fee is refused; an external vet's fee is recorded, and
+ * is posted as a Journal Entry when SMOKE_VET_POSTS=1 (that vet has a Supplier
+ * and Livestock Settings names a vet expense account). Create the test vets,
+ * Employee and Supplier yourself and remove them afterwards.
  * Point it at a development site only.
  */
 const URL_ = process.env.LIVESTOCK_URL;
@@ -21,6 +29,9 @@ const PASS = process.env.LIVESTOCK_PASSWORD;
 const WRITE = process.env.WRITE === "1";
 const [F1, F2, F3] = (process.env.SMOKE_ANIMALS || "").split(",");
 const HERD = process.env.SMOKE_HERD;
+const VET_EXT = process.env.SMOKE_VET_EXTERNAL;
+const VET_INT = process.env.SMOKE_VET_INTERNAL;
+const VET_POSTS = process.env.SMOKE_VET_POSTS === "1";
 if (!URL_ || !USER || !PASS) {
   console.error("Set LIVESTOCK_URL, LIVESTOCK_USER and LIVESTOCK_PASSWORD.");
   process.exit(2);
@@ -180,6 +191,14 @@ await step("read", "movement.movement_suggestions", async () => {
   need(m, ["growth"], "suggestions");
   if (m.growth[0]) need(m.growth[0], ["animal", "label", "from_herd", "to_herd", "reason", "overdue"], "suggestion");
 });
+await step("read", "people.vet_options (useVets)", async () => {
+  const m = msgOf(await post(`${M}.people.vet_options.vet_options`, { payload: {} }));
+  need(m, ["vets", "mine"], "vet_options");
+  for (const v of m.vets) need(v, ["value", "label", "type", "detail"], "vet option");
+  for (const want of [VET_EXT, VET_INT].filter(Boolean))
+    if (!m.vets.some((v) => v.value === want)) throw new Error(`${want} is not offered (disabled or missing)`);
+  return `${m.vets.length} vets, mine=${m.mine}`;
+});
 await step("read", "health.health_options (useEventItems)", async () => {
   const m = msgOf(await post(`${M}.health.health_options.health_options`, {}));
   need(m, ["items_by_event", "diseases", "appearances", "hydrations", "actions", "severities", "routes", "responses", "employee", "company"], "options");
@@ -255,8 +274,9 @@ async function writes() {
     return m.name;
   });
   await step("write", "Pregnancy Diagnosis (Confirmed)", async () => {
-    const m = await ev("Pregnancy Diagnosis", { animal: F1, event_date: today, operator: op, diagnosis_date: today, diagnosis_result: "Confirmed", related_service: ctx.service1, diagnosis_remarks: "smoke" });
+    const m = await ev("Pregnancy Diagnosis", { animal: F1, event_date: today, operator: op, diagnosis_date: today, diagnosis_result: "Confirmed", related_service: ctx.service1, diagnosis_remarks: "smoke", vet: VET_EXT });
     ctx.pd1 = m.name;
+    if (VET_EXT) same(await got("Livestock Event", m.name), { vet: VET_EXT }, "pregnancy diagnosis");
     return m.name;
   });
   await step("write", "Pregnancy Diagnosis (second cow)", async () => {
@@ -266,7 +286,9 @@ async function writes() {
   await step("write", "Abortion", async () => (await ev("Abortion", { animal: F2, event_date: today, operator: op, abortion_cause: "Unknown", abortion_notes: "smoke" })).name); // the app sends no related_pregnancy; the server finds the open one
   await step("write", "Drying Off", async () => {
     const d = drug();
-    return (await ev("Drying Off", { animal: F1, event_date: today, operator: op, new_herd: ctx.elig.next_herd?.[HERD] || ctx.herds.find((h) => h.is_dry)?.name || ctx.herds[0].name, drugs: d ? [d] : [], remarks: "smoke" })).name;
+    const m = await ev("Drying Off", { animal: F1, event_date: today, operator: op, vet: VET_INT, new_herd: ctx.elig.next_herd?.[HERD] || ctx.herds.find((h) => h.is_dry)?.name || ctx.herds[0].name, drugs: d ? [d] : [], remarks: "smoke" });
+    if (VET_INT) same(await got("Livestock Event", m.name), { vet: VET_INT }, "drying off");
+    return m.name;
   });
   await step("write", "Calving (live birth) with photo: upload_file + calf image", async () => {
     // a 1x1 png, uploaded exactly like the app (multipart `file`, is_private=0)
@@ -298,10 +320,14 @@ async function writes() {
   for (const t of ["Vaccination", "Deworming", "Hoof Trimming", "Dehorning"]) {
     await step("write", `${t} round (+vet_fee)`, async () => {
       const d = ["Vaccination", "Deworming"].includes(t) ? drug() : null;
-      const m = await ev(t, { event_date: today, operator: op, animals: t === "Dehorning" ? [F3] : [F1, F3], drugs: d ? [{ ...d, withdrawal_days: 2 }] : [], vet_fee: 1500, remarks: `smoke ${t}` });
+      const m = await ev(t, { event_date: today, operator: op, vet: VET_EXT, animals: t === "Dehorning" ? [F3] : [F1, F3], drugs: d ? [{ ...d, withdrawal_days: 2 }] : [], vet_fee: 1500, remarks: `smoke ${t}` });
       if (!m.vet_fee || m.vet_fee.amount !== 1500) throw new Error("vet_fee not echoed");
+      if (m.vet_fee.journal_entry) track("Journal Entry", m.vet_fee.journal_entry);
+      if (VET_EXT && VET_POSTS && !m.vet_fee.posted) throw new Error(`fee not posted: ${m.vet_fee.reason}`);
+      if (VET_EXT && !VET_POSTS && m.vet_fee.posted) throw new Error("fee posted though SMOKE_VET_POSTS is not set");
+      if (!m.vet_fee.posted && !m.vet_fee.reason) throw new Error("an unposted fee must say why");
       const doc = await got("Livestock Event", m.name);
-      same(doc, { event_type: t, operator: op, event_date: today }, `${t} event`);
+      same(doc, { event_type: t, operator: op, event_date: today, vet: VET_EXT }, `${t} event`);
       if (!String(doc.remarks || "").includes(`smoke ${t}`)) throw new Error("remarks dropped");
       if (!String(doc.remarks || "").includes("1,500")) throw new Error("vet fee not on the first event");
       if (d) {
@@ -310,6 +336,15 @@ async function writes() {
         same(row, { item_code: d.item_code, qty: 1, source_warehouse: d.source_warehouse, withdrawal_days: 2 }, "drug row");
       }
       return `${m.animals} animals${m.stock_entry ? " SE " + m.stock_entry : ""}`;
+    });
+  }
+  if (VET_INT) {
+    await step("write", "husbandry: an internal vet with a fee is refused, nothing recorded", async () => {
+      const r = await post(`${M}.mobile.record_animal_event.record_animal_event`, { payload: { type: "Hoof Trimming", event_date: today, operator: op, vet: VET_INT, animals: [F3], vet_fee: 800 } });
+      const m = r.data?.message;
+      if (!m?.error) throw new Error("an internal vet's fee was accepted");
+      if (!/no vet fee/i.test(m.error)) throw new Error(`unexpected refusal: ${m.error}`);
+      return m.error.slice(0, 60);
     });
   }
   await step("write", "mobile.record_milking", async () => {
@@ -347,6 +382,7 @@ async function writes() {
       temperature_c: 39.4, heart_rate: 72, respiration_rate: 28, bcs: 3.25, lameness_score: 2,
       appearance: "Dull", hydration: "Mild dehydration", suggested_disease: "Mastitis",
       differential_notes: "Could be ketosis", action_taken: "Logged — monitor", follow_up_date: today, action_notes: "Recheck tomorrow",
+      vet: VET_EXT,
     };
     const m = msgOf(await post(`${M}.health.create_check_up.create_check_up`, { payload: sent }));
     track("Livestock Diagnosis", m.name);
@@ -371,7 +407,7 @@ async function writes() {
     const c = ctx.opts.items_by_event.Treatment?.[0];
     const sent = {
       animal: F1, open_new: true, presenting_symptoms: "Hot hard right hind quarter", provisional_diagnosis: "Mastitis", severity: "Severe",
-      operator: op, opened_by: op, treatment_date: today,
+      operator: op, opened_by: op, vet: VET_INT, treatment_date: today,
       treatments: [{ drug_item: c.value, qty: 2, dosage: "20 ml", route: "IM (Intramuscular)", withdrawal_period_days: 4,
         response_observed: "Improving", administered_by: op, notes: "smoke", source_warehouse: c.warehouse }],
     };
@@ -379,7 +415,7 @@ async function writes() {
     track("Livestock Health Case", m.case);
     if (m.stock_entry) track("Stock Entry", m.stock_entry);
     const doc = await got("Livestock Health Case", m.case);
-    same(doc, { animal: F1, presenting_symptoms: sent.presenting_symptoms, provisional_diagnosis: "Mastitis", severity: "Severe", opened_by: op, case_status: "Under Treatment" }, "case");
+    same(doc, { animal: F1, presenting_symptoms: sent.presenting_symptoms, provisional_diagnosis: "Mastitis", severity: "Severe", opened_by: op, case_status: "Under Treatment", vet: VET_INT }, "case");
     if (!doc.milk_safe_date) throw new Error("withdrawal date not worked out by the server");
     const t = doc.treatments?.[0];
     same(t, { drug_item: c.value, qty: 2, dosage: "20 ml", route: "IM (Intramuscular)", withdrawal_period_days: 4, response_observed: "Improving", administered_by: op, notes: "smoke", source_warehouse: c.warehouse, treatment_date: today }, "treatment row");
@@ -401,15 +437,16 @@ async function writes() {
     return m.duration_days;
   });
   await step("write", "health.create_health_case (blank cow)", async () => {
-    const sent = { animal: F2, company: ctx.company, opened_date: today, opened_by: op, presenting_symptoms: "Limping, left fore", body_systems: "Feet / Hooves", provisional_diagnosis: "Lameness - Foot Rot", severity: "Mild", vet_called: true, vet_name: "Dr. Mwangi" };
+    const sent = { animal: F2, company: ctx.company, opened_date: today, opened_by: op, presenting_symptoms: "Limping, left fore", body_systems: "Feet / Hooves", provisional_diagnosis: "Lameness - Foot Rot", severity: "Mild", vet: VET_EXT };
     const m = msgOf(await post(`${M}.health.create_health_case.create_health_case`, { payload: sent }));
     track("Livestock Health Case", m.name);
     const doc = await got("Livestock Health Case", m.name);
-    same(doc, { animal: F2, presenting_symptoms: sent.presenting_symptoms, body_systems: sent.body_systems, provisional_diagnosis: sent.provisional_diagnosis, severity: "Mild", vet_called: 1, vet_name: "Dr. Mwangi", opened_by: op }, "health case");
+    same(doc, { animal: F2, presenting_symptoms: sent.presenting_symptoms, body_systems: sent.body_systems, provisional_diagnosis: sent.provisional_diagnosis, severity: "Mild", vet: VET_EXT, opened_by: op }, "health case");
   });
   await step("write", "disposal.record_disposal (Culled (Farm Use))", async () => {
-    const m = msgOf(await post(`${M}.disposal.record_disposal.record_disposal`, { payload: { animal: F2, disposal_type: "Culled (Farm Use)", disposal_date: today, reason_details: "smoke", witness: op } }));
+    const m = msgOf(await post(`${M}.disposal.record_disposal.record_disposal`, { payload: { animal: F2, disposal_type: "Culled (Farm Use)", disposal_date: today, reason_details: "smoke", witness: op, vet: VET_EXT } }));
     track("Livestock Disposal", m.name);
+    if (VET_EXT) same(await got("Livestock Disposal", m.name), { vet: VET_EXT }, "disposal");
     return m.name;
   });
 }

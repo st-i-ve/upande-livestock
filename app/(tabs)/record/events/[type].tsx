@@ -10,6 +10,7 @@ import { Button } from "@/components/Button";
 import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { VetPicker } from "@/components/VetPicker";
 import { StockItemFields } from "@/components/StockItemFields";
 import { RADIUS } from "@/constants/theme";
 import {
@@ -22,6 +23,7 @@ import { useBackdate } from "@/src/hooks/useBackdate";
 import { useColors } from "@/src/hooks/useColors";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -47,8 +49,8 @@ const SPECS: Record<string, Spec> = {
  * The routine health and husbandry events. For the rounds the fields are the web
  * Husbandry page's: the job, the date, the animals, what each animal got (item,
  * store, quantity per animal, batch) and notes — plus the two things the server
- * also records for a round, the vet fee and each drug's withdrawal days. A vet's
- * name, the dehorning method or which feet were trimmed are not fields on the
+ * also records for a round, the vet fee and each drug's withdrawal days. The vet is
+ * picked from the farm's vets; the dehorning method or which feet were trimmed are not fields on the
  * record, so they are not asked for; put them in Notes if they matter.
  */
 export default function GenericEvent() {
@@ -56,6 +58,7 @@ export default function GenericEvent() {
   const spec = SPECS[type || ""];
 
   const { operator, missingMessage } = useOperator();
+  const { vets, vet, setVet, isInternal } = useVetChoice();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const [selected, setSelected] = useState<Animal[]>([]);
   const [weight, setWeight] = useState("");
@@ -139,9 +142,11 @@ export default function GenericEvent() {
           animals: selected.map((a) => a.id),
           currentHerd: selected[0].herd,
           operator,
+          vet: vet || undefined,
           eventDate,
           remarks: note,
-          vetFee: Number(vetFee) > 0 ? Number(vetFee) : undefined,
+          // An employee-vet is paid by payroll; the server refuses a fee for one.
+          vetFee: !isInternal && Number(vetFee) > 0 ? Number(vetFee) : undefined,
           drugIssues: takesDrugs
             ? filledDrugRows.map((d) => ({
                 itemCode: d.itemCode.trim(),
@@ -274,7 +279,9 @@ export default function GenericEvent() {
         <DrugRows rows={drugs} onChange={setDrugs} choices={stockChoices} headcount={selected.length} />
       ) : null}
 
-      {spec.isRound ? (
+      {spec.isRound ? <VetPicker vets={vets} value={vet} onChange={setVet} /> : null}
+
+      {spec.isRound && !isInternal ? (
         <Field label="Vet fee for the round (KES)" help="The whole round's fee, once — the server records it.">
           <Input value={vetFee} onChangeText={setVetFee} keyboardType="decimal-pad" placeholder="0" />
         </Field>

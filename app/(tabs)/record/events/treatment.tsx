@@ -14,6 +14,7 @@ import { Field, FieldRow, Input } from "@/components/Field";
 import { Loader } from "@/components/Loader";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { VetPicker } from "@/components/VetPicker";
 import { StockItemFields, type StockPick } from "@/components/StockItemFields";
 import { RADIUS } from "@/constants/theme";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
@@ -24,6 +25,7 @@ import { useEventItems } from "@/src/hooks/useEventItems";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useTreatAnimal } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -68,6 +70,7 @@ export default function Treatment() {
   const options = useHealthOptions().data;
   const { choices: stock } = useEventItems("Treatment");
   const mutation = useTreatAnimal();
+  const { vets, vet, setVet } = useVetChoice();
 
   const [animal, setAnimal] = useState<Animal | null>(null);
   const standingQ = useQuery({
@@ -127,6 +130,7 @@ export default function Treatment() {
         provisionalDiagnosis: suspected || undefined,
         severity: severity || undefined,
         operator,
+        vet: vet || undefined,
         treatmentDate: isBackdating ? backdateDate : todayISO(),
         doses: given.map((d) => ({
           itemCode: d.pick.itemCode,
@@ -229,6 +233,8 @@ export default function Treatment() {
           ) : null}
         </>
       ) : null}
+
+      <VetPicker vets={vets} value={vet} onChange={setVet} />
 
       <Field label="Given on">
         {isBackdating ? (

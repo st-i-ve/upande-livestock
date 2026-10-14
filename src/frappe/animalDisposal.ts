@@ -26,6 +26,8 @@ export type CreateAnimalDisposalInput = {
   buyerContact?: string;
   reasonDetails?: string;
   witness?: string;
+  /** Livestock Vet id of the vet who attended. Defaults to the logged-in vet. */
+  vet?: string;
   costCenter?: string;
   incomeAccount?: string;
   disposalAccount?: string;
@@ -58,6 +60,7 @@ export const createAnimalDisposal = async (
   if (input.buyerContact) body.buyer_contact = input.buyerContact;
   if (input.reasonDetails) body.reason_details = input.reasonDetails;
   if (input.witness) body.witness = input.witness;
+  if (input.vet) body.vet = input.vet;
   if (input.giftedTo) body.gifted_to = input.giftedTo;
   if (input.giftDestination) body.gift_destination = input.giftDestination;
 

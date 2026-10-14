@@ -11,10 +11,12 @@ import { Chip, Chips } from "@/components/Chips";
 import { DateField } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { VetPicker } from "@/components/VetPicker";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -30,6 +32,7 @@ export default function PD() {
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
+  const { vets, vet, setVet } = useVetChoice();
   // The server decides who has a service awaiting a check, using the same rule
   // create_pregnancy_diagnosis enforces on submit. Deriving a second list here
   // is how a picker ends up offering a cow the server then refuses.
@@ -53,6 +56,7 @@ export default function PD() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
+          vet: vet || undefined,
           eventDate: isBackdating ? backdateDate : todayISO(),
           diagnosisResult: result,
           remarks: remarks || undefined,
@@ -121,8 +125,9 @@ export default function PD() {
           ))}
         </Chips>
       </Field>
+      <VetPicker vets={vets} value={vet} onChange={setVet} />
       <Field label="Remarks">
-        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Vet observations..." />
+        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Observations..." />
       </Field>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
