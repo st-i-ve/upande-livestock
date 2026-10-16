@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
@@ -21,6 +20,8 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
 type Result = "Confirmed" | "Not Pregnant" | "Aborted";
 
@@ -30,7 +31,12 @@ export default function PD() {
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -78,14 +84,16 @@ export default function PD() {
       "PD recorded",
       `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
     );
-    router.replace("/(tabs)/record/success?name=Pregnancy diagnosis");
+    finish("Pregnancy diagnosis");
   };
 
   return (
     <Screen
-      title="Pregnancy diagnosis"
+      title={titleFor("Pregnancy diagnosis", preset)}
       subtitle="Confirm or rule out"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type="pd" />}
     >
       {isBackdating ? <BackdateBanner /> : null}

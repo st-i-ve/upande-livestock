@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
@@ -20,13 +19,16 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
+import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 
 type DCTRow = {
   id: number;
@@ -41,7 +43,10 @@ export default function Dryoff() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const { data: herds = [] } = useHerds();
-  const { choices: stockChoices } = useEventItems("Drying Off");
+  // Drugs only where Drying Off posts stock, as the server's rule says.
+  const { choices: stockChoices, consumes } = useEventItems("Drying Off");
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
 
   const { operator, missingMessage } = useOperator();
   const { vets, vet, setVet } = useVetChoice();
@@ -49,6 +54,9 @@ export default function Dryoff() {
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [toHerdPick, setToHerd] = useState<string>("");
   const dryHerd = herds.find((h) => h.isDry)?.n ?? herds.find((h) => /steamer|dry/i.test(h.n))?.n ?? herds[0]?.n ?? "";
   const toHerd = toHerdPick || dryHerd;
@@ -83,7 +91,7 @@ export default function Dryoff() {
     if (selected.length === 0) return setError("Pick at least one cow to dry off.");
     if (!toHerd) return setError("Pick a destination herd.");
 
-    const drugIssues: AnimalDrugIssueInput[] = dctRows
+    const drugIssues: AnimalDrugIssueInput[] = (consumes ? dctRows : [])
       .filter((d) => d.itemCode.trim() && Number(d.qty) > 0)
       .map((d) => ({
         itemCode: d.itemCode.trim(),
@@ -135,14 +143,16 @@ export default function Dryoff() {
       stockNote ? "Drying off saved — stock issue pending" : "Drying off recorded",
       [parts.join(" · "), stockNote].filter(Boolean).join("\n\n"),
     );
-    router.replace("/(tabs)/record/success?name=Drying off");
+    finish("Drying off");
   };
 
   return (
     <Screen
-      title="Drying off"
+      title={titleFor("Drying off", preset)}
       subtitle="From a milking herd"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type="dryoff" />}
     >
       {isBackdating ? <BackdateBanner /> : null}
@@ -174,6 +184,9 @@ export default function Dryoff() {
         <Field label="Date"><Input value={serverToday} editable={false} /></Field>
       )}
 
+      {consumes ? (
+        <>
+          <AvailableStockButton eventType="Drying Off" />
       <Field
         label="DCT drugs (applied to every selected cow)"
         help="Each row issues stock for every selected cow; the server posts it. Picking an item picks the store that holds it; change it if another has stock."
@@ -222,6 +235,8 @@ export default function Dryoff() {
         ))}
         <Button label="Add drug" icon="plus" variant="outline" onPress={addDct} />
       </Field>
+        </>
+      ) : null}
 
       {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}

@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
@@ -16,6 +15,7 @@ import { Loader } from "@/components/Loader";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { VetPicker } from "@/components/VetPicker";
+import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields, type StockPick } from "@/components/StockItemFields";
 import { RADIUS } from "@/constants/theme";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
@@ -27,13 +27,17 @@ import { useEventItems } from "@/src/hooks/useEventItems";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useTreatAnimal } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 
 type Dose = {
   id: number;
   pick: StockPick;
+  /** What was given, in words, when Treatment does not post stock. */
+  drugName: string;
   qty: string;
   dosage: string;
   route: string;
@@ -44,6 +48,7 @@ type Dose = {
 const blankDose = (id: number): Dose => ({
   id,
   pick: { itemCode: "", uom: "", warehouse: "", batch: "" },
+  drugName: "",
   qty: "1",
   dosage: "",
   route: "",
@@ -72,12 +77,19 @@ export default function Treatment() {
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const options = useHealthOptions().data;
-  const { choices: stock } = useEventItems("Treatment");
+  // Stock fields only where Treatment posts stock (the server's rule). Where it
+  // does not, the drug is named in words and nothing leaves a store.
+  const { choices: stock, consumes } = useEventItems("Treatment");
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
   const mutation = useTreatAnimal();
   const { vets, vet, setVet, isExternal } = useVetChoice();
   const [vetFee, setVetFee] = useState("");
 
   const [animal, setAnimal] = useState<Animal | null>(null);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, animal, setAnimal);
+  const finish = useFinishRecording();
   const standingQ = useQuery({
     queryKey: ["animal-case", animal?.id],
     queryFn: () => getAnimalCase(animal!.id),
@@ -112,11 +124,13 @@ export default function Treatment() {
     if (!animal) return setError("Pick the animal.");
     if (standingQ.isLoading) return setError("Looking her file up — try again in a moment.");
     if (standingQ.error) return setError(extractFrappeError(standingQ.error));
-    const given = doses.filter((d) => d.pick.itemCode && Number(d.qty) > 0);
-    if (!given.length) return setError("Pick a drug and a quantity.");
+    const given = doses.filter((d) =>
+      consumes ? d.pick.itemCode && Number(d.qty) > 0 : d.drugName.trim(),
+    );
+    if (!given.length) return setError(consumes ? "Pick a drug and a quantity." : "Say what she was given.");
     if (fresh && !complaint.trim()) return setError("A new file needs a complaint on the front of it.");
 
-    const shortage = await findShortage(
+    const shortage = !consumes ? null : await findShortage(
       stock,
       given.map((d) => ({
         itemCode: d.pick.itemCode,
@@ -140,10 +154,12 @@ export default function Treatment() {
         vetFee: isExternal && Number(vetFee) > 0 ? Number(vetFee) : undefined,
         treatmentDate: isBackdating ? backdateDate : serverToday,
         doses: given.map((d) => ({
-          itemCode: d.pick.itemCode,
-          qty: Number(d.qty),
-          warehouse: d.pick.warehouse || undefined,
-          batch: d.pick.batch || undefined,
+          // No item fields at all where Treatment posts no stock.
+          itemCode: consumes ? d.pick.itemCode : undefined,
+          drugName: consumes ? undefined : d.drugName.trim(),
+          qty: consumes ? Number(d.qty) : 1,
+          warehouse: (consumes && d.pick.warehouse) || undefined,
+          batch: (consumes && d.pick.batch) || undefined,
           dosage: d.dosage.trim() || undefined,
           route: d.route || undefined,
           withdrawalDays: d.withdrawal ? Number(d.withdrawal) : undefined,
@@ -162,7 +178,7 @@ export default function Treatment() {
           : `Vet fee KES ${Number(fee.amount).toLocaleString()} noted on the record; ${fee.reason}`
         : "";
       Alert.alert("Treatment recorded", [said, stockNote, feeNote].filter(Boolean).join("\n\n"));
-      router.replace("/(tabs)/record/success?name=Treatment");
+      finish("Treatment");
     } catch (err) {
       setError(extractFrappeError(err));
     }
@@ -170,9 +186,11 @@ export default function Treatment() {
 
   return (
     <Screen
-      title="Treatment"
+      title={titleFor("Treatment", preset)}
       subtitle="Into her health file"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type="treatment" />}
     >
       {isBackdating ? <BackdateBanner /> : null}
@@ -264,20 +282,29 @@ export default function Treatment() {
       {doses.map((d, i) => (
         <View key={d.id} style={s.dose}>
           <Text style={s.fileTitle}>Drug {i + 1}</Text>
-          <StockItemFields
-            choices={stock}
-            value={d.pick}
-            onChange={(pick) => patch(d.id, { pick })}
-            qtyNeeded={Number(d.qty)}
-          />
-          <FieldRow>
-            <Field label="Qty" style={{ flex: 1 }}>
-              <Input value={d.qty} onChangeText={(t) => patch(d.id, { qty: t })} keyboardType="decimal-pad" />
+          {consumes ? (
+            <>
+              {i === 0 ? <AvailableStockButton eventType="Treatment" /> : null}
+              <StockItemFields
+                choices={stock}
+                value={d.pick}
+                onChange={(pick) => patch(d.id, { pick })}
+                qtyNeeded={Number(d.qty)}
+              />
+              <FieldRow>
+                <Field label="Qty" style={{ flex: 1 }}>
+                  <Input value={d.qty} onChangeText={(t) => patch(d.id, { qty: t })} keyboardType="decimal-pad" />
+                </Field>
+                <Field label="UOM" style={{ flex: 1 }}>
+                  <Input value={d.pick.uom} editable={false} placeholder="—" />
+                </Field>
+              </FieldRow>
+            </>
+          ) : (
+            <Field label="What she was given" help="Treatment does not take stock out of a store, so the drug is named here.">
+              <Input value={d.drugName} onChangeText={(t) => patch(d.id, { drugName: t })} placeholder="Oxytetracycline" />
             </Field>
-            <Field label="UOM" style={{ flex: 1 }}>
-              <Input value={d.pick.uom} editable={false} placeholder="—" />
-            </Field>
-          </FieldRow>
+          )}
           <FieldRow>
             <Field label="Dose" style={{ flex: 1 }}>
               <Input value={d.dosage} onChangeText={(t) => patch(d.id, { dosage: t })} placeholder="20 ml" />

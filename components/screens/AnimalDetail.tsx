@@ -98,10 +98,18 @@ export function AnimalDetail({ id }: { id: string }) {
   }
 
   const kind = kindOf({ ...a, stage });
+  const isFemaleAdult = kind === "cow" || kind === "heifer";
+  // In calf and milking: she has calved (so she is a cow, not an in-calf heifer).
+  const lactating = (a.parity ?? 0) > 0 || profile?.cycle.daysInMilk != null;
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
   const actions: Action[] = [
     { label: "Check up", route: "diagnosis", icon: "magnify" },
-    ...(kind === "cow" || kind === "heifer" ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
+    ...(isFemaleAdult ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
+    { label: "Treat", route: "treatment", icon: "medical-bag" },
+    ...(isFemaleAdult && stage === "served" ? [{ label: "PD", route: "pd", icon: "stethoscope" } as Action] : []),
+    ...(isFemaleAdult && stage === "confirmed" && lactating
+      ? [{ label: "Dry off", route: "dryoff", icon: "water-off" } as Action]
+      : []),
     { label: "Vaccinate", route: "vaccination", icon: "needle" },
     { label: "Deworm", route: "deworming", icon: "bug-outline" },
     { label: "Weigh", route: "weight", icon: "scale" },
