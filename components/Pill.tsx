@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { StyleSheet, Text, View } from "react-native";
 import { BACKDATE_AMBER_DARK, BACKDATE_AMBER_LIGHT } from "@/components/BackdateButton";
 import { useColors } from "@/src/hooks/useColors";
@@ -53,5 +54,5 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderWidth: StyleSheet.hairlineWidth,
       alignSelf: "flex-start",
     },
-    text: { fontSize: 10, fontWeight: "600" },
+    text: { fontSize: 10, ...font("600") },
   });

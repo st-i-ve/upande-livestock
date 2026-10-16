@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text } from "react-native";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 
 export function Picker<T extends string>({
@@ -45,7 +45,7 @@ export function Picker<T extends string>({
                 onPress={() => { onChange(o); setOpen(false); }}
                 style={({ pressed }) => [s.option, pressed && { backgroundColor: c.bgMuted }]}
               >
-                <Text style={[s.optText, o === value && { fontWeight: "700", color: c.text }]}>{o}</Text>
+                <Text style={[s.optText, o === value && { ...font("700"), color: c.text }]}>{o}</Text>
                 {o === value ? <MaterialCommunityIcons name="check" size={18} color={c.text} /> : null}
               </Pressable>
             ))}

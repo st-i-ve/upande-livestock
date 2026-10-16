@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { font } from "@/constants/theme";
 import React, { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
@@ -66,11 +67,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     },
     row: { flexDirection: "row", alignItems: "center", gap: 6 },
     primary: { backgroundColor: c.primary },
-    primaryText: { color: c.bg, fontSize: 16, fontWeight: "600" },
+    primaryText: { color: c.bg, fontSize: 16, ...font("600") },
     outline: { backgroundColor: "transparent", borderWidth: StyleSheet.hairlineWidth, borderColor: c.border },
-    outlineText: { color: c.text, fontSize: 16, fontWeight: "500" },
+    outlineText: { color: c.text, fontSize: 16, ...font("500") },
     danger: { backgroundColor: c.danger },
-    dangerText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+    dangerText: { color: "#fff", fontSize: 16, ...font("600") },
     link: { paddingVertical: 6, marginTop: 0 },
-    linkText: { color: c.text, fontSize: 14, fontWeight: "600", textDecorationLine: "underline" },
+    linkText: { color: c.text, fontSize: 14, ...font("600"), textDecorationLine: "underline" },
   });

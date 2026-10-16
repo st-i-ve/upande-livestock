@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams, useSegments } from "expo-router";
+import { font } from "@/constants/theme";
 import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -53,5 +54,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 999,
   },
-  label: { fontSize: 12, fontWeight: "600" },
+  label: { fontSize: 12, ...font("600") },
 });

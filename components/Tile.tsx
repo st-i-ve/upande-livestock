@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { font } from "@/constants/theme";
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
@@ -40,6 +41,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       padding: 12,
       gap: 5,
     },
-    title: { fontSize: 12, fontWeight: "600", color: c.text, marginTop: 2 },
+    title: { fontSize: 12, ...font("600"), color: c.text, marginTop: 2 },
     sub: { fontSize: 10, color: c.textMuted, marginTop: 2, lineHeight: 14 },
   });

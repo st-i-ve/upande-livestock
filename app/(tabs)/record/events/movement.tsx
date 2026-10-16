@@ -15,7 +15,7 @@ import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
@@ -232,8 +232,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,
     },
-    selName: { fontSize: 13, fontWeight: "600", color: c.text },
-    selId: { fontFamily: "monospace", fontSize: 11, fontWeight: "400", color: c.textSubtle },
+    selName: { fontSize: 13, ...font("600"), color: c.text },
+    selId: { fontSize: 11, ...font("400"), color: c.textSubtle },
     hint: {
       marginTop: 6,
       fontSize: 12,

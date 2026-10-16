@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { StyleSheet, Text, View } from "react-native";
 import { Pill } from "@/components/Pill";
 import { useColors } from "@/src/hooks/useColors";
@@ -50,7 +51,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     line: { width: 1, flex: 1, backgroundColor: c.borderSubtle, marginTop: 4 },
     body: { flex: 1, paddingLeft: 6 },
     date: { fontSize: 10, color: c.textSubtle, marginBottom: 1 },
-    title: { fontSize: 12, fontWeight: "600", color: c.text },
+    title: { fontSize: 12, ...font("600"), color: c.text },
     desc: { fontSize: 11, color: c.textMuted, marginTop: 1 },
     badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
   });

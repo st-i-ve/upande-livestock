@@ -66,6 +66,34 @@ export const FONT_FAMILY = {
   bold: "Poppins_700Bold",
 } as const;
 
+// Weight -> Poppins face. Android ignores `fontWeight` on a custom font, so
+// every weight must be its own family. Heavy weights (700+) resolve to
+// SemiBold on purpose: the UI reads calmer, emphasis is SemiBold not Bold.
+// Use FONT_FAMILY.bold directly where a true Bold is wanted.
+const WEIGHT_FAMILY: Record<string, string> = {
+  normal: FONT_FAMILY.regular,
+  "100": FONT_FAMILY.regular,
+  "200": FONT_FAMILY.regular,
+  "300": FONT_FAMILY.regular,
+  "400": FONT_FAMILY.regular,
+  "500": FONT_FAMILY.medium,
+  "600": FONT_FAMILY.semibold,
+  "700": FONT_FAMILY.semibold,
+  "800": FONT_FAMILY.semibold,
+  "900": FONT_FAMILY.semibold,
+  bold: FONT_FAMILY.semibold,
+};
+
+export function fontFamilyFor(weight?: string | number | null): string {
+  if (weight === undefined || weight === null) return FONT_FAMILY.regular;
+  return WEIGHT_FAMILY[String(weight)] ?? FONT_FAMILY.regular;
+}
+
+/** Use instead of a raw `fontWeight`: `{ fontSize: 14, ...font("600") }`. */
+export function font(weight?: string | number | null): { fontFamily: string } {
+  return { fontFamily: fontFamilyFor(weight) };
+}
+
 // Type scale bumped toward the Scout reference — larger, more legible sizes.
 export const FONT = {
   page: { size: 20, weight: "600" as const },

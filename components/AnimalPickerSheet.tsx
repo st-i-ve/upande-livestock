@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useColors } from "@/src/hooks/useColors";
 import { pillFor } from "@/services/utils";
@@ -191,7 +191,7 @@ export function AnimalPickerSheet({
                     <View style={[s.cb, allSelected && { backgroundColor: c.text, borderColor: c.text }]}>
                       {allSelected ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
                     </View>
-                    <Text style={[s.itemName, { fontWeight: "700" }]}>Select all ({list.length})</Text>
+                    <Text style={[s.itemName, { ...font("700") }]}>Select all ({list.length})</Text>
                   </Pressable>
                 ) : null
               }
@@ -234,7 +234,7 @@ export function AnimalPickerSheet({
           {mode === "multi" && list.length > 0 ? (
             <View style={s.bar}>
               <Text style={s.barText}>
-                <Text style={{ fontWeight: "700" }}>{selected.size}</Text> selected
+                <Text style={{ ...font("700") }}>{selected.size}</Text> selected
               </Text>
               <Button label="Confirm" onPress={confirm} style={{ marginTop: 0, paddingHorizontal: 16 }} />
             </View>
@@ -260,12 +260,12 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
   },
   handle: { width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  title: { fontSize: 14, fontWeight: "600", color: c.text },
+  title: { fontSize: 14, ...font("600"), color: c.text },
   tabs: { flexDirection: "row", backgroundColor: c.bgMuted, borderRadius: RADIUS.md, padding: 3, marginBottom: 10 },
   tab: { flex: 1, paddingVertical: 6, borderRadius: 6, alignItems: "center" },
   tabActive: { backgroundColor: c.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.borderSubtle },
   tabText: { fontSize: 11, color: c.textMuted },
-  tabTextActive: { color: c.text, fontWeight: "600" },
+  tabTextActive: { color: c.text, ...font("600") },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -293,7 +293,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     borderWidth: 1.5, borderColor: c.border,
     alignItems: "center", justifyContent: "center",
   },
-  itemName: { fontSize: 13, fontWeight: "600", color: c.text },
+  itemName: { fontSize: 13, ...font("600"), color: c.text },
   itemMeta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
   groupHeader: {
     flexDirection: "row",
@@ -305,7 +305,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     marginTop: 6,
     borderRadius: RADIUS.sm,
   },
-  groupTitle: { flex: 1, fontSize: 12, fontWeight: "700", color: c.text },
+  groupTitle: { flex: 1, fontSize: 12, ...font("700"), color: c.text },
   groupCount: { fontSize: 11, color: c.textMuted },
   bar: {
     flexDirection: "row",

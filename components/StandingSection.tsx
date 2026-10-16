@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
@@ -103,8 +104,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     scope: { fontSize: 12, color: c.textMuted },
     item: { gap: 4 },
     line: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
-    label: { fontSize: 14, color: c.text, fontWeight: "500" },
-    value: { fontSize: 14, color: c.text, fontWeight: "600" },
+    label: { fontSize: 14, color: c.text, ...font("500") },
+    value: { fontSize: 14, color: c.text, ...font("600") },
     sub: { fontSize: 12, color: c.textSubtle },
     track: { height: 8, borderRadius: 4, backgroundColor: c.bgMuted, overflow: "hidden" },
     fill: { height: 8, borderRadius: 4, backgroundColor: c.primary },

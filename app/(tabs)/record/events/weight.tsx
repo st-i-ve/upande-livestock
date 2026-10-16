@@ -15,7 +15,7 @@ import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { syncAnimals } from "@/src/db/sync";
 import {
   getWeightSettings,
@@ -374,8 +374,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,
     },
-    name: { fontSize: 13, fontWeight: "600", color: c.text },
-    id: { fontFamily: "monospace", fontSize: 11, fontWeight: "400", color: c.textSubtle },
+    name: { fontSize: 13, ...font("600"), color: c.text },
+    id: { fontSize: 11, ...font("400"), color: c.textSubtle },
     meta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
     cell: {
       height: 40,

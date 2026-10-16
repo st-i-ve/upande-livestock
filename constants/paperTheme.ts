@@ -7,6 +7,8 @@ import {
   type MD3Theme,
 } from "react-native-paper";
 
+import { fontFamilyFor } from "@/constants/theme";
+
 const INK = "#080808"; // primary text / accent
 const PAPER = "#FFFFFF"; // background
 const GRAPHITE = "#2B2B2B"; // secondary
@@ -31,11 +33,15 @@ const DARK_ELEVATION = {
   level5: "#2A2A2A",
 } as const;
 
-// React Native does not synthesise weights from a single face, but Paper's
-// variants only need one family; the app's Text.render patch handles weight
-// mapping globally. Point Paper at the regular Poppins face.
+// Android ignores fontWeight on a custom font, so each Paper variant gets the
+// Poppins face for its own weight (never rely on fontWeight).
 const fonts = configureFonts({
-  config: { fontFamily: "Poppins_400Regular" },
+  config: Object.fromEntries(
+    Object.entries(MD3LightTheme.fonts).map(([variant, f]) => [
+      variant,
+      { ...f, fontFamily: fontFamilyFor(f.fontWeight), fontWeight: "normal" },
+    ]),
+  ) as any,
 });
 
 export function getPaperTheme(scheme: "light" | "dark" | null | undefined): MD3Theme {

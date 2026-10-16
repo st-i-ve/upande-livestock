@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { font } from "@/constants/theme";
 import React from "react";
 import { Text } from "react-native";
 
@@ -13,7 +14,7 @@ export default function EventSuccess() {
   return (
     <Screen title={name || "Submitted"} subtitle="Submitted" back>
       <Banner tone="success">
-        <Text style={{ fontWeight: "700" }}>{name} submitted</Text>
+        <Text style={{ ...font("700") }}>{name} submitted</Text>
         {fullname ? `\nRecorded by ${fullname}.` : ""}
       </Banner>
       {/* "/(tabs)" no longer resolves — there is no tabs index route. Done

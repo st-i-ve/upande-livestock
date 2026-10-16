@@ -11,6 +11,7 @@ import {
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
@@ -26,6 +27,8 @@ import { startAnimalSync } from "@/src/db/sync";
 import { startAutoDrain } from "@/src/offline/autoDrain";
 import { queryClient } from "@/src/services/queryClient";
 import { useScheme, useThemeStore } from "@/src/theme/themeStore";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // React Navigation theme so the scene/card background matches the app theme —
 // this is what removes the white flash during push/pop and tab switches.
@@ -123,6 +126,10 @@ export default function RootLayout() {
   // Hold on a themed splash until fonts, theme preference, and the auth check
   // are all resolved — so we never flash the login screen on resume/cold start.
   const ready = fontsLoaded && hydrated && !authLoading;
+
+  React.useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
 
   if (!ready) {
     return (
