@@ -569,11 +569,37 @@ async function writes() {
       return m.error.slice(0, 60);
     });
   }
+  const uploadPng = async (tag) => {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    const form = new FormData();
+    form.append("file", new Blob([png], { type: "image/png" }), `smoke-${tag}-${Date.now()}.png`);
+    form.append("is_private", "0");
+    const up = msgOf(await http("POST", "/api/method/upload_file", { form }));
+    track("File", up.name);
+    return up.file_url;
+  };
+  await step("write", "animal_photos: a photo on the open file appears in her gallery", async () => {
+    const url = await uploadPng("case");
+    const m = msgOf(await post(`${M}.animals.animal_photos.add_animal_photo`, { animal: F1, file_url: url, context: "health_case", ref: ctx.case1, caption: "smoke" }));
+    if (m.ref_name !== ctx.case1) throw new Error(`attached to ${m.ref_name}`);
+    const g = msgOf(await post(`${M}.animals.animal_photos.animal_gallery`, { animal: F1 }));
+    const hit = g.photos.find((p) => p.url === url);
+    if (!hit || hit.source !== "Health case" || hit.caption !== "smoke") throw new Error(`gallery: ${JSON.stringify(g.photos).slice(0, 160)}`);
+    ctx.photoUrl = url;
+    return `${g.photos.length} in gallery`;
+  });
   await step("write", "health.close_health_case", async () => {
     const m = msgOf(await post(`${M}.health.close_health_case.close_health_case`, { payload: { case: ctx.case1, case_status: "Recovered", outcome_notes: "smoke", closed_date: today } }));
     const doc = await got("Livestock Health Case", ctx.case1);
     same(doc, { case_status: "Recovered", outcome_notes: "smoke" }, "closed case");
     return m.duration_days;
+  });
+  await step("write", "animal_photos: a closed case refuses a photo", async () => {
+    const url = await uploadPng("closed");
+    const r = await post(`${M}.animals.animal_photos.add_animal_photo`, { animal: F1, file_url: url, context: "health_case", ref: ctx.case1 });
+    const m = r.data?.message;
+    if (!m?.error || !/open/i.test(m.error)) throw new Error(`unexpected: ${JSON.stringify(m)?.slice(0, 120)}`);
+    return m.error.slice(0, 60);
   });
   await step("write", "health.create_health_case (blank cow)", async () => {
     const sent = { animal: F2, company: ctx.company, opened_date: today, opened_by: op, presenting_symptoms: "Limping, left fore", body_systems: "Feet / Hooves", provisional_diagnosis: "Lameness - Foot Rot", severity: "Mild", vet: VET_EXT };
