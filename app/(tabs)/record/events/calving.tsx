@@ -1,4 +1,3 @@
-import { useOnChange } from "@/src/hooks/useOnChange";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Alert } from "react-native";
@@ -16,6 +15,8 @@ import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { CalfPhotoField } from "@/components/CalfPhotoField";
+import { syncAnimals } from "@/src/db/sync";
+import type { CalfInput } from "@/src/frappe/calves";
 import type { FileAsset } from "@/src/frappe/files";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useBackdate } from "@/src/hooks/useBackdate";
@@ -26,6 +27,32 @@ import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+
+type CalfRow = {
+  key: number;
+  sex: "Female" | "Male";
+  burnName: string;
+  birthWt: string;
+  coat: string;
+  health: "Healthy" | "Weak" | "Needs Attention" | "Critical";
+  /** "" = the herd Settings routes this sex to. */
+  herdPick: string;
+  isStillborn: boolean;
+  photo: FileAsset | null;
+};
+
+let nextCalfKey = 1;
+const blankCalf = (): CalfRow => ({
+  key: nextCalfKey++,
+  sex: "Female",
+  burnName: "",
+  birthWt: "",
+  coat: "",
+  health: "Healthy",
+  herdPick: "",
+  isStillborn: false,
+  photo: null,
+});
 
 export default function Calving() {
   const { data: animals = [] } = useAnimals();
@@ -41,17 +68,9 @@ export default function Calving() {
   const [abortionCause, setAbortionCause] = useState<
     "Infectious" | "Nutritional" | "Traumatic" | "Congenital" | "Unknown" | "Other"
   >("Unknown");
-  const [sex, setSex] = useState<"Female" | "Male">("Female");
-  const [calfBook, setCalfBook] = useState("");
-  const [calfName, setCalfName] = useState("");
-  const [birthWt, setBirthWt] = useState("");
-  const [coatColour, setCoatColour] = useState("");
-  const [health, setHealth] = useState<"Healthy" | "Weak" | "Needs Attention" | "Critical">(
-    "Healthy",
-  );
-  const [calfPhoto, setCalfPhoto] = useState<FileAsset | null>(null);
+  const [coatNote, setCoatNote] = useState("");
+  const [calves, setCalves] = useState<CalfRow[]>(() => [blankCalf()]);
   const [toHerdPick, setToHerd] = useState<string>("");
-  const [calfHerdPick, setCalfTargetHerd] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const pregnantCount = animals.filter((a) => a.pregnant).length;
@@ -65,13 +84,13 @@ export default function Calving() {
       : (herds.find((h) => h.isMilking)?.n ?? herds[0]?.n ?? "");
   const toHerd = toHerdPick || defaultToHerd;
 
-  // Default calf target herd: Female → female_calf_herd,
-  // Male → male_calf_herd. Refreshes when sex flips.
-  const sexTarget = sex === "Female" ? settings?.female_calf_herd : settings?.male_calf_herd;
-  const settingsCalfHerd = sexTarget && herds.some((h) => h.n === sexTarget) ? sexTarget : "";
-  // A change of sex or outcome puts the default back, as before.
-  useOnChange(`${outcome}|${sex}|${settingsCalfHerd}`, () => setCalfTargetHerd(""));
-  const calfTargetHerd = calfHerdPick || settingsCalfHerd || herds[0]?.n || "";
+  // Default calf herd, per calf: Female -> female_calf_herd, Male -> male_calf_herd.
+  const defaultCalfHerd = (sex: "Female" | "Male") => {
+    const t = sex === "Female" ? settings?.female_calf_herd : settings?.male_calf_herd;
+    return t && herds.some((h) => h.n === t) ? t : (herds[0]?.n ?? "");
+  };
+  const patchCalf = (key: number, patch: Partial<CalfRow>) =>
+    setCalves((cs) => cs.map((c) => (c.key === key ? { ...c, ...patch } : c)));
 
   const mutation = useCreateAnimalEvent();
 
@@ -79,8 +98,8 @@ export default function Calving() {
     setError(null);
     if (!operator) return setError(missingMessage);
     if (!dam) return setError("Pick the dam (mother).");
-    if (outcome === "Live Birth" && (!calfBook.trim() || !calfName.trim())) {
-      return setError("Live births need a calf book number and burn name — the server uses these to create the Animal record.");
+    if (outcome === "Live Birth" && calves.some((c) => !c.isStillborn && !c.burnName.trim())) {
+      return setError("Give every live calf a name. Its book number is assigned when you save.");
     }
 
     // A pregnancy loss is not a calving with a bad outcome. It closes the
@@ -95,7 +114,7 @@ export default function Calving() {
           operator,
           eventDate: isBackdating ? backdateDate : serverToday,
           abortionCause,
-          abortionNotes: coatColour || undefined,
+          abortionNotes: coatNote || undefined,
         });
         Alert.alert(
           "Abortion recorded",
@@ -117,29 +136,38 @@ export default function Calving() {
         eventDate: isBackdating ? backdateDate : serverToday,
         calvingOutcome: outcome as "Live Birth" | "Still Birth",
         toHerd: toHerd || undefined,
-        calfBookNumber: outcome === "Live Birth" ? calfBook.trim() : undefined,
-        calfBurnName: outcome === "Live Birth" ? calfName.trim() : undefined,
-        calfGender: outcome === "Live Birth" ? sex : undefined,
-        calfTargetHerd: outcome === "Live Birth" ? calfTargetHerd || undefined : undefined,
-        calfHealthStatus: outcome === "Live Birth" ? health : undefined,
-        birthWeightKg: birthWt ? Number(birthWt) : undefined,
-        coatColour: coatColour || undefined,
-        calfPhoto: outcome === "Live Birth" && calfPhoto ? calfPhoto : undefined,
+        calves:
+          outcome === "Live Birth"
+            ? calves.map(
+                (c): CalfInput => ({
+                  sex: c.sex,
+                  burnName: c.burnName.trim(),
+                  birthWeightKg: c.birthWt ? Number(c.birthWt) : undefined,
+                  coatColour: c.coat || undefined,
+                  healthStatus: c.health,
+                  herd: c.herdPick || defaultCalfHerd(c.sex) || undefined,
+                  isStillborn: c.isStillborn,
+                  photo: c.photo,
+                }),
+              )
+            : [{ sex: calves[0]?.sex ?? "Female", isStillborn: true }],
       });
 
-      // The photo (if any) was uploaded by createAnimalEvent and the server set it
-      // as the calf image; a failed upload costs the photo, never the birth.
-      const calf = r?.calves?.[0];
-      if (outcome === "Live Birth" && calf?.animal) {
+      // The server numbered each calf (A heifers, B bulls). Show them, then pull
+      // them into the phone's own animal store now rather than at the next tick.
+      const born: { animal: string; tag?: string; herd?: string }[] = r?.calves ?? [];
+      void syncAnimals();
+      if (outcome === "Live Birth" && born.length) {
         const photoLine =
           r?.photo === "attached"
             ? "\nPhoto saved on the calf's record."
             : r?.photo === "failed"
-              ? "\nThe photo could not be uploaded, so the calf has none yet. Add it from the animal's page."
+              ? "\nA photo could not be uploaded, so that calf has none yet. Add it from the animal's page."
               : "";
+        const lines = born.map((c) => `${c.animal} in ${c.herd || "—"}`).join("\n");
         Alert.alert(
           "Calving recorded",
-          `${dam.name} calved. Calf ${calf.tag} created in ${calf.herd || "—"}.${photoLine}`,
+          `${dam.name} calved ${born.length === 1 ? "one calf" : `${born.length} calves`}:\n${lines}${photoLine}`,
         );
         router.replace("/(tabs)/record/success?name=Calving");
         return;
@@ -215,8 +243,8 @@ export default function Calving() {
           </Field>
           <Field label="Notes">
             <Input
-              value={coatColour}
-              onChangeText={setCoatColour}
+              value={coatNote}
+              onChangeText={setCoatNote}
               placeholder="What was observed"
             />
           </Field>
@@ -225,46 +253,73 @@ export default function Calving() {
 
       {outcome === "Live Birth" ? (
         <>
-          <SectionTitle>Calf details</SectionTitle>
-          <Field
-            label="Calf moves to herd"
-            help={sex === "Female" ? "Default: heifer herd from Livestock Settings." : "Default: bull herd from Livestock Settings."}
-          >
-            <Picker value={calfTargetHerd} onChange={setCalfTargetHerd} options={herds.map((h) => h.n)} />
-          </Field>
-          <Field label="Calf book number">
-            <Input value={calfBook} onChangeText={setCalfBook} placeholder="e.g. A001/26" autoCapitalize="characters" />
-          </Field>
-          <FieldRow>
-            <Field label="Calf burn name" style={{ flex: 1 }}>
-              <Input value={calfName} onChangeText={setCalfName} placeholder="e.g. BLOSSOM" autoCapitalize="characters" />
-            </Field>
-            <Field label="Sex" style={{ flex: 1 }}>
-              <Chips>
-                <Chip label="Female" active={sex === "Female"} onPress={() => setSex("Female")} />
-                <Chip label="Male" active={sex === "Male"} onPress={() => setSex("Male")} />
-              </Chips>
-            </Field>
-          </FieldRow>
-          <FieldRow>
-            <Field label="Birth weight (kg)" style={{ flex: 1 }}>
-              <Input value={birthWt} onChangeText={setBirthWt} keyboardType="numeric" placeholder="36" />
-            </Field>
-            <Field label="Coat colour" style={{ flex: 1 }}>
-              <Input value={coatColour} onChangeText={setCoatColour} placeholder="Black & White" />
-            </Field>
-          </FieldRow>
-          <Field
-            label="Condition at birth"
-            help="Goes onto the calf's own record. A weak calf found early is a calf that survives."
-          >
-            <Picker
-              value={health}
-              onChange={(v) => setHealth(v as typeof health)}
-              options={["Healthy", "Weak", "Needs Attention", "Critical"]}
-            />
-          </Field>
-          <CalfPhotoField value={calfPhoto} onChange={setCalfPhoto} />
+          {calves.map((c, i) => (
+            <React.Fragment key={c.key}>
+              <SectionTitle>{calves.length > 1 ? `Calf ${i + 1} of ${calves.length}` : "Calf details"}</SectionTitle>
+              <Field label="Sex">
+                <Chips>
+                  <Chip label="Female" active={c.sex === "Female"} onPress={() => patchCalf(c.key, { sex: "Female", herdPick: "" })} />
+                  <Chip label="Male" active={c.sex === "Male"} onPress={() => patchCalf(c.key, { sex: "Male", herdPick: "" })} />
+                  <Chip label="Stillborn" active={c.isStillborn} onPress={() => patchCalf(c.key, { isStillborn: !c.isStillborn })} />
+                </Chips>
+              </Field>
+              <Field
+                label="Calf book number"
+                help={c.sex === "Female" ? "A series (heifer). The next number is given when you save." : "B series (bull). The next number is given when you save."}
+              >
+                <Input value={c.isStillborn ? "None - stillborn" : "Book no. assigned on save"} editable={false} />
+              </Field>
+              {c.isStillborn ? null : (
+                <>
+                  <Field
+                    label="Calf moves to herd"
+                    help={c.sex === "Female" ? "Default: heifer herd from Livestock Settings." : "Default: bull herd from Livestock Settings."}
+                  >
+                    <Picker
+                      value={c.herdPick || defaultCalfHerd(c.sex)}
+                      onChange={(v) => patchCalf(c.key, { herdPick: v })}
+                      options={herds.map((h) => h.n)}
+                    />
+                  </Field>
+                  <Field label="Calf name">
+                    <Input value={c.burnName} onChangeText={(v) => patchCalf(c.key, { burnName: v })} placeholder="e.g. BLOSSOM" autoCapitalize="characters" />
+                  </Field>
+                  <FieldRow>
+                    <Field label="Birth weight (kg)" style={{ flex: 1 }}>
+                      <Input value={c.birthWt} onChangeText={(v) => patchCalf(c.key, { birthWt: v })} keyboardType="numeric" placeholder="36" />
+                    </Field>
+                    <Field label="Coat colour" style={{ flex: 1 }}>
+                      <Input value={c.coat} onChangeText={(v) => patchCalf(c.key, { coat: v })} placeholder="Black & White" />
+                    </Field>
+                  </FieldRow>
+                  <Field
+                    label="Condition at birth"
+                    help="Goes onto the calf's own record. A weak calf found early is a calf that survives."
+                  >
+                    <Picker
+                      value={c.health}
+                      onChange={(v) => patchCalf(c.key, { health: v as CalfRow["health"] })}
+                      options={["Healthy", "Weak", "Needs Attention", "Critical"]}
+                    />
+                  </Field>
+                  <CalfPhotoField value={c.photo} onChange={(a) => patchCalf(c.key, { photo: a })} />
+                </>
+              )}
+              {calves.length > 1 ? (
+                <Button
+                  label={`Remove calf ${i + 1}`}
+                  variant="outline"
+                  onPress={() => setCalves((cs) => cs.filter((x) => x.key !== c.key))}
+                />
+              ) : null}
+            </React.Fragment>
+          ))}
+          <Button
+            label="Add another calf (twins)"
+            variant="outline"
+            icon="plus"
+            onPress={() => setCalves((cs) => [...cs, blankCalf()])}
+          />
         </>
       ) : null}
 
