@@ -1,18 +1,19 @@
 import { router } from "expo-router";
 import React, { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
 import { Loader } from "@/components/Loader";
-import { MetricGrid } from "@/components/MetricGrid";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { Tile, TileGrid } from "@/components/Tile";
+import { StandingSection } from "@/components/StandingSection";
 import { Timeline } from "@/components/Timeline";
 import { AnimalImage } from "@/components/AnimalImage";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
+import { kindOf } from "@/src/animalKind";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimal, useAnimalProfile } from "@/src/hooks/useAnimal";
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
@@ -96,6 +97,17 @@ export function AnimalDetail({ id }: { id: string }) {
     );
   }
 
+  const kind = kindOf({ ...a, stage });
+  type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
+  const actions: Action[] = [
+    { label: "Check up", route: "diagnosis", icon: "magnify" },
+    ...(kind === "cow" || kind === "heifer" ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
+    { label: "Vaccinate", route: "vaccination", icon: "needle" },
+    { label: "Deworm", route: "deworming", icon: "bug-outline" },
+    { label: "Weigh", route: "weight", icon: "scale" },
+    { label: "Move", route: "movement", icon: "arrow-left-right" },
+  ];
+
   return (
     <Screen
       title={a.name}
@@ -110,57 +122,52 @@ export function AnimalDetail({ id }: { id: string }) {
         </Banner>
       ) : null}
 
-      <View style={s.portrait}>
-        <AnimalImage image={a.image ?? profile?.photo} style={s.photo} iconSize={72} />
-        <View style={s.caption}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.capName} numberOfLines={1}>{a.name}</Text>
-            <Text style={s.capId}>{a.id}</Text>
+      <View style={s.header}>
+        <AnimalImage image={a.image ?? profile?.photo} animal={{ ...a, stage }} style={s.photo} />
+        <View style={s.details}>
+          <Text style={s.name} numberOfLines={1}>{a.name}</Text>
+          <Text style={s.capId} numberOfLines={1}>{a.id}</Text>
+          {stage ? (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{STAGE_LABELS[stage] ?? stage}</Text>
+            </View>
+          ) : null}
+          <View style={s.facts}>
+            <Fact label="Age" value={ageFrom(a.dob)} />
+            <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
+            <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
+            <Fact label="Herd" value={a.herd || "no herd"} />
+            <Fact label="Dam" value={a.dam || "—"} />
+            <Fact label="Sire" value={a.sire || "—"} />
+            <Fact label="Parity" value={String(a.parity ?? 0)} />
+            <Fact label="Weight" value={a.lastWt ? `${a.lastWt} kg` : "—"} />
+            {profile?.cycle.daysInMilk != null ? (
+              <Fact label="Days in milk" value={`${profile.cycle.daysInMilk}`} />
+            ) : null}
           </View>
-          {stage ? <Text style={s.stage}>{STAGE_LABELS[stage] ?? stage}</Text> : null}
         </View>
       </View>
 
-      <View style={s.facts}>
-        <Fact label="Age" value={ageFrom(a.dob)} />
-        <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
-        <Fact label="Herd" value={a.herd || "no herd"} />
-        <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
-        <Fact label="Dam" value={a.dam || "—"} />
-        <Fact label="Sire" value={a.sire || "—"} />
-      </View>
-
-      <MetricGrid
-        items={[
-          { label: "Last weight", value: a.lastWt ? `${a.lastWt} kg` : "—" },
-          {
-            label: "Parity / DIM",
-            value: `${a.parity}${profile?.cycle.daysInMilk != null ? ` / ${profile.cycle.daysInMilk}d` : ""}`,
-            small: true,
-          },
-        ]}
-      />
-
-      {canRecord ? (
-        <>
-      <SectionTitle>Quick actions</SectionTitle>
-      <TileGrid>
-        <Tile icon="magnify" title="Check up" onPress={() => router.push(`/(tabs)/animals/act/diagnosis?animal=${encodeURIComponent(id)}`)} />
-        {a.repro === "Calf" ? (
-          <>
-            <Tile icon="scale" title="Weigh" onPress={() => router.push(`/(tabs)/animals/act/weight?animal=${encodeURIComponent(id)}`)} />
-            <Tile icon="arrow-left-right" title="Move" onPress={() => router.push(`/(tabs)/animals/act/movement?animal=${encodeURIComponent(id)}`)} />
-          </>
-        ) : (
-          <>
-            <Tile icon="needle" title="Vaccinate" onPress={() => router.push(`/(tabs)/animals/act/vaccination?animal=${encodeURIComponent(id)}`)} />
-            <Tile icon="heart" title="Service" onPress={() => router.push(`/(tabs)/animals/act/service?animal=${encodeURIComponent(id)}`)} />
-            <Tile icon="arrow-left-right" title="Move" onPress={() => router.push(`/(tabs)/animals/act/movement?animal=${encodeURIComponent(id)}`)} />
-          </>
-        )}
-      </TileGrid>
-        </>
+      {canRecord && actions.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.actions}>
+          {actions.map((x) => (
+            <Pressable
+              key={x.label}
+              accessibilityRole="button"
+              accessibilityLabel={x.label}
+              onPress={() => router.push(`/(tabs)/animals/act/${x.route}?animal=${encodeURIComponent(id)}` as never)}
+              style={s.action}
+            >
+              <View style={s.actionCircle}>
+                <MaterialCommunityIcons name={x.icon} size={22} color={c.text} />
+              </View>
+              <Text style={s.actionLabel} numberOfLines={1}>{x.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       ) : null}
+
+      <StandingSection id={id} />
 
       <SectionTitle>History</SectionTitle>
       {eventsLoading ? (
@@ -184,34 +191,33 @@ export function AnimalDetail({ id }: { id: string }) {
 function Fact({ label, value }: { label: string; value: string }) {
   const c = useColors();
   return (
-    <View style={{ width: "50%", paddingVertical: 6, paddingRight: 8 }}>
-      <Text style={{ fontSize: 10, fontWeight: "500", letterSpacing: 1.2, textTransform: "uppercase", color: c.textSubtle }}>
+    <View style={{ width: "50%", paddingVertical: 3, paddingRight: 6 }}>
+      <Text style={{ fontSize: 9, fontWeight: "500", letterSpacing: 1, textTransform: "uppercase", color: c.textSubtle }}>
         {label}
       </Text>
-      <Text style={{ fontSize: 14, color: c.text }} numberOfLines={1}>{value}</Text>
+      <Text style={{ fontSize: 13, color: c.text }} numberOfLines={1}>{value}</Text>
     </View>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    portrait: { borderRadius: 14, overflow: "hidden", backgroundColor: c.bgMuted, marginBottom: 8 },
-    photo: { width: "100%", aspectRatio: 4 / 3 },
-    caption: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      bottom: 0,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: 8,
-      paddingHorizontal: 14,
-      paddingBottom: 10,
-      paddingTop: 28,
-      backgroundColor: "rgba(10,10,10,0.55)",
+    header: { flexDirection: "row", gap: 14, alignItems: "flex-start", marginBottom: 14 },
+    photo: { width: 120, height: 120, borderRadius: 18 },
+    details: { flex: 1, minWidth: 0 },
+    name: { fontSize: 20, fontWeight: "700", color: c.text },
+    capId: { fontSize: 12, color: c.textSubtle, fontFamily: "monospace" },
+    badge: {
+      alignSelf: "flex-start", marginTop: 4, borderWidth: 1, borderColor: c.border, borderRadius: 8,
+      paddingHorizontal: 8, paddingVertical: 1,
     },
-    capName: { fontSize: 18, fontWeight: "600", color: "#fff" },
-    capId: { fontSize: 12, color: "rgba(255,255,255,0.75)" },
-    stage: { fontSize: 11, fontWeight: "600", color: "#fff", textTransform: "uppercase", letterSpacing: 1 },
-    facts: { flexDirection: "row", flexWrap: "wrap", marginBottom: 8 },
+    badgeText: { fontSize: 11, fontWeight: "600", color: c.textMuted, textTransform: "uppercase", letterSpacing: 0.8 },
+    facts: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
+    actions: { gap: 14, paddingVertical: 4, paddingRight: 8 },
+    action: { alignItems: "center", width: 64, gap: 5 },
+    actionCircle: {
+      width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center",
+      backgroundColor: c.bgMuted, borderWidth: 1, borderColor: c.borderSubtle,
+    },
+    actionLabel: { fontSize: 11, color: c.textMuted },
   });
