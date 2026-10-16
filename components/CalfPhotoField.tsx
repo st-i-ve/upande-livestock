@@ -16,10 +16,12 @@ export function CalfPhotoField({
   value,
   onChange,
   label = "Calf photo",
+  help = "Optional. It becomes the calf's picture on its record. It is uploaded when you submit.",
 }: {
   value: FileAsset | null;
   onChange: (asset: FileAsset | null) => void;
   label?: string;
+  help?: string;
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
@@ -41,7 +43,7 @@ export function CalfPhotoField({
   return (
     <Field
       label={label}
-      help="Optional. It becomes the calf's picture on its record. It is uploaded when you submit."
+      help={help}
     >
       {value ? <Image source={{ uri: value.uri }} style={s.preview} resizeMode="cover" /> : null}
       <View style={s.row}>

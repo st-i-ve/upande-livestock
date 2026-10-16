@@ -8,6 +8,7 @@ import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
+import { CalfPhotoField } from "@/components/CalfPhotoField";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
@@ -19,6 +20,8 @@ import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields, type StockPick } from "@/components/StockItemFields";
 import { RADIUS } from "@/constants/theme";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
+import { addAnimalPhoto } from "@/src/frappe/animalPhotos";
+import type { FileAsset } from "@/src/frappe/files";
 import { getAnimalCase } from "@/src/frappe/treatment";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
@@ -105,6 +108,7 @@ export default function Treatment() {
   const [complaint, setComplaint] = useState("");
   const [suspected, setSuspected] = useState("");
   const [severity, setSeverity] = useState("");
+  const [photo, setPhoto] = useState<FileAsset | null>(null);
   const [doses, setDoses] = useState<Dose[]>(() => [blankDose(1)]);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -115,6 +119,7 @@ export default function Treatment() {
   const pickAnimal = (a: Animal) => {
     setAnimal(a);
     setFreshPick(null);
+    setPhoto(null);
   };
 
   const submit = async () => {
@@ -177,7 +182,18 @@ export default function Treatment() {
           ? `Vet fee KES ${Number(fee.amount).toLocaleString()} posted.`
           : `Vet fee KES ${Number(fee.amount).toLocaleString()} noted on the record; ${fee.reason}`
         : "";
-      Alert.alert("Treatment recorded", [said, stockNote, feeNote].filter(Boolean).join("\n\n"));
+      // The treatment stands whatever happens to the picture; the server
+      // decides whether the file may take it (it is open, it is hers).
+      let photoNote = "";
+      if (photo && d.case) {
+        try {
+          await addAnimalPhoto({ animal: animal.id, asset: photo, context: "health_case", ref: d.case });
+          photoNote = "Photo added to the file.";
+        } catch (pe) {
+          photoNote = `The treatment is recorded but the photo was not added: ${extractFrappeError(pe)}`;
+        }
+      }
+      Alert.alert("Treatment recorded", [said, stockNote, feeNote, photoNote].filter(Boolean).join("\n\n"));
       finish("Treatment");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -340,6 +356,15 @@ export default function Treatment() {
         variant="outline"
         onPress={() => setDoses((r) => [...r, blankDose(Date.now())])}
       />
+
+      {animal && standing ? (
+        <CalfPhotoField
+          label="Photo of her (optional)"
+          help="Goes into her health file with the treatment. It is uploaded when you record it."
+          value={photo}
+          onChange={setPhoto}
+        />
+      ) : null}
 
       {warning ? (
         <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner>

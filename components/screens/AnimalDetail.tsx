@@ -12,6 +12,7 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { StandingSection } from "@/components/StandingSection";
 import { Timeline } from "@/components/Timeline";
 import { AnimalImage } from "@/components/AnimalImage";
+import { AnimalPhotos } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { kindOf } from "@/src/animalKind";
 import { extractFrappeError } from "@/src/services/api";
@@ -174,6 +175,8 @@ export function AnimalDetail({ id }: { id: string }) {
           ))}
         </ScrollView>
       ) : null}
+
+      <AnimalPhotos id={id} isCalf={kind === "calf"} hasCalved={isFemaleAdult && (a.parity ?? 0) > 0} />
 
       <StandingSection id={id} />
 
