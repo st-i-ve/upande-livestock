@@ -142,7 +142,7 @@ export function AnimalPhotos({
   );
 }
 
-function Viewer({ photos, start, onClose }: { photos: AnimalPhoto[]; start: number; onClose: () => void }) {
+export function Viewer({ photos, start, onClose }: { photos: AnimalPhoto[]; start: number; onClose: () => void }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const { width, height } = useWindowDimensions();

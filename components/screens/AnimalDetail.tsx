@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -12,12 +12,13 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { StandingSection } from "@/components/StandingSection";
 import { Timeline } from "@/components/Timeline";
 import { AnimalImage } from "@/components/AnimalImage";
-import { AnimalPhotos } from "@/components/AnimalPhotos";
+import { AnimalPhotos, Viewer } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { kindOf } from "@/src/animalKind";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimal, useAnimalProfile } from "@/src/hooks/useAnimal";
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
+import { useAnimalGallery } from "@/src/hooks/useAnimalGallery";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
@@ -33,6 +34,8 @@ export function AnimalDetail({ id }: { id: string }) {
   const online = useAnimal(id);
   const profileQ = useAnimalProfile(id);
   const profile = profileQ.data ?? null;
+  const gallery = useAnimalGallery(id).data?.photos ?? [];
+  const [viewing, setViewing] = useState<number | null>(null);
   const a = local.data
     ? { ...local.data, inTreatment: online.data?.inTreatment ?? 0, milkSafe: online.data?.milkSafe ?? null }
     : (online.data ?? null);
@@ -131,30 +134,47 @@ export function AnimalDetail({ id }: { id: string }) {
         </Banner>
       ) : null}
 
-      <View style={s.header}>
-        <AnimalImage image={a.image ?? profile?.photo} animal={{ ...a, stage }} style={s.photo} />
-        <View style={s.details}>
-          <Text style={s.name} numberOfLines={1}>{a.name}</Text>
-          <Text style={s.capId} numberOfLines={1}>{a.id}</Text>
-          {stage ? (
-            <View style={s.badge}>
-              <Text style={s.badgeText}>{STAGE_LABELS[stage] ?? stage}</Text>
-            </View>
-          ) : null}
-          <View style={s.facts}>
-            <Fact label="Age" value={ageFrom(a.dob)} />
-            <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
-            <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
-            <Fact label="Herd" value={a.herd || "no herd"} />
-            <Fact label="Dam" value={a.dam || "—"} />
-            <Fact label="Sire" value={a.sire || "—"} />
-            <Fact label="Parity" value={String(a.parity ?? 0)} />
-            <Fact label="Weight" value={a.lastWt ? `${a.lastWt} kg` : "—"} />
-            {profile?.cycle.daysInMilk != null ? (
-              <Fact label="Days in milk" value={`${profile.cycle.daysInMilk}`} />
+      <Pressable
+        accessibilityRole="imagebutton"
+        accessibilityLabel="Open her photos"
+        disabled={!gallery.length}
+        onPress={() => {
+          const mine = a.image ?? profile?.photo;
+          const i = mine ? gallery.findIndex((p) => p.url === mine) : -1;
+          setViewing(i >= 0 ? i : 0);
+        }}
+        style={s.hero}
+      >
+        <AnimalImage image={a.image ?? profile?.photo} animal={{ ...a, stage }} style={s.heroPhoto} />
+        <View style={s.heroShade}>
+          <Text style={s.heroName} numberOfLines={1}>{a.name}</Text>
+          <Text style={s.heroId} numberOfLines={1}>{a.id}</Text>
+          <View style={s.heroRow}>
+            {stage ? (
+              <View style={s.heroBadge}>
+                <Text style={s.heroBadgeText}>{STAGE_LABELS[stage] ?? stage}</Text>
+              </View>
             ) : null}
+            <Text style={s.heroMeta} numberOfLines={1}>
+              {ageFrom(a.dob)} · {a.herd || "no herd"}
+            </Text>
           </View>
         </View>
+      </Pressable>
+      {viewing !== null && gallery.length ? (
+        <Viewer photos={gallery} start={viewing} onClose={() => setViewing(null)} />
+      ) : null}
+
+      <View style={s.facts}>
+        <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
+        <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
+        <Fact label="Dam" value={a.dam || "—"} />
+        <Fact label="Sire" value={a.sire || "—"} />
+        <Fact label="Parity" value={String(a.parity ?? 0)} />
+        <Fact label="Weight" value={a.lastWt ? `${a.lastWt} kg` : "—"} />
+        {profile?.cycle.daysInMilk != null ? (
+          <Fact label="Days in milk" value={`${profile.cycle.daysInMilk}`} />
+        ) : null}
       </View>
 
       {canRecord && actions.length ? (
@@ -213,17 +233,19 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    header: { flexDirection: "row", gap: 14, alignItems: "flex-start", marginBottom: 14 },
-    photo: { width: 120, height: 120, borderRadius: 18 },
-    details: { flex: 1, minWidth: 0 },
-    name: { fontSize: 20, fontWeight: "700", color: c.text },
-    capId: { fontSize: 12, color: c.textSubtle, fontFamily: "monospace" },
-    badge: {
-      alignSelf: "flex-start", marginTop: 4, borderWidth: 1, borderColor: c.border, borderRadius: 8,
-      paddingHorizontal: 8, paddingVertical: 1,
+    hero: { width: "100%", aspectRatio: 4 / 3, borderRadius: 20, overflow: "hidden", marginBottom: 12, backgroundColor: c.bgMuted },
+    heroPhoto: { width: "100%", height: "100%" },
+    heroShade: {
+      position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, paddingTop: 36,
+      backgroundColor: "rgba(0,0,0,0.45)",
     },
-    badgeText: { fontSize: 11, fontWeight: "600", color: c.textMuted, textTransform: "uppercase", letterSpacing: 0.8 },
-    facts: { flexDirection: "row", flexWrap: "wrap", marginTop: 6 },
+    heroName: { fontSize: 24, fontWeight: "700", color: "#fff" },
+    heroId: { fontSize: 12, color: "rgba(255,255,255,0.8)", fontFamily: "monospace" },
+    heroRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
+    heroBadge: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 1 },
+    heroBadgeText: { fontSize: 11, fontWeight: "600", color: "#fff", textTransform: "uppercase", letterSpacing: 0.8 },
+    heroMeta: { flexShrink: 1, fontSize: 13, color: "#fff" },
+    facts: { flexDirection: "row", flexWrap: "wrap", marginBottom: 12 },
     actions: { gap: 14, paddingVertical: 4, paddingRight: 8 },
     action: { alignItems: "center", width: 64, gap: 5 },
     actionCircle: {
