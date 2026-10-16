@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { ANIMAL_PHOTO_CREDITS } from "@/src/animalKind";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -160,6 +161,9 @@ export default function Profile() {
         <Pressable style={s.versionContainer}>
           <Text style={s.versionText}>Version {appVersion}</Text>
           <Text style={s.versionText}>{runtimeLabel}</Text>
+          <Text style={s.versionText}>
+            {"Photos: " + ANIMAL_PHOTO_CREDITS.map((x) => `${x.author}, ${x.licence}`).join("; ")}
+          </Text>
         </Pressable>
       </ScrollView>
 

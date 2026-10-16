@@ -55,9 +55,8 @@ export function AnimalImage({
       ) : (
         <Image
           source={KIND_IMAGES[kindOf(animal)]}
-          tintColor={c.textSubtle}
-          contentFit="contain"
-          style={{ width: "78%", height: "78%" }}
+          contentFit="cover"
+          style={{ width: "100%", height: "100%" }}
         />
       )}
     </View>

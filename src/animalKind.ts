@@ -2,14 +2,22 @@ import type { ImageSourcePropType } from "react-native";
 
 export type AnimalKind = "cow" | "heifer" | "calf" | "bull";
 
-/** Black silhouettes, tinted by the theme where they are shown. Drawn by
- *  scripts/build_animal_silhouettes.py from the desk's cow mark. */
+/** Generic photos (512px square) for an animal with no picture of her own.
+ *  Sources and licences: assets/animals/CREDITS.md, ANIMAL_PHOTO_CREDITS below. */
 export const KIND_IMAGES: Record<AnimalKind, ImageSourcePropType> = {
-  cow: require("@/assets/animals/cow.png"),
-  heifer: require("@/assets/animals/heifer.png"),
-  calf: require("@/assets/animals/calf.png"),
-  bull: require("@/assets/animals/bull.png"),
+  cow: require("@/assets/animals/photo-cow.jpg"),
+  heifer: require("@/assets/animals/photo-heifer.jpg"),
+  calf: require("@/assets/animals/photo-calf.jpg"),
+  bull: require("@/assets/animals/photo-bull.jpg"),
 };
+
+/** Shown on the Profile screen: CC BY and BY-SA ask for attribution. */
+export const ANIMAL_PHOTO_CREDITS = [
+  { kind: "cow", author: "Tom Igodt", licence: "CC BY 4.0" },
+  { kind: "heifer", author: "John Haynes", licence: "CC BY-SA 2.0" },
+  { kind: "calf", author: "Ranjithkumar Murugesan", licence: "CC0" },
+  { kind: "bull", author: "Homoatrox", licence: "CC BY-SA 3.0" },
+] as const;
 
 export type KindFacts = {
   sex?: string | null;
