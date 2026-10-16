@@ -1,24 +1,27 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { StyleProp, View, ViewStyle } from "react-native";
 
 import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
+import { KIND_IMAGES, kindOf, type KindFacts } from "@/src/animalKind";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
- * The animal's picture, or a silhouette when she has none. Loaded lazily by
+ * The animal's picture, or a generic cow, heifer, calf or bull when she has none. Loaded lazily by
  * the view that shows it (no bulk prefetch) and kept on disk by expo-image, so
  * a picture seen once is there offline. Private files need the session cookie.
  */
 export function AnimalImage({
   image,
   style,
-  iconSize = 18,
+  animal,
 }: {
   image?: string | null;
   style?: StyleProp<ViewStyle>;
+  /** Her sex, age and stage, to pick the generic picture when she has no photo. */
+  animal?: KindFacts | null;
+  /** Kept for callers written before the generic pictures; unused. */
   iconSize?: number;
 }) {
   const c = useColors();
@@ -50,7 +53,12 @@ export function AnimalImage({
           style={{ width: "100%", height: "100%" }}
         />
       ) : (
-        <MaterialCommunityIcons name="cow" size={iconSize} color={c.textSubtle} />
+        <Image
+          source={KIND_IMAGES[kindOf(animal)]}
+          tintColor={c.textSubtle}
+          contentFit="contain"
+          style={{ width: "78%", height: "78%" }}
+        />
       )}
     </View>
   );

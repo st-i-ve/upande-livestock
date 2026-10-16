@@ -125,7 +125,7 @@ export function AnimalPickerSheet({
             {isSel ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
           </View>
         ) : null}
-        <AnimalImage image={a.image} style={{ width: 30, height: 30, borderRadius: 15 }} iconSize={15} />
+        <AnimalImage image={a.image} animal={a} style={{ width: 30, height: 30, borderRadius: 15 }} iconSize={15} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={s.itemName} numberOfLines={1}>{a.name}</Text>
           <Text style={s.itemMeta} numberOfLines={1}>{a.id} · {a.herd}</Text>

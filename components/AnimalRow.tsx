@@ -14,7 +14,7 @@ export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => voi
   const p = pillFor(a);
   return (
     <Row
-      left={<AnimalImage image={a.image} style={{ width: 38, height: 38, borderRadius: 19 }} />}
+      left={<AnimalImage image={a.image} animal={a} style={{ width: 38, height: 38, borderRadius: 19 }} />}
       title={
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
           <Text style={s.name}>{a.name}</Text>
