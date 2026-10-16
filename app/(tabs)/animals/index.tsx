@@ -1,18 +1,25 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { BlurView } from "expo-blur";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View,
+  type NativeScrollEvent, type NativeSyntheticEvent,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AnimalRow } from "@/components/AnimalRow";
 import { Chip, Chips } from "@/components/Chips";
 import { Collapsible } from "@/components/Collapsible";
+import { CowIcon } from "@/components/CowIcon";
 import { Empty } from "@/components/Empty";
 import { ErrorState } from "@/components/ErrorState";
 import { Loader } from "@/components/Loader";
-import { Screen } from "@/components/Screen";
-import { RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
+import { useScheme } from "@/src/theme/themeStore";
+import { useAnimalGroups } from "@/src/stores/animalGroups";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import type { Animal } from "@/types";
 
@@ -26,9 +33,17 @@ const FILTERS = [
 
 export default function Animals() {
   const c = useColors();
+  const dark = useScheme() === "dark";
   const s = useMemo(() => makeStyles(c), [c]);
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [headerH, setHeaderH] = useState(220);
+  const [showTop, setShowTop] = useState(false);
+  const listRef = useRef<SectionList<Animal>>(null);
+  const openMap = useAnimalGroups((st) => st.open);
+  const toggleGroup = useAnimalGroups((st) => st.toggle);
+  const setAll = useAnimalGroups((st) => st.setAll);
   const { data: animals = [], isLoading, isRefetching, error, refetch } = useAnimals();
   // Search runs in the local SQLite store (tag, name, herd), so it works offline.
   const { data: found = animals } = useAnimals(query);
@@ -38,7 +53,7 @@ export default function Animals() {
     return found.filter((a) => (a.repro || "").includes(filter));
   }, [found, filter]);
 
-  // Group the filtered list by herd for the collapsible tree.
+  // Group the filtered list by herd.
   const groups = useMemo(() => {
     const map = new Map<string, Animal[]>();
     for (const a of list) {
@@ -50,63 +65,167 @@ export default function Animals() {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [list]);
 
+  const searching = query.trim().length > 0;
+  const isOpen = useCallback((herd: string) => searching || !!openMap[herd], [searching, openMap]);
+  const herds = useMemo(() => groups.map(([h]) => h), [groups]);
+  const allOpen = herds.length > 0 && herds.every((h) => isOpen(h));
+
+  // Collapsed groups contribute no rows, so ~400 animals stay cheap.
+  const sections = useMemo(
+    () =>
+      groups.map(([herd, items]) => ({
+        herd,
+        count: items.length,
+        data: isOpen(herd) ? items : [],
+      })),
+    [groups, isOpen],
+  );
+
+  const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  const toggleAll = () => {
+    animate();
+    setAll(herds, !allOpen);
+  };
+  const backToTop = () => {
+    animate();
+    setAll(herds, false);
+    listRef.current?.scrollToLocation({ sectionIndex: 0, itemIndex: 0, viewOffset: headerH, animated: true });
+    setShowTop(false);
+  };
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const show = e.nativeEvent.contentOffset.y > 500;
+    setShowTop((prev) => (prev === show ? prev : show));
+  };
+
   const subtitle = animals.length ? `${animals.length} animals` : "";
-  // Expand all groups while searching/filtering so matches are visible.
-  const expanded = !!query || filter !== "all";
+  const state = isLoading ? "loading" : error ? "error" : list.length === 0 ? "empty" : "ok";
 
   return (
-    <Screen
-      title="Animals"
-      subtitle={subtitle}
-      onRefresh={() => refetch()}
-      refreshing={isRefetching}
-    >
-      <View style={s.search}>
-        <MaterialCommunityIcons name="magnify" size={18} color={c.textSubtle} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search by tag, name or herd"
-          placeholderTextColor={c.textSubtle}
-          style={s.input}
-        />
-      </View>
-      <Chips>
-        {FILTERS.map((f) => (
-          <Chip key={f.id} label={f.label} active={filter === f.id} onPress={() => setFilter(f.id)} />
-        ))}
-      </Chips>
-
-      {isLoading ? (
-        <Loader />
-      ) : error ? (
-        <ErrorState text={extractFrappeError(error)} onRetry={() => refetch()} />
-      ) : list.length === 0 ? (
-        <Empty text="No animals match" />
-      ) : (
-        groups.map(([herd, herdAnimals]) => (
-          <Collapsible
-            key={`${herd}-${expanded}`}
-            title={herd}
-            meta={`${herdAnimals.length} head`}
-            defaultOpen={expanded}
-          >
-            {herdAnimals.map((a) => (
+    <View style={s.screen}>
+      {state === "ok" ? (
+        <SectionList
+          ref={listRef}
+          sections={sections}
+          keyExtractor={(a) => a.id}
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={64}
+          contentContainerStyle={{ paddingTop: headerH, paddingHorizontal: 14, paddingBottom: 24 }}
+          scrollIndicatorInsets={{ top: headerH }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={() => refetch()}
+              tintColor={c.text}
+              progressViewOffset={headerH}
+            />
+          }
+          renderSectionHeader={({ section }) => (
+            <Collapsible
+              title={section.herd}
+              meta={`${section.count} head`}
+              open={isOpen(section.herd)}
+              onToggle={() => toggleGroup(section.herd)}
+            />
+          )}
+          renderItem={({ item }) => (
+            <View style={s.rowIndent}>
               <AnimalRow
-                key={a.id}
-                a={a}
-                onPress={() => router.push(`/(tabs)/animals/${encodeURIComponent(a.id)}`)}
+                a={item}
+                onPress={() => router.push(`/(tabs)/animals/${encodeURIComponent(item.id)}`)}
               />
-            ))}
-          </Collapsible>
-        ))
+            </View>
+          )}
+        />
+      ) : (
+        <View style={{ paddingTop: headerH, paddingHorizontal: 14 }}>
+          {state === "loading" ? (
+            <Loader />
+          ) : state === "error" ? (
+            <ErrorState text={extractFrappeError(error)} onRetry={() => refetch()} />
+          ) : (
+            <Empty text="No animals match" />
+          )}
+        </View>
       )}
-    </Screen>
+
+      <BlurView
+        intensity={50}
+        tint={dark ? "dark" : "light"}
+        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+        style={[s.header, { paddingTop: insets.top + 8, backgroundColor: dark ? "rgba(8,8,8,0.55)" : "rgba(255,255,255,0.6)" }]}
+        onLayout={(e) => {
+          const h = Math.round(e.nativeEvent.layout.height);
+          setHeaderH((prev) => (prev === h ? prev : h));
+        }}
+      >
+        <View style={s.titleRow}>
+          <CowIcon size={30} color={c.text} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.title} numberOfLines={1}>Animals</Text>
+            {subtitle ? <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
+          </View>
+          {!searching && herds.length > 0 ? (
+            <Pressable onPress={toggleAll} hitSlop={8} style={s.toggleAll} accessibilityRole="button">
+              <MaterialCommunityIcons
+                name={allOpen ? "unfold-less-horizontal" : "unfold-more-horizontal"}
+                size={18}
+                color={c.text}
+              />
+              <Text style={s.toggleText}>{allOpen ? "Collapse all" : "Expand all"}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <View style={s.search}>
+          <MaterialCommunityIcons name="magnify" size={18} color={c.textSubtle} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by tag, name or herd"
+            placeholderTextColor={c.textSubtle}
+            style={s.input}
+          />
+        </View>
+        <Chips>
+          {FILTERS.map((f) => (
+            <Chip key={f.id} label={f.label} active={filter === f.id} onPress={() => setFilter(f.id)} />
+          ))}
+        </Chips>
+      </BlurView>
+
+      {showTop ? (
+        <Pressable onPress={backToTop} style={s.fab} accessibilityRole="button" accessibilityLabel="Back to top and collapse all">
+          <MaterialCommunityIcons name="chevron-up" size={26} color={c.bg} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    header: {
+      position: "absolute", top: 0, left: 0, right: 0,
+      paddingHorizontal: 14, paddingBottom: 8, overflow: "hidden",
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.borderSubtle,
+    },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
+    title: { fontSize: 22, fontFamily: FONT_FAMILY.semibold, color: c.text },
+    subtitle: { fontSize: 13, fontFamily: FONT_FAMILY.regular, color: c.textMuted, marginTop: 1 },
+    toggleAll: {
+      flexDirection: "row", alignItems: "center", gap: 4,
+      paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth, borderColor: c.border,
+    },
+    toggleText: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: c.text },
+    rowIndent: { marginLeft: 24 },
+    fab: {
+      position: "absolute", right: 16, bottom: 16, width: 48, height: 48, borderRadius: 24,
+      backgroundColor: c.text, alignItems: "center", justifyContent: "center",
+      elevation: 6, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+    },
     search: {
       flexDirection: "row",
       alignItems: "center",

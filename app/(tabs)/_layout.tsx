@@ -5,6 +5,7 @@ import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CowIcon } from "@/components/CowIcon";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -68,7 +69,7 @@ export default function TabLayout() {
         options={{
           title: "Animals",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="cow" size={ICON_SIZE} color={color} />
+            <CowIcon size={ICON_SIZE + 3} color={color} />
           ),
         }}
       />
