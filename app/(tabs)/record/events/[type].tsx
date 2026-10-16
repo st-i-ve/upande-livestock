@@ -35,14 +35,12 @@ import type { Animal } from "@/types";
 type Spec = {
   title: string;
   eventType: AnimalEventType;
-  needsWeight?: boolean;
   /** A routine round (Vaccination, Deworming, Hoof Trimming, Dehorning): one
    *  call books an event per animal and one drug issue for the batch. */
   isRound?: boolean;
 };
 
 const SPECS: Record<string, Spec> = {
-  weight:      { title: "Weight recording",  eventType: "Weight Recording",  needsWeight: true },
   vaccination: { title: "Vaccination",       eventType: "Vaccination",       isRound: true },
   deworming:   { title: "Deworming",         eventType: "Deworming",         isRound: true },
   dehorning:   { title: "Dehorning",         eventType: "Dehorning",         isRound: true },
@@ -71,8 +69,6 @@ export default function GenericEvent() {
   const preset = usePresetAnimal();
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
   const finish = useFinishRecording();
-  const [weight, setWeight] = useState("");
-  const [bcs, setBcs] = useState("");
   const [vetFee, setVetFee] = useState("");
   const [drugs, setDrugs] = useState<DrugRow[]>([]);
   const [remarks, setRemarks] = useState("");
@@ -112,12 +108,6 @@ export default function GenericEvent() {
 
     if (selected.length === 0) return setError("Pick at least one animal.");
     if (!operator) return setError(missingMessage);
-    if (spec.needsWeight) {
-      if (!weight) return setError("Enter the weight (kg).");
-      if (selected.length > 1) {
-        return setError("Weight recording takes one animal at a time. Unselect the others.");
-      }
-    }
 
     if (takesDrugs && filledDrugRows.length > 0) {
       // A heads-up, never a block: the server decides what the store can bear
@@ -184,10 +174,7 @@ export default function GenericEvent() {
           eventDate,
           remarks: note,
         } as const;
-        const payload: AnimalEventInput =
-          spec.eventType === "Weight Recording"
-            ? { ...common, eventType: "Weight Recording", weightKg: Number(weight), bcs: bcs ? Number(bcs) : undefined }
-            : { ...common, eventType: "Heat Detection" };
+        const payload: AnimalEventInput = { ...common, eventType: "Heat Detection" };
         try {
           const r = await eventMutation.mutateAsync(payload);
           succeededEvents += 1;
@@ -236,30 +223,19 @@ export default function GenericEvent() {
       {isBackdating ? <BackdateBanner /> : null}
 
       <Field
-        label={spec.needsWeight ? "Animal" : "Animal(s)"}
+        label="Animal(s)"
         help={
-          spec.needsWeight
-            ? "Pick one animal — weight is per-animal."
-            : spec.isRound
-              ? "Pick one cow, several, or a whole herd. Drug quantities below are per animal."
-              : "Pick one cow, several, or a whole herd. Same details applied per animal."
+          spec.isRound
+            ? "Pick one cow, several, or a whole herd. Drug quantities below are per animal."
+            : "Pick one cow, several, or a whole herd. Same details applied per animal."
         }
       >
-        {spec.needsWeight ? (
-          <AnimalPickerButton
-            mode="single"
-            placeholder={selected[0] ? `${selected[0].name} · ${selected[0].id}` : "Search by tag or name…"}
-            value={selected[0] ?? null}
-            onPickSingle={(a) => setSelected([a])}
-          />
-        ) : (
-          <AnimalPickerButton
-            mode="multi"
-            placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
-            value={selected}
-            onPickMulti={setSelected}
-          />
-        )}
+        <AnimalPickerButton
+          mode="multi"
+          placeholder={selected.length ? `${selected.length} selected — tap to change` : "Search by tag or name…"}
+          value={selected}
+          onPickMulti={setSelected}
+        />
       </Field>
 
       {isBackdating ? (
@@ -269,17 +245,6 @@ export default function GenericEvent() {
       ) : (
         <Field label="Done on"><Input value={serverToday} editable={false} /></Field>
       )}
-
-      {spec.needsWeight ? (
-        <FieldRow>
-          <Field label="Weight (kg)" style={{ flex: 1 }}>
-            <Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="480" />
-          </Field>
-          <Field label="BCS (1-5)" style={{ flex: 1 }}>
-            <Input value={bcs} onChangeText={setBcs} keyboardType="decimal-pad" placeholder="3.5" />
-          </Field>
-        </FieldRow>
-      ) : null}
 
       {takesDrugs ? (
         <>

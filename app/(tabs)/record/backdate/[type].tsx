@@ -15,6 +15,7 @@ import Movement from "../events/movement";
 import PD from "../events/pd";
 import Service from "../events/service";
 import Treatment from "../events/treatment";
+import Weight from "../events/weight";
 
 /**
  * Not a form of its own. This route maps `type` to the SAME screen component
@@ -34,7 +35,7 @@ const SCREENS: Record<string, ComponentType> = {
   calving: Calving,
   diagnosis: Diagnosis,
   treatment: Treatment,
-  weight: GenericEvent,
+  weight: Weight,
   vaccination: GenericEvent,
   deworming: GenericEvent,
   dehorning: GenericEvent,

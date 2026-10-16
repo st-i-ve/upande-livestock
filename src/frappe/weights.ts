@@ -17,6 +17,8 @@ export type WeighingMode = "each" | "platform" | "alike";
 export type WeightSession = {
   method: string;
   operator?: string | null;
+  /** ISO date; omitted means today on the server. Only sent when backdating. */
+  eventDate?: string;
   mode: WeighingMode;
   /** Mode "each": one row per animal that got on the scale. */
   rows?: { animal: string; weight_kg: number; heart_girth_cm?: number; bcs?: number }[];
@@ -56,6 +58,7 @@ export const recordWeights = async (s: WeightSession): Promise<WeightOutcome> =>
     payload: {
       method: s.method,
       measured_by: s.operator || undefined,
+      event_date: s.eventDate || undefined,
       weights: s.mode === "each" ? s.rows ?? [] : [],
       group: s.mode === "each" ? undefined : s.group,
     },

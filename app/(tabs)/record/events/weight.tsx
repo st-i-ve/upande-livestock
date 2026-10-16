@@ -4,9 +4,12 @@ import React, { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Picker } from "@/components/Picker";
@@ -20,9 +23,11 @@ import {
   type WeighingMode,
   type WeightOutcome,
 } from "@/src/frappe/weights";
+import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useColors } from "@/src/hooks/useColors";
 import { useOperator } from "@/src/hooks/useOperator";
-import { titleFor, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -53,6 +58,9 @@ export default function WeightSession() {
 
   const [selected, setSelected] = useState<Animal[]>([]);
   const preset = usePresetAnimal();
+  const finish = useFinishRecording();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
 
   const [mode, setMode] = useState<WeighingMode>("each");
@@ -99,6 +107,7 @@ export default function WeightSession() {
       const o = await recordWeights({
         method,
         operator,
+        ...(isBackdating ? { eventDate: backdateDate } : {}),
         mode,
         rows: written.map((a) => {
           const e = entries[a.id] ?? EMPTY;
@@ -121,6 +130,8 @@ export default function WeightSession() {
       qc.invalidateQueries({ queryKey: ["animal"] });
       keepRefused(o);
       setGroupFigure("");
+      // Opened for one animal and nothing was refused: back to her page.
+      if (preset && o.failed.length === 0) finish("Weight recording");
     } catch (e) {
       setError(extractFrappeError(e));
     } finally {
@@ -140,7 +151,13 @@ export default function WeightSession() {
   };
 
   return (
-    <Screen title={titleFor("Weight recording", preset)} subtitle="Weigh one animal, several, or a herd" back>
+    <Screen
+      title={titleFor("Weight recording", preset)}
+      subtitle="Weigh one animal, several, or a herd"
+      back
+      headerRight={isBackdating ? undefined : <BackdateButton type="weight" />}
+    >
+      {isBackdating ? <BackdateBanner /> : null}
       {settings.isError ? (
         <Banner tone="danger">Could not read the weighing settings. Pull to retry or check your connection.</Banner>
       ) : null}
@@ -154,6 +171,12 @@ export default function WeightSession() {
           onPickMulti={setSelected}
         />
       </Field>
+
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
+        </Field>
+      ) : null}
 
       <Field label="Method" help={settings.data?.weighbridgeAvailable ? undefined : "No weighbridge on this farm."}>
         <Picker value={method} onChange={setMethodPick} options={methods} placeholder="Method" />

@@ -25,7 +25,6 @@ export type AnimalEventType =
   | "Calving"
   | "Drying Off"
   | "Birth"
-  | "Weight Recording"
   | "Vaccination"
   | "Deworming"
   | "Dehorning"
@@ -98,12 +97,6 @@ type EventSpecificInput =
       eventType: "Drying Off";
       toHerd: string;
       drugIssues?: AnimalDrugIssueInput[];
-    }
-  | {
-      eventType: "Weight Recording";
-      weightKg: number;
-      bcs?: number;
-      weighMethod?: "Weighbridge" | "Platform Scale" | "Heart Girth Tape" | "Visual Estimate";
     }
   | {
       eventType: "Vaccination" | "Deworming" | "Hoof Trimming" | "Dehorning";
@@ -351,19 +344,6 @@ export const createAnimalEvent = async (
         ...common,
         new_herd: input.toHerd,
         drugs: mapDrugRows(input.drugIssues),
-      });
-
-    case "Weight Recording":
-      // Not a Livestock Event at all — weighings are their own doctype, which
-      // owns the previous-weight / daily-gain columns and the interval guard.
-      return callOp("Weight Recording", {
-        animal: input.animal,
-        weight_date: common.event_date,
-        measured_by: input.operator,
-        weight_kg: input.weightKg,
-        bcs: input.bcs,
-        method: input.weighMethod,
-        remarks: input.remarks,
       });
 
     case "Vaccination":
