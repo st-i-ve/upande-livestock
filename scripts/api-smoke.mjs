@@ -183,6 +183,14 @@ await step("read", "animals.animal_profile (days in milk)", async () => {
   const m = msgOf(await post(`${M}.animals.animal_profile.animal_profile`, { payload: { animal: ctx.animal } }));
   need(m.cycle, ["daysInMilk"], "cycle");
 });
+await step("read", "animals.animal_standing (performance vs herd and group)", async () => {
+  const m = msgOf(await post(`${M}.animals.animal_standing.animal_standing`, { payload: { animal: ctx.animal } }));
+  need(m, ["asOf", "herd", "group", "per_animal_milk", "metrics"], "standing");
+  const first = m.metrics?.[0];
+  if (!first) throw new Error("no metrics");
+  need(first, ["key", "label", "value", "herd", "group"], "metric");
+  need(first.group, ["avg", "n", "top"], "peers");
+});
 await step("read", "GET Livestock Health Case (open case of an animal)", async () => {
   msgOf(await get("/api/resource/Livestock Health Case", {
     fields: ["name", "milk_safe_date"],
