@@ -21,7 +21,7 @@ import { useVetChoice } from "@/src/hooks/useVets";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
-import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
+import { findShortage, stockOutcomeText, stockWarningsOf } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
@@ -115,6 +115,8 @@ export default function Dryoff() {
 
     let succeeded = 0;
     const replies: any[] = [];
+    // A cow the server refuses is skipped with its reason; the others still dry off.
+    const skipped: { name: string; reason: string }[] = [];
     for (const a of selected) {
       try {
         const r = await mutation.mutateAsync({
@@ -130,18 +132,20 @@ export default function Dryoff() {
         succeeded += 1;
         replies.push(r);
       } catch (err) {
-        setError(
-          `${succeeded} of ${selected.length} dried off. Stopped at ${a.name}: ${extractFrappeError(err)}`,
-        );
-        return;
+        skipped.push({ name: a.name, reason: extractFrappeError(err) });
       }
     }
+    if (succeeded === 0) {
+      setError(`Nothing was recorded.\n${skipped.map((k) => `${k.name}: ${k.reason}`).join("\n")}`);
+      return;
+    }
     const parts: string[] = [];
-    if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
+    parts.push(`Recorded ${succeeded} · Skipped ${skipped.length}${succeeded ? ` (moved to ${toHerd})` : ""}`);
+    for (const k of skipped) parts.push(`${k.name}: ${k.reason}`);
     const stockNote = stockOutcomeText(replies);
     Alert.alert(
       stockNote ? "Drying off saved — stock issue pending" : "Drying off recorded",
-      [parts.join(" · "), stockNote].filter(Boolean).join("\n\n"),
+      [parts.join("\n"), stockNote, ...stockWarningsOf(replies)].filter(Boolean).join("\n\n"),
     );
     finish("Drying off");
   };

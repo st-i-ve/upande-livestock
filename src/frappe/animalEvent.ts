@@ -219,6 +219,33 @@ const callOp = async (type: string, payload: Record<string, any>): Promise<any> 
   return msg;
 };
 
+export type SkippedAnimal = { animal: string; reason: string };
+
+const ROUND_ELIGIBILITY = "upande_livestock.serverscripts.husbandry.round_eligibility";
+
+/**
+ * Which animals a routine round would skip, and why, before anything is saved.
+ * Advice only: the server decides again when the round is recorded. Resolves to
+ * [] when the preview itself fails, so a flaky check never blocks a round.
+ */
+export const previewRound = async (
+  eventType: string,
+  animals: string[],
+  eventDate?: string,
+): Promise<SkippedAnimal[]> => {
+  if (!animals.length) return [];
+  try {
+    const client = await getClient();
+    const res = await client.post(`/api/method/${ROUND_ELIGIBILITY}.round_eligibility`, {
+      payload: { event_type: eventType, animals, event_date: eventDate },
+    });
+    const skipped = res.data?.message?.skipped;
+    return Array.isArray(skipped) ? (skipped as SkippedAnimal[]) : [];
+  } catch {
+    return [];
+  }
+};
+
 const mapDrugRows = (rows?: AnimalDrugIssueInput[]) =>
   (rows ?? [])
     .filter((d) => d.itemCode && Number(d.qty) > 0)

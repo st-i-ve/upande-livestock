@@ -79,3 +79,13 @@ export const stockOutcomeText = (replies: any[]): string => {
   const lines = [...byName.values()].map((d) => `${d.stock_entry_type} ${d.name}: ${d.short}`);
   return `Saved with stock issue pending. The store was short, so the issue is a draft until it is posted from the web Transactions page.\n${lines.join("\n")}`;
 };
+
+/** What the server said aloud about stock (`stock_warnings`, see common/envelope.run),
+ *  for example an item issued at zero because it has no cost. Merged and de-duplicated. */
+export const stockWarningsOf = (replies: any[]): string[] => {
+  const seen = new Set<string>();
+  for (const r of replies) {
+    if (Array.isArray(r?.stock_warnings)) for (const w of r.stock_warnings) seen.add(String(w));
+  }
+  return [...seen];
+};

@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -18,8 +18,10 @@ import { RADIUS } from "@/constants/theme";
 import {
   AnimalEventInput,
   AnimalEventType,
+  previewRound,
+  type SkippedAnimal,
 } from "@/src/frappe/animalEvent";
-import { findShortage, stockOutcomeText, type StockChoice } from "@/src/frappe/eventItems";
+import { findShortage, stockOutcomeText, stockWarningsOf, type StockChoice } from "@/src/frappe/eventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
@@ -85,6 +87,31 @@ export default function GenericEvent() {
   const eventMutation = useCreateAnimalEvent();
   const submitting = eventMutation.isPending;
 
+  // Animals the server's rules would refuse for this round (deworming too soon,
+  // too old to dehorn, ...), asked before saving so they can be marked and left
+  // out. Advice only: the server decides again, and reports what it skipped.
+  const [previewed, setIneligible] = useState<SkippedAnimal[]>([]);
+  const previewDate = isBackdating ? backdateDate : serverToday;
+  const selectedKey = selected.map((a) => a.id).join("|");
+  useEffect(() => {
+    if (!spec?.isRound || selected.length === 0) return;
+    let live = true;
+    previewRound(spec.eventType, selected.map((a) => a.id), previewDate).then((s) => {
+      if (live) setIneligible(s);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, previewDate, spec?.eventType]);
+  const ineligible = useMemo(
+    () => (spec?.isRound ? previewed.filter((s) => selected.some((a) => a.id === s.animal)) : []),
+    [previewed, selected, spec?.isRound],
+  );
+  const ineligibleIds = useMemo(() => new Set(ineligible.map((s) => s.animal)), [ineligible]);
+  const eligible = useMemo(() => selected.filter((a) => !ineligibleIds.has(a.id)), [selected, ineligibleIds]);
+  const roundAnimals = spec?.isRound ? eligible : selected;
+
   const filledDrugRows = useMemo(
     () => drugs.filter((d) => d.itemCode.trim() && Number(d.qty) > 0),
     [drugs],
@@ -107,6 +134,7 @@ export default function GenericEvent() {
     setWarning(null);
 
     if (selected.length === 0) return setError("Pick at least one animal.");
+    if (roundAnimals.length === 0) return setError("None of the selected animals can have this recorded.");
     if (!operator) return setError(missingMessage);
 
     if (takesDrugs && filledDrugRows.length > 0) {
@@ -119,7 +147,7 @@ export default function GenericEvent() {
         filledDrugRows.map((d) => ({
           itemCode: d.itemCode.trim(),
           warehouse: d.sourceWarehouse,
-          qtyNeeded: Number(d.qty) * selected.length,
+          qtyNeeded: Number(d.qty) * roundAnimals.length,
         })),
       );
       if (shortage) setWarning(shortage);
@@ -130,6 +158,9 @@ export default function GenericEvent() {
 
     const replies: any[] = [];
     let succeededEvents = 0;
+    // Skipped by the server on save: the preview's marks plus anything that
+    // changed since. Shown with their reasons after the save.
+    let skippedRows: SkippedAnimal[] = [];
 
     if (spec.isRound) {
       // One call for the whole round: the server books an event per animal and
@@ -139,9 +170,9 @@ export default function GenericEvent() {
       try {
         const r = await eventMutation.mutateAsync({
           eventType: husbandryType,
-          animal: selected[0].id,
-          animals: selected.map((a) => a.id),
-          currentHerd: selected[0].herd,
+          animal: roundAnimals[0].id,
+          animals: roundAnimals.map((a) => a.id),
+          currentHerd: roundAnimals[0].herd,
           operator,
           vet: vet || undefined,
           eventDate,
@@ -159,7 +190,8 @@ export default function GenericEvent() {
               }))
             : undefined,
         });
-        succeededEvents = r?.animals ?? selected.length;
+        succeededEvents = r?.animals ?? roundAnimals.length;
+        skippedRows = Array.isArray(r?.skipped) ? r.skipped : [];
         replies.push(r);
       } catch (err) {
         setError(`Nothing was recorded. ${extractFrappeError(err)}`);
@@ -191,11 +223,19 @@ export default function GenericEvent() {
     // What the server did, not what the phone assumes: drugs posted, or saved
     // with the stock issue pending, and what became of the vet fee.
     const eventParts: string[] = [];
-    if (succeededEvents) eventParts.push(`${succeededEvents} submitted`);
+    if (spec.isRound) {
+      // Left out before saving (marked on the screen) plus skipped by the server.
+      const all = [...ineligible.filter((i) => !skippedRows.some((k) => k.animal === i.animal)), ...skippedRows];
+      eventParts.push(`Recorded ${succeededEvents} · Skipped ${all.length}`);
+      for (const k of all) eventParts.push(`${k.animal}: ${k.reason}`);
+    } else if (succeededEvents) {
+      eventParts.push(`${succeededEvents} submitted`);
+    }
 
     const notes: string[] = [];
     const stockNote = stockOutcomeText(replies);
     if (stockNote) notes.push(stockNote);
+    notes.push(...stockWarningsOf(replies));
     const fee = replies.map((r) => r?.vet_fee).find(Boolean);
     if (fee) {
       notes.push(
@@ -206,7 +246,7 @@ export default function GenericEvent() {
     }
     Alert.alert(
       stockNote ? `${spec.title} saved — stock issue pending` : `${spec.title} recorded`,
-      [eventParts.join(" · "), ...notes].filter(Boolean).join("\n\n"),
+      [spec.isRound ? eventParts.join("\n") : eventParts.join(" · "), ...notes].filter(Boolean).join("\n\n"),
     );
     finish(spec.title);
   };
@@ -238,6 +278,15 @@ export default function GenericEvent() {
         />
       </Field>
 
+      {spec.isRound && ineligible.length > 0 ? (
+        <Banner tone="warning">
+          {`Left out (${ineligible.length}) — the server's rules refuse these:\n` +
+            ineligible
+              .map((s) => `${selected.find((a) => a.id === s.animal)?.name ?? s.animal}: ${s.reason}`)
+              .join("\n")}
+        </Banner>
+      ) : null}
+
       {isBackdating ? (
         <Field label="Done on">
           <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
@@ -249,7 +298,7 @@ export default function GenericEvent() {
       {takesDrugs ? (
         <>
           <AvailableStockButton eventType={spec.eventType} />
-          <DrugRows rows={drugs} onChange={setDrugs} choices={stockChoices} headcount={selected.length} />
+          <DrugRows rows={drugs} onChange={setDrugs} choices={stockChoices} headcount={roundAnimals.length} />
         </>
       ) : null}
 
@@ -271,7 +320,7 @@ export default function GenericEvent() {
       <OnlineOnlyNotice />
       <Button
         label={submitting ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
-        disabled={offline || submitting || selected.length === 0}
+        disabled={offline || submitting || roundAnimals.length === 0}
         loading={submitting}
         onPress={handleSubmit}
       />
