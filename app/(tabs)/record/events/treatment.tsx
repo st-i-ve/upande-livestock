@@ -18,7 +18,7 @@ import { Screen } from "@/components/Screen";
 import { VetPicker } from "@/components/VetPicker";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields, type StockPick } from "@/components/StockItemFields";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { addAnimalPhoto } from "@/src/frappe/animalPhotos";
 import type { FileAsset } from "@/src/frappe/files";
@@ -384,7 +384,7 @@ export default function Treatment() {
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     file: { backgroundColor: c.bgMuted, padding: 12, borderRadius: RADIUS.md, marginBottom: 10, gap: 4 },
-    fileTitle: { fontSize: 13, fontWeight: "600", color: c.text, marginBottom: 6 },
+    fileTitle: { fontSize: 13, ...font("600"), color: c.text, marginBottom: 6 },
     fileBody: { fontSize: 12, color: c.textMuted, lineHeight: 17 },
     small: { fontSize: 11, color: c.textSubtle, marginBottom: 8 },
     dose: { backgroundColor: c.bgMuted, padding: 11, borderRadius: RADIUS.md, marginBottom: 8 },

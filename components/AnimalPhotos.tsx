@@ -17,7 +17,7 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { useOffline } from "@/components/OnlineOnlyNotice";
 import { SectionTitle } from "@/components/SectionTitle";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
   addAnimalPhoto,
@@ -273,19 +273,19 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       position: "absolute", top: 6, left: 6, backgroundColor: "rgba(0,0,0,0.6)",
       borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, maxWidth: 92,
     },
-    chipText: { color: "#fff", fontSize: 10, fontWeight: "600" },
+    chipText: { color: "#fff", fontSize: 10, ...font("600") },
     tileDate: { fontSize: 11, color: c.textSubtle, marginTop: 3 },
     viewer: { flex: 1, backgroundColor: "#000", justifyContent: "center" },
     close: { position: "absolute", top: 44, right: 16, padding: 8, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 20 },
     info: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 18, paddingBottom: 32, backgroundColor: "rgba(0,0,0,0.65)", gap: 3 },
     infoCount: { color: "#bbb", fontSize: 11 },
-    infoCaption: { color: "#fff", fontSize: 15, fontWeight: "600" },
+    infoCaption: { color: "#fff", fontSize: 15, ...font("600") },
     infoLine: { color: "#ddd", fontSize: 13 },
-    infoRef: { color: "#999", fontSize: 11, fontFamily: "monospace" },
+    infoRef: { color: "#999", fontSize: 11, ...font("400") },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     sheet: { backgroundColor: c.bg, padding: 18, paddingBottom: 28, borderTopLeftRadius: 18, borderTopRightRadius: 18, gap: 8 },
-    sheetTitle: { fontSize: 16, fontWeight: "700", color: c.text, marginBottom: 4 },
+    sheetTitle: { fontSize: 16, ...font("700"), color: c.text, marginBottom: 4 },
     purpose: { backgroundColor: c.bgMuted, padding: 12, borderRadius: RADIUS.md, gap: 4 },
-    purposeLabel: { fontSize: 14, fontWeight: "600", color: c.text },
+    purposeLabel: { fontSize: 14, ...font("600"), color: c.text },
     purposeBtns: { flexDirection: "row", gap: 8, marginTop: 4 },
   });

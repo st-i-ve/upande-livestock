@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { font } from "@/constants/theme";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
@@ -223,7 +224,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   const c = useColors();
   return (
     <View style={{ width: "50%", paddingVertical: 3, paddingRight: 6 }}>
-      <Text style={{ fontSize: 9, fontWeight: "500", letterSpacing: 1, textTransform: "uppercase", color: c.textSubtle }}>
+      <Text style={{ fontSize: 9, ...font("500"), letterSpacing: 1, textTransform: "uppercase", color: c.textSubtle }}>
         {label}
       </Text>
       <Text style={{ fontSize: 13, color: c.text }} numberOfLines={1}>{value}</Text>
@@ -239,11 +240,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, paddingTop: 36,
       backgroundColor: "rgba(0,0,0,0.45)",
     },
-    heroName: { fontSize: 24, fontWeight: "700", color: "#fff" },
-    heroId: { fontSize: 12, color: "rgba(255,255,255,0.8)", fontFamily: "monospace" },
+    heroName: { fontSize: 24, ...font("700"), color: "#fff" },
+    heroId: { fontSize: 12, color: "rgba(255,255,255,0.8)", ...font("400") },
     heroRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
     heroBadge: { borderWidth: 1, borderColor: "rgba(255,255,255,0.7)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 1 },
-    heroBadgeText: { fontSize: 11, fontWeight: "600", color: "#fff", textTransform: "uppercase", letterSpacing: 0.8 },
+    heroBadgeText: { fontSize: 11, ...font("600"), color: "#fff", textTransform: "uppercase", letterSpacing: 0.8 },
     heroMeta: { flexShrink: 1, fontSize: 13, color: "#fff" },
     facts: { flexDirection: "row", flexWrap: "wrap", marginBottom: 12 },
     actions: { gap: 14, paddingVertical: 4, paddingRight: 8 },

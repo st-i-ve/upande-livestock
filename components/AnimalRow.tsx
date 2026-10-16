@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import type { Animal } from "@/types";
 import { STAGE_LABELS, pillFor } from "@/services/utils";
@@ -33,10 +34,10 @@ export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => voi
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    name: { fontSize: 16, fontWeight: "600", color: c.text },
+    name: { fontSize: 16, ...font("600"), color: c.text },
     stage: {
-      fontSize: 11, fontWeight: "600", color: c.textSubtle, borderWidth: 1, borderColor: c.border,
+      fontSize: 11, ...font("600"), color: c.textSubtle, borderWidth: 1, borderColor: c.border,
       borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: "hidden",
     },
-    id: { fontSize: 13, color: c.textSubtle, fontFamily: "monospace" },
+    id: { fontSize: 13, color: c.textSubtle, ...font("400") },
   });
