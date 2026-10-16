@@ -253,6 +253,14 @@ await step("read", "health.health_options (useEventItems)", async () => {
 await step("read", "GET Item search (feeding: add an ingredient)", async () => {
   msgOf(await get("/api/resource/Item", { fields: ["name", "item_name", "item_code", "stock_uom"], filters: [["disabled", "=", 0], ["is_stock_item", "=", 1], ["item_name", "like", "%a%"]], limit_page_length: 30 }));
 });
+await step("read", "mobile.get_livestock_stock (the read-only Stock list)", async () => {
+  const m = msgOf(await post(`${M}.mobile.get_livestock_stock.get_livestock_stock`, {}));
+  need(m, ["as_of", "stores", "count"], "livestock stock");
+  for (const st of m.stores) need(st, ["warehouse", "items"], "store");
+  const first = m.stores[0]?.items[0];
+  if (first) need(first, ["item_code", "item_name", "uom", "qty", "events"], "stock item");
+  return `${m.count} items in ${m.stores.length} stores`;
+});
 await step("read", "feeding.herd_recipes (useHerdRecipes)", async () => {
   const herd = ctx.herds.find((h) => h.has_bom)?.name;
   const m = msgOf(await post(`${M}.feeding.herd_recipes.herd_recipes`, { herd }));
@@ -308,9 +316,35 @@ async function writes() {
     const m = await ev("Weight Recording", { animal: F1, weight_date: today, measured_by: op, weight_kg: 480, bcs: 3.5, method: "Platform Scale", remarks: "smoke" });
     return m.name;
   });
+  // The weighing session the phone's Weight screen sends: one call, three
+  // animals, one of them unknown to the server. The good two must be saved and
+  // the bad one reported with its reason, not allowed to sink the round.
+  await step("write", "weights.record_weights session (2 good + 1 refused)", async () => {
+    const opts = msgOf(await get(`${M}.weights.weight_options.weight_options`, { settings_only: 1 }));
+    need(opts, ["methods", "default_method", "weighbridge_available"], "weight_options");
+    const bad = "ZZ-NO-SUCH-ANIMAL";
+    const m = msgOf(await post(`${M}.weights.record_weights.record_weights`, {
+      payload: {
+        method: opts.default_method, measured_by: op,
+        weights: [{ animal: F2, weight_kg: 455 }, { animal: bad, weight_kg: 300 }, { animal: F3, weight_kg: 120 }],
+      },
+    }));
+    for (const r of m.recorded) { const name = r.name; track("Livestock Weight Record", name); }
+    if (m.count !== 2 || m.failed.length !== 1 || m.failed[0].animal !== bad || !m.failed[0].why) {
+      throw new Error(`expected 2 saved + 1 refused, got ${JSON.stringify(m)}`);
+    }
+    const delta = msgOf(await get(`${M}.mobile.animals_since.animals_since`, {}));
+    const row = (delta.animals || []).find((x) => x.name === F2);
+    if (row && Number(row.last_weight_kg) !== 455) throw new Error(`last_weight_kg is ${row.last_weight_kg}, not 455`);
+    return `${m.count} saved, refused: ${m.failed[0].why}`.slice(0, 90);
+  });
   await step("write", "Heat Detection", async () => (await ev("Heat Detection", { animal: F3, event_date: today, operator: op, remarks: "smoke" })).name);
   await step("write", "Service", async () => {
-    const m = await ev("Service", { animal: F1, event_date: today, operator: op, service_type: "A.I.", service_date: today, semen_item: sem?.value, semen_warehouse: sem?.warehouse, sire: "SMOKE SIRE", remarks: "smoke" });
+    // As the phone sends it: the straw is an items line, and only when the Service
+    // event type posts stock (its key is in items_by_event); no item fields otherwise.
+    const mapped = Object.prototype.hasOwnProperty.call(ctx.opts.items_by_event, "Service");
+    const items = mapped && sem ? [{ item_code: sem.value, qty: 1, source_warehouse: sem.warehouse }] : undefined;
+    const m = await ev("Service", { animal: F1, event_date: today, operator: op, service_type: "A.I.", service_date: today, items, sire: "SMOKE SIRE", remarks: "smoke" });
     ctx.service1 = m.name;
     return m.name;
   });
@@ -345,17 +379,27 @@ async function writes() {
     const up = msgOf(await http("POST", "/api/method/upload_file", { form }));
     need(up, ["file_url"], "upload");
     track("File", up.name);
-    const tag = `ZSMOKE-C${Date.now() % 100000}`;
+    // Twins, and the old single-calf payload's typed name: the server ignores it
+    // and numbers both calves itself, A for a heifer and B for a bull.
     const m = await ev("Calving", {
       dam: F1, event_date: today, operator: op, outcome: "Live Birth", remarks: "smoke · Coat: Black",
-      calves: [{ name: tag, sex: "Female", birth_weight: 32, herd: ctx.elig.calf_herds.female || ctx.herds[0].name, breed: undefined, health_status: "Healthy", photo: up.file_url }],
+      calves: [
+        { name: "A", sex: "Female", birth_weight: 32, herd: ctx.elig.calf_herds.female || ctx.herds[0].name, health_status: "Healthy", photo: up.file_url },
+        { sex: "Female", birth_weight: 30, health_status: "Healthy" },
+        { sex: "Male", birth_weight: 34, health_status: "Weak" },
+      ],
     });
     need(m, ["calves"], "birth reply");
-    const calf = m.calves[0].animal;
-    track("Animal", calf);
-    const doc = await got("Animal", calf);
+    if (m.calves.length !== 3) throw new Error(`expected 3 calves, got ${m.calves.length}`);
+    for (const c of m.calves) track("Animal", c.animal);
+    const [c1, c2, c3] = m.calves.map((c) => c.animal);
+    const seq = (n) => Number(n.slice(1, 4));
+    if (!/^A\d{3}\/\d{2}$/.test(c1) || !/^A\d{3}\/\d{2}$/.test(c2) || !/^B\d{3}\/\d{2}$/.test(c3)) throw new Error(`numbers not A/A/B series: ${c1} ${c2} ${c3}`);
+    if (seq(c2) !== seq(c1) + 1) throw new Error(`twins not sequential: ${c1} ${c2}`);
+    for (const c of [c1, c2, c3]) same(await got("Animal", c), { tag_number: c, book_number: c }, `book number of ${c}`);
+    const doc = await got("Animal", c1);
     if (doc.image !== up.file_url) throw new Error(`calf image ${doc.image} != ${up.file_url}`);
-    return `${calf} image ok`;
+    return `${c1} ${c2} ${c3} image ok`;
   });
   await step("write", "Movement", async () => {
     const to = ctx.herds.find((h) => h.name !== HERD && !h.is_milking)?.name;

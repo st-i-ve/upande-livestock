@@ -36,6 +36,9 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     { icon: "tools", label: "Hoof trimming", href: "/(tabs)/record/events/hoof" },
     { icon: "water-off", label: "Drying off", href: "/(tabs)/record/events/dryoff" },
   ]},
+  { title: "Stores", items: [
+    { icon: "warehouse", label: "Stock (read only)", href: "/(tabs)/record/stock" },
+  ]},
 ];
 
 export default function Record() {

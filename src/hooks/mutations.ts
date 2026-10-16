@@ -11,6 +11,7 @@ import {
   createMilkRecording,
 } from "@/src/frappe/milkRecording";
 import { manufactureHerdFeed } from "@/src/frappe/feeding";
+import { invalidateStock } from "@/src/hooks/useServerLists";
 import { isOfflineError } from "@/src/offline/dispatcher";
 import {
   PendingMutationType,
@@ -31,6 +32,9 @@ const invalidateAll = (qc: ReturnType<typeof useQueryClient>) => {
   qc.invalidateQueries({ queryKey: ["health-cases"] });
   qc.invalidateQueries({ queryKey: ["diagnoses"] });
   qc.invalidateQueries({ queryKey: ["disposals"] });
+  // A save may have moved stock: what the pickers and the Stock list show must
+  // be read again, not trusted for another 30 s.
+  invalidateStock(qc);
 };
 
 /**
@@ -134,10 +138,7 @@ export const useTreatAnimal = () => {
   return useMutation({
     mutationFn: (input: TreatAnimalInput) =>
       sendNow(() => treatAnimal(input)),
-    onSuccess: () => {
-      invalidateAll(qc);
-      qc.invalidateQueries({ queryKey: ["health-options"] });
-    },
+    onSuccess: () => invalidateAll(qc),
   });
 };
 

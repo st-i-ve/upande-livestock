@@ -2,6 +2,7 @@ import { OpsError } from "./opsError";
 import { getClient, todayISO } from "@/src/services/api";
 import { listDocuments } from "./generic";
 import { discardCalfPhoto, uploadCalfPhoto } from "./calfPhoto";
+import { legacyCalf, type CalfInput } from "./calves";
 import type { FileAsset } from "./files";
 
 // Event types the `Livestock Event Type` master carries in upande_livestock.
@@ -71,6 +72,11 @@ type EventSpecificInput =
       eventType: "Calving" | "Birth";
       calvingOutcome: "Live Birth" | "Still Birth";
       toHerd?: string;
+      /** Every calf of this calving, twins and more. When absent the single-calf
+       *  fields below are read instead, which is what an older build queued. */
+      calves?: CalfInput[];
+      /** @deprecated The server numbers calves; a typed number is ignored. Kept
+       *  so a calving queued by an older build still parses. */
       calfBookNumber?: string;
       calfBurnName?: string;
       calfGender?: "Female" | "Male";
@@ -268,10 +274,13 @@ export const createAnimalEvent = async (
         service_type: input.serviceType,
         service_date: common.event_date,
         sire: input.sire,
-        semen_item: input.semenItem,
-        // The server issues the straw itself (Stock Entry "Livestock Service"), one per
-        // event, from this store or the event type's default store when blank.
-        semen_warehouse: input.semenWarehouse,
+        // What the straw used is a stock line, sent only when the screen showed
+        // one (the Service event type posts stock). The server issues it as the
+        // named Stock Entry "Livestock Service", one per event, from this store
+        // or the event type's default store when blank.
+        items: input.semenItem
+          ? [{ item_code: input.semenItem, qty: 1, source_warehouse: input.semenWarehouse || undefined }]
+          : undefined,
       });
 
     case "Pregnancy Diagnosis":
@@ -287,48 +296,53 @@ export const createAnimalEvent = async (
     case "Birth": {
       // record_birth books the Calving on the dam and creates one Animal per
       // calf. `animal` here is the dam — the calf does not exist yet.
-      const stillborn = input.calvingOutcome !== "Live Birth";
-      // Upload first, so one server call carries the calving and the photo.
+      const wholeStillbirth = input.calvingOutcome !== "Live Birth";
+      const calves: CalfInput[] = input.calves?.length ? input.calves : [legacyCalf(input)];
+      // Upload first, so one server call carries the calving and every photo.
       // A network failure rethrows — nothing is recorded yet, so the queue can
       // safely retry the whole item. Any other failure (the file is gone, the
-      // server refused it) drops the photo, not the birth.
-      let photoUrl: string | undefined;
+      // server refused it) drops that photo, not the birth.
       let photo: "attached" | "failed" | "none" = "none";
-      if (!stillborn && input.calfPhoto) {
-        try {
-          photoUrl = await uploadCalfPhoto(input.calfPhoto);
-          photo = "attached";
-        } catch (e) {
-          if (!(e as any)?.response) throw e;
-          photo = "failed";
+      const rows: Record<string, unknown>[] = [];
+      for (const c of calves) {
+        const dead = wholeStillbirth || !!c.isStillborn;
+        let photoUrl: string | undefined;
+        if (!dead && c.photo) {
+          try {
+            photoUrl = await uploadCalfPhoto(c.photo);
+            if (photo !== "failed") photo = "attached";
+          } catch (e) {
+            if (!(e as any)?.response) throw e;
+            photo = "failed";
+          }
         }
+        rows.push({
+          // No number is sent: the server numbers every live calf (A for a
+          // heifer, B for a bull). A blank name is NOT a stillbirth;
+          // is_stillborn says so explicitly.
+          sex: c.sex,
+          burn_name: c.burnName?.trim() || undefined,
+          birth_weight: c.birthWeightKg,
+          herd: c.herd || undefined,
+          breed: c.breed,
+          health_status: c.healthStatus,
+          is_stillborn: dead ? 1 : 0,
+          photo: photoUrl,
+        });
       }
+      const coats = calves
+        .map((c, i) => (c.coatColour?.trim() ? `${calves.length > 1 ? `Calf ${i + 1} ` : ""}Coat: ${c.coatColour.trim()}` : undefined));
       const reply = await callOp(input.eventType, {
         dam: input.animal,
         event_date: common.event_date,
         operator: input.operator,
         outcome: input.calvingOutcome,
         related_pregnancy: input.relatedPregnancy,
-        remarks: withNote(
-          input.remarks,
-          input.coatColour ? `Coat: ${input.coatColour}` : undefined,
-        ),
-        calves: [
-          {
-            // _calf_row treats an empty/"STILLBORN" tag as stillborn, so a
-            // still birth needs no tag and a live birth must carry one.
-            name: stillborn ? "" : (input.calfBookNumber || "").trim(),
-            sex: input.calfGender,
-            birth_weight: input.birthWeightKg,
-            herd: input.calfTargetHerd,
-            breed: input.calfBreed,
-            health_status: input.calfHealthStatus,
-            photo: photoUrl,
-          },
-        ],
+        remarks: withNote(input.remarks, ...coats),
+        calves: rows,
       });
       // The calving is recorded: the durable copy has done its job.
-      if (input.calfPhoto) discardCalfPhoto(input.calfPhoto.uri);
+      for (const c of calves) if (c.photo) discardCalfPhoto(c.photo.uri);
       return { ...reply, photo };
     }
 

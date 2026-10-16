@@ -7,5 +7,5 @@ export const useHealthOptions = () =>
   useQuery({
     queryKey: ["health-options"],
     queryFn: getHealthOptions,
-    staleTime: 60_000,
+    staleTime: 30_000,
   });

@@ -16,6 +16,7 @@ import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useFinishRecording } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
 export default function Milk() {
   const finish = useFinishRecording();
@@ -26,6 +27,8 @@ export default function Milk() {
   const { data: eligibility } = useEligibility();
   const mutation = useCreateMilkRecording();
   const offline = useOffline();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
 
   // Only herds that actually produce milk. The backend derives this list from
   // Herd Movement settings; the `custom_is_milking` flag is the fallback until
@@ -83,7 +86,7 @@ export default function Milk() {
   };
 
   return (
-    <Screen title="Milk recording" subtitle="Record a herd's yield" back>
+    <Screen title="Milk recording" subtitle="Record a herd's yield" back onRefresh={onRefresh} refreshing={refreshing}>
       {offline ? (
         <Banner tone="info" icon="wifi-off">
           No connection. Milking works offline: it is kept on this phone and sent when you are back online.

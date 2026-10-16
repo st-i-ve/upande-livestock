@@ -13,8 +13,10 @@ import { getClient, todayISO } from "@/src/services/api";
 const NS = "/api/method/upande_livestock.serverscripts.health";
 
 export type TreatmentDose = {
-  /** Item code of the drug. */
-  itemCode: string;
+  /** Item code of the drug; absent where Treatment posts no stock. */
+  itemCode?: string;
+  /** The drug in words, when there is no item to name. */
+  drugName?: string;
   qty: number;
   warehouse?: string;
   batch?: string;
@@ -83,7 +85,8 @@ export const treatAnimal = async (input: TreatAnimalInput): Promise<any> => {
     vet_fee: input.vetFee && input.vetFee > 0 ? input.vetFee : undefined,
     treatment_date: input.treatmentDate || todayISO(),
     treatments: input.doses.map((d) => ({
-      drug_item: d.itemCode,
+      drug_item: d.itemCode || undefined,
+      drug_name_text: d.itemCode ? undefined : d.drugName,
       qty: d.qty,
       dosage: d.dosage || undefined,
       route: d.route || undefined,

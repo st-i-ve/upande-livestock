@@ -26,6 +26,7 @@ import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { extractFrappeError } from "@/src/services/api";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
 const REASONS = ["Routine age-out", "Repro status", "Other"] as const;
 
@@ -39,6 +40,8 @@ export default function Movement() {
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
   const [toHerdPick, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
@@ -122,6 +125,8 @@ export default function Movement() {
       title={titleFor("Movement", preset)}
       subtitle="Move animals between herds"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type="movement" />}
     >
       {isBackdating ? <BackdateBanner /> : null}

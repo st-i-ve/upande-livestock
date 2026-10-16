@@ -8,7 +8,7 @@ export const useVets = () =>
   useQuery({
     queryKey: ["vets"],
     queryFn: getVetOptions,
-    staleTime: 5 * 60_000,
+    staleTime: 30_000,
   });
 
 /**

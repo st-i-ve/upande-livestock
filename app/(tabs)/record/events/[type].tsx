@@ -12,6 +12,7 @@ import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { VetPicker } from "@/components/VetPicker";
+import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
 import { RADIUS } from "@/constants/theme";
 import {
@@ -25,6 +26,7 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useColors } from "@/src/hooks/useColors";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useOperator } from "@/src/hooks/useOperator";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
@@ -81,6 +83,8 @@ export default function GenericEvent() {
   // the farm has not set to issue stock shows no drug section at all.
   const { choices: stockChoices, consumes } = useEventItems(spec?.eventType ?? "");
   const takesDrugs = !!spec?.isRound && consumes;
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
 
   const eventMutation = useCreateAnimalEvent();
   const submitting = eventMutation.isPending;
@@ -225,6 +229,8 @@ export default function GenericEvent() {
       title={titleFor(spec.title, preset)}
       subtitle="New event"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type={type ?? ""} />}
     >
       {isBackdating ? <BackdateBanner /> : null}
@@ -276,7 +282,10 @@ export default function GenericEvent() {
       ) : null}
 
       {takesDrugs ? (
-        <DrugRows rows={drugs} onChange={setDrugs} choices={stockChoices} headcount={selected.length} />
+        <>
+          <AvailableStockButton eventType={spec.eventType} />
+          <DrugRows rows={drugs} onChange={setDrugs} choices={stockChoices} headcount={selected.length} />
+        </>
       ) : null}
 
       {spec.isRound ? <VetPicker vets={vets} value={vet} onChange={setVet} /> : null}

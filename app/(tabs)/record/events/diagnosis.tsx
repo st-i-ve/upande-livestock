@@ -18,6 +18,7 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useCreateCheckUp } from "@/src/hooks/mutations";
 import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useOperator } from "@/src/hooks/useOperator";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
@@ -45,6 +46,8 @@ export default function CheckUp() {
   const options = useHealthOptions();
   const o = options.data;
   const mutation = useCreateCheckUp();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
   const { vets, vet, setVet } = useVetChoice();
 
   const [animal, setAnimal] = useState<Animal | null>(null);
@@ -117,6 +120,8 @@ export default function CheckUp() {
       title={titleFor("Check up", preset)}
       subtitle="One look at one animal"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type="diagnosis" />}
     >
       {isBackdating ? <BackdateBanner /> : null}

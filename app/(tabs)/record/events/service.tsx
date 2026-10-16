@@ -12,13 +12,17 @@ import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
+import { VetPicker } from "@/components/VetPicker";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
+import { useVetChoice } from "@/src/hooks/useVets";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -37,12 +41,18 @@ export default function Service() {
   const [straw, setStraw] = useState<string>("");
   const [strawUom, setStrawUom] = useState<string>("");
   const [semenWarehouse, setSemenWarehouse] = useState<string>("");
+  const [sire, setSire] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
-  const { choices: semenChoices } = useEventItems("Service");
+  // Whether a service issues a straw is the Service event type's own rule
+  // (Settings > Stock), read from the server: no rule, no stock section.
+  const { choices: semenChoices, consumes } = useEventItems("Service");
+  const { vets, vet, setVet } = useVetChoice();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
 
   const handleSubmit = async () => {
     setError(null);
@@ -50,7 +60,7 @@ export default function Service() {
     if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to service.");
     // For A.I. with a semen straw, we issue it from a store — need the source.
-    const willIssueSemen = type === "A.I." && !!straw;
+    const willIssueSemen = consumes && type === "A.I." && !!straw;
     if (willIssueSemen && !semenWarehouse) {
       return setError("Pick the store the semen straws come from.");
     }
@@ -74,8 +84,10 @@ export default function Service() {
           operator,
           eventDate: isBackdating ? backdateDate : serverToday,
           serviceType: type,
-          semenItem: type === "A.I." ? straw || undefined : undefined,
-          semenWarehouse: type === "A.I." && semenWarehouse ? semenWarehouse : undefined,
+          vet: vet || undefined,
+          sire: sire.trim() || undefined,
+          semenItem: willIssueSemen ? straw : undefined,
+          semenWarehouse: willIssueSemen && semenWarehouse ? semenWarehouse : undefined,
           remarks: remarks || undefined,
         });
         succeeded += 1;
@@ -108,6 +120,8 @@ export default function Service() {
       title={titleFor("Service / AI", preset)}
       subtitle="Issue semen straw"
       back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       headerRight={isBackdating ? undefined : <BackdateButton type="service" />}
     >
       {isBackdating ? <BackdateBanner /> : null}
@@ -136,8 +150,9 @@ export default function Service() {
           <Picker value={type} onChange={(v) => setType(v as "A.I." | "Natural")} options={["A.I.", "Natural"]} />
         </Field>
       </FieldRow>
-      {type === "A.I." ? (
+      {type === "A.I." && consumes ? (
         <>
+          <AvailableStockButton eventType="Service" />
           <StockItemFields
             choices={semenChoices}
             itemLabel="Semen straw (Item)"
@@ -152,6 +167,10 @@ export default function Service() {
           />
         </>
       ) : null}
+      <Field label="Bull / sire" help={type === "A.I." && consumes ? "Optional. With a straw picked, the server takes the sire from the straw." : "Optional."}>
+        <Input value={sire} onChangeText={setSire} placeholder="Bull name or number" />
+      </Field>
+      <VetPicker vets={vets} value={vet} onChange={setVet} label="Vet / AI technician" />
       <Field label="Remarks">
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Heat signs, technician notes..." />
       </Field>
