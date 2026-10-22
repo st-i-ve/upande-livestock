@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View,
@@ -31,6 +32,20 @@ const FILTERS = [
   { id: "calf", label: "Calves" },
   { id: "incalf", label: "In-calf" },
 ];
+
+/** `#rgb`, `#rrggbb` or `rgb(...)` with an alpha. */
+function withAlpha(color: string, a: number): string {
+  const hex = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})/i);
+  if (hex) {
+    let h = hex[1];
+    if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const rgb = color.match(/rgba?\(([^)]+)\)/);
+  if (rgb) return `rgba(${rgb[1].split(",").slice(0, 3).join(",")},${a})`;
+  return color;
+}
 
 const monthsOld = (dob: string) => {
   const t = Date.parse(dob);
@@ -184,12 +199,18 @@ export default function Animals() {
         intensity={50}
         tint={dark ? "dark" : "light"}
         experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-        style={[s.header, { paddingTop: insets.top + 8, backgroundColor: dark ? "rgba(8,8,8,0.55)" : "rgba(255,255,255,0.6)" }]}
+        style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.10)" }]}
         onLayout={(e) => {
           const h = Math.round(e.nativeEvent.layout.height);
           setHeaderH((prev) => (prev === h ? prev : h));
         }}
       >
+        {/* Glass: the theme background is solid at the top and thins to ~40% at the bottom edge. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={[withAlpha(c.bg, 1), withAlpha(c.bg, 0.4)]}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={s.titleRow}>
           <CowIcon size={30} color={c.text} />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -239,7 +260,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     header: {
       position: "absolute", top: 0, left: 0, right: 0,
       paddingHorizontal: 14, paddingBottom: 8, overflow: "hidden",
-      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
     },
     titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
     title: { fontSize: 22, fontFamily: FONT_FAMILY.semibold, color: c.text },

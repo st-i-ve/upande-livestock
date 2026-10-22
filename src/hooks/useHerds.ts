@@ -31,9 +31,7 @@ export function useHerdFacts(): HerdFacts {
   }, []);
   useEffect(() => {
     if (!data) return;
-    const facts = factsFrom(data);
-    setKept(facts);
-    storage.setItem(HERD_FACTS_KEY, JSON.stringify(facts));
+    storage.setItem(HERD_FACTS_KEY, JSON.stringify(factsFrom(data)));
   }, [data]);
   return data ? factsFrom(data) : kept;
 }
