@@ -14,7 +14,7 @@ export const useHerds = () =>
 
 const HERD_FACTS_KEY = "herd_facts";
 
-export type HerdFacts = { milking: string[]; calf: string[] };
+export type HerdFacts = { milking: string[]; calf: string[]; heifer: string[] };
 
 /**
  * Which herds are milking (Livestock Settings) and which rear calves
@@ -23,10 +23,10 @@ export type HerdFacts = { milking: string[]; calf: string[] };
  */
 export function useHerdFacts(): HerdFacts {
   const { data } = useHerds();
-  const [kept, setKept] = useState<HerdFacts>({ milking: [], calf: [] });
+  const [kept, setKept] = useState<HerdFacts>({ milking: [], calf: [], heifer: [] });
   useEffect(() => {
     storage.getItem(HERD_FACTS_KEY).then((raw) => {
-      try { if (raw) setKept(JSON.parse(raw)); } catch {}
+      try { if (raw) setKept({ heifer: [], ...JSON.parse(raw) }); } catch {}
     });
   }, []);
   useEffect(() => {
@@ -39,4 +39,5 @@ export function useHerdFacts(): HerdFacts {
 const factsFrom = (herds: Herd[]): HerdFacts => ({
   milking: herds.filter((h) => h.isMilking).map((h) => h.n),
   calf: herds.filter((h) => h.isCalfRearing).map((h) => h.n),
+  heifer: herds.filter((h) => h.isHeifer).map((h) => h.n),
 });

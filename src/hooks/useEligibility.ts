@@ -16,6 +16,7 @@ import { getClient } from "@/src/services/api";
  */
 export type Eligibility = {
   milking_herds: string[];
+  heifer_herds: string[];
   service_herds: string[];
   service_wait_days: number;
   growth_ladder: {
@@ -34,6 +35,7 @@ export type Eligibility = {
 
 const EMPTY: Eligibility = {
   milking_herds: [],
+  heifer_herds: [],
   service_herds: [],
   service_wait_days: 0,
   growth_ladder: [],

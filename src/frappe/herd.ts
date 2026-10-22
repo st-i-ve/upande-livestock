@@ -24,6 +24,7 @@ export const mapHerd = (row: Record<string, any>): Herd => ({
   isMilking: !!row.is_milking,
   isDry: !!row.is_dry,
   isCalfRearing: !!row.is_calf_rearing,
+  isHeifer: !!row.is_heifer,
 });
 
 export const getHerds = async (): Promise<Herd[]> => {
