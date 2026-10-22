@@ -21,15 +21,37 @@ import { extractFrappeError } from "@/src/services/api";
 import { useScheme } from "@/src/theme/themeStore";
 import { useAnimalGroups } from "@/src/stores/animalGroups";
 import { useAnimals } from "@/src/hooks/useAnimals";
+import { useHerdFacts, type HerdFacts } from "@/src/hooks/useHerds";
 import type { Animal } from "@/types";
 
 const FILTERS = [
   { id: "all", label: "All" },
-  { id: "Lactating", label: "Lactating" },
-  { id: "Heifer", label: "Heifers" },
-  { id: "Calf", label: "Calves" },
-  { id: "Pregnant", label: "In-calf" },
+  { id: "lactating", label: "Lactating" },
+  { id: "heifer", label: "Heifers" },
+  { id: "calf", label: "Calves" },
+  { id: "incalf", label: "In-calf" },
 ];
+
+const monthsOld = (dob: string) => {
+  const t = Date.parse(dob);
+  return Number.isNaN(t) ? Infinity : (Date.now() - t) / (30.44 * 86_400_000);
+};
+
+/** The farm's own definitions: milking herds from Livestock Settings, calf-rearing herds from Herds, stages from the server. */
+function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal) => boolean {
+  const milking = new Set(facts.milking);
+  const calfHerds = new Set(facts.calf);
+  switch (id) {
+    case "lactating": return (a) => milking.has(a.herd);
+    case "heifer": return (a) => a.stage === "heifer";
+    case "calf":
+      return anyCalfHerd
+        ? (a) => calfHerds.has(a.herd)
+        : (a) => !!a.dob && monthsOld(a.dob) < 6;
+    case "incalf": return (a) => a.stage === "confirmed" || a.stage === "dry";
+    default: return () => true;
+  }
+}
 
 export default function Animals() {
   const c = useColors();
@@ -48,10 +70,18 @@ export default function Animals() {
   // Search runs in the local SQLite store (tag, name, herd), so it works offline.
   const { data: found = animals } = useAnimals(query);
 
-  const list = useMemo(() => {
-    if (filter === "all") return found;
-    return found.filter((a) => (a.repro || "").includes(filter));
-  }, [found, filter]);
+  const facts = useHerdFacts();
+  const matchers = useMemo(() => {
+    const any = facts.calf.length > 0;
+    return Object.fromEntries(FILTERS.map((f) => [f.id, matcher(f.id, facts, any)]));
+  }, [facts]);
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const f of FILTERS) out[f.id] = f.id === "all" ? animals.length : animals.filter(matchers[f.id]).length;
+    return out;
+  }, [animals, matchers]);
+
+  const list = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
 
   // Group the filtered list by herd.
   const groups = useMemo(() => {
@@ -189,7 +219,7 @@ export default function Animals() {
         </View>
         <Chips>
           {FILTERS.map((f) => (
-            <Chip key={f.id} label={f.label} active={filter === f.id} onPress={() => setFilter(f.id)} />
+            <Chip key={f.id} label={`${f.label} ${counts[f.id] ?? 0}`} active={filter === f.id} onPress={() => setFilter(f.id)} />
           ))}
         </Chips>
       </BlurView>

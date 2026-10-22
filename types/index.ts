@@ -35,6 +35,7 @@ export type Herd = {
   hasBom: boolean;
   isMilking?: boolean;
   isDry?: boolean;
+  isCalfRearing?: boolean;
 };
 
 export type DrawerItem = {
