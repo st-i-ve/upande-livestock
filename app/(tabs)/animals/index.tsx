@@ -1,25 +1,21 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  LayoutAnimation, Platform, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View,
+  LayoutAnimation, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View,
   type NativeScrollEvent, type NativeSyntheticEvent,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AnimalRow } from "@/components/AnimalRow";
 import { Chip, Chips } from "@/components/Chips";
 import { Collapsible } from "@/components/Collapsible";
-import { CowIcon } from "@/components/CowIcon";
 import { Empty } from "@/components/Empty";
 import { ErrorState } from "@/components/ErrorState";
 import { Loader } from "@/components/Loader";
+import { Screen } from "@/components/Screen";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
-import { useScheme } from "@/src/theme/themeStore";
 import { useAnimalGroups } from "@/src/stores/animalGroups";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useHerdFacts, type HerdFacts } from "@/src/hooks/useHerds";
@@ -33,32 +29,6 @@ const FILTERS = [
   { id: "incalf", label: "In-calf" },
 ];
 
-/** `#rgb`, `#rrggbb` or `rgb(...)` with an alpha. */
-// Header opacity down its height: 1 until GLASS_START, then
-// alpha(t) = 1 - (1 - GLASS_MIN) * (e^(k·u) - 1) / (e^k - 1), u = progress through
-// the fade — flat at first, dropping fastest at the very bottom edge.
-const GLASS_START = 0.55;
-const GLASS_MIN = 0.62;
-const GLASS_K = 3.5;
-const GLASS_STOPS: [number, number][] = [0, GLASS_START, 0.7, 0.8, 0.88, 0.94, 1].map((t) => {
-  const u = Math.max(0, (t - GLASS_START) / (1 - GLASS_START));
-  const a = 1 - (1 - GLASS_MIN) * (Math.exp(GLASS_K * u) - 1) / (Math.exp(GLASS_K) - 1);
-  return [t, Math.round(a * 1000) / 1000];
-});
-
-function withAlpha(color: string, a: number): string {
-  const hex = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})/i);
-  if (hex) {
-    let h = hex[1];
-    if (h.length === 3) h = h.split("").map((x) => x + x).join("");
-    const n = parseInt(h, 16);
-    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-  }
-  const rgb = color.match(/rgba?\(([^)]+)\)/);
-  if (rgb) return `rgba(${rgb[1].split(",").slice(0, 3).join(",")},${a})`;
-  return color;
-}
-
 const monthsOld = (dob: string) => {
   const t = Date.parse(dob);
   return Number.isNaN(t) ? Infinity : (Date.now() - t) / (30.44 * 86_400_000);
@@ -68,9 +38,15 @@ const monthsOld = (dob: string) => {
 function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal) => boolean {
   const milking = new Set(facts.milking);
   const calfHerds = new Set(facts.calf);
+  const heiferHerds = new Set(facts.heifer);
   switch (id) {
     case "lactating": return (a) => milking.has(a.herd);
-    case "heifer": return (a) => a.stage === "heifer";
+    case "heifer":
+      // The farm's heifer herds when set; otherwise unserved females that are
+      // old enough not to be calves.
+      return heiferHerds.size > 0
+        ? (a) => heiferHerds.has(a.herd)
+        : (a) => a.stage === "heifer" && !!a.dob && monthsOld(a.dob) >= 6;
     case "calf":
       return anyCalfHerd
         ? (a) => calfHerds.has(a.herd)
@@ -82,12 +58,9 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
 
 export default function Animals() {
   const c = useColors();
-  const dark = useScheme() === "dark";
   const s = useMemo(() => makeStyles(c), [c]);
-  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
-  const [headerH, setHeaderH] = useState(220);
   const [showTop, setShowTop] = useState(false);
   const listRef = useRef<SectionList<Animal>>(null);
   const openMap = useAnimalGroups((st) => st.open);
@@ -146,7 +119,7 @@ export default function Animals() {
   const backToTop = () => {
     animate();
     setAll(herds, false);
-    listRef.current?.scrollToLocation({ sectionIndex: 0, itemIndex: 0, viewOffset: headerH, animated: true });
+    listRef.current?.scrollToLocation({ sectionIndex: 0, itemIndex: 0, animated: true });
     setShowTop(false);
   };
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -158,7 +131,34 @@ export default function Animals() {
   const state = isLoading ? "loading" : error ? "error" : list.length === 0 ? "empty" : "ok";
 
   return (
-    <View style={s.screen}>
+    <Screen title="Animals" subtitle={subtitle || undefined} scroll={false} headerRight={(!searching && herds.length > 0 ? (
+          <Pressable onPress={toggleAll} hitSlop={8} style={s.toggleAll} accessibilityRole="button">
+            <MaterialCommunityIcons
+              name={allOpen ? "unfold-less-horizontal" : "unfold-more-horizontal"}
+              size={18}
+              color={c.text}
+            />
+            <Text style={s.toggleText}>{allOpen ? "Collapse all" : "Expand all"}</Text>
+          </Pressable>
+        ) : null)}>
+      <View style={s.search}>
+        <MaterialCommunityIcons name="magnify" size={18} color={c.textSubtle} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search by tag, name or herd"
+          placeholderTextColor={c.textSubtle}
+          style={s.input}
+        />
+      </View>
+      <Chips>
+        {FILTERS.map((f) => (
+          <Chip key={f.id} label={`${f.label} ${counts[f.id] ?? 0}`} active={filter === f.id} onPress={() => setFilter(f.id)} />
+        ))}
+      </Chips>
+      {filter === "heifer" && facts.heifer.length === 0 ? (
+        <Text style={s.hint}>Set heifer herds in Livestock Settings</Text>
+      ) : null}
       {state === "ok" ? (
         <SectionList
           ref={listRef}
@@ -168,14 +168,12 @@ export default function Animals() {
           keyboardShouldPersistTaps="handled"
           onScroll={onScroll}
           scrollEventThrottle={64}
-          contentContainerStyle={{ paddingTop: headerH, paddingHorizontal: 14, paddingBottom: 24 }}
-          scrollIndicatorInsets={{ top: headerH }}
+          contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={() => refetch()}
               tintColor={c.text}
-              progressViewOffset={headerH}
             />
           }
           renderSectionHeader={({ section }) => (
@@ -196,7 +194,7 @@ export default function Animals() {
           )}
         />
       ) : (
-        <View style={{ paddingTop: headerH, paddingHorizontal: 14 }}>
+        <View>
           {state === "loading" ? (
             <Loader />
           ) : state === "error" ? (
@@ -207,78 +205,20 @@ export default function Animals() {
         </View>
       )}
 
-      <BlurView
-        intensity={50}
-        tint={dark ? "dark" : "light"}
-        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-        style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.10)" }]}
-        onLayout={(e) => {
-          const h = Math.round(e.nativeEvent.layout.height);
-          setHeaderH((prev) => (prev === h ? prev : h));
-        }}
-      >
-        {/* Glass: solid for most of the header, then an inverse-exponential fall-off
-            in the last stretch, so only the bottom edge is frosted. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={GLASS_STOPS.map(([, a]) => withAlpha(c.bg, a)) as unknown as readonly [string, string, ...string[]]}
-          locations={GLASS_STOPS.map(([t]) => t) as unknown as readonly [number, number, ...number[]]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={s.titleRow}>
-          <CowIcon size={30} color={c.text} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.title} numberOfLines={1}>Animals</Text>
-            {subtitle ? <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
-          </View>
-          {!searching && herds.length > 0 ? (
-            <Pressable onPress={toggleAll} hitSlop={8} style={s.toggleAll} accessibilityRole="button">
-              <MaterialCommunityIcons
-                name={allOpen ? "unfold-less-horizontal" : "unfold-more-horizontal"}
-                size={18}
-                color={c.text}
-              />
-              <Text style={s.toggleText}>{allOpen ? "Collapse all" : "Expand all"}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        <View style={s.search}>
-          <MaterialCommunityIcons name="magnify" size={18} color={c.textSubtle} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search by tag, name or herd"
-            placeholderTextColor={c.textSubtle}
-            style={s.input}
-          />
-        </View>
-        <Chips>
-          {FILTERS.map((f) => (
-            <Chip key={f.id} label={`${f.label} ${counts[f.id] ?? 0}`} active={filter === f.id} onPress={() => setFilter(f.id)} />
-          ))}
-        </Chips>
-      </BlurView>
 
       {showTop ? (
         <Pressable onPress={backToTop} style={s.fab} accessibilityRole="button" accessibilityLabel="Back to top and collapse all">
           <MaterialCommunityIcons name="chevron-up" size={26} color={c.bg} />
         </Pressable>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.bg },
-    header: {
-      position: "absolute", top: 0, left: 0, right: 0,
-      paddingHorizontal: 14, paddingBottom: 8, overflow: "hidden",
-      borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    titleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
-    title: { fontSize: 22, fontFamily: FONT_FAMILY.semibold, color: c.text },
-    subtitle: { fontSize: 13, fontFamily: FONT_FAMILY.regular, color: c.textMuted, marginTop: 1 },
+    hint: { fontSize: 12, fontFamily: FONT_FAMILY.regular, color: c.textMuted, marginTop: 6 },
     toggleAll: {
       flexDirection: "row", alignItems: "center", gap: 4,
       paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
