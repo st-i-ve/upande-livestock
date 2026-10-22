@@ -41,6 +41,13 @@ const MIGRATIONS: string[][] = [
     `ALTER TABLE animals ADD COLUMN stage TEXT`,
     `DELETE FROM meta WHERE key = 'animals_server_time'`,
   ],
+  // 2 -> 3: animals_since now returns each animal's photo, but a photo set on
+  // the server does not move the animal's `modified`, so a delta sync never
+  // brought it down and rows synced earlier kept image NULL (the app showed the
+  // generic cow and never requested a /files/ URL). Drop the cursor: full sync.
+  [
+    `DELETE FROM meta WHERE key = 'animals_server_time'`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

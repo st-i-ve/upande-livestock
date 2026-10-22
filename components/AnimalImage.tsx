@@ -50,6 +50,7 @@ export function AnimalImage({
           recyclingKey={uri!}
           contentFit="cover"
           transition={120}
+          onError={(e) => console.warn("[img] failed", uri, e?.error)}
           style={{ width: "100%", height: "100%" }}
         />
       ) : (
