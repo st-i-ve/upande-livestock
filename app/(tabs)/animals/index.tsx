@@ -39,6 +39,7 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
   const milking = new Set(facts.milking);
   const calfHerds = new Set(facts.calf);
   const heiferHerds = new Set(facts.heifer);
+  const inCalfHerds = new Set(facts.inCalf);
   switch (id) {
     case "lactating": return (a) => milking.has(a.herd);
     case "heifer":
@@ -51,7 +52,11 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
       return anyCalfHerd
         ? (a) => calfHerds.has(a.herd)
         : (a) => !!a.dob && monthsOld(a.dob) < 6;
-    case "incalf": return (a) => a.stage === "confirmed" || a.stage === "dry";
+    case "incalf":
+      // Only the farm's in-calf herds (bullying heifers, steamers) when set.
+      return inCalfHerds.size > 0
+        ? (a) => inCalfHerds.has(a.herd)
+        : (a) => a.stage === "confirmed" || a.stage === "dry";
     default: return () => true;
   }
 }
@@ -158,6 +163,9 @@ export default function Animals() {
       </Chips>
       {filter === "heifer" && facts.heifer.length === 0 ? (
         <Text style={s.hint}>Set heifer herds in Livestock Settings</Text>
+      ) : null}
+      {filter === "incalf" && facts.inCalf.length === 0 ? (
+        <Text style={s.hint}>Set in-calf herds in Livestock Settings</Text>
       ) : null}
       {state === "ok" ? (
         <SectionList

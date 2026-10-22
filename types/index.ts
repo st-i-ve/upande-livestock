@@ -38,6 +38,8 @@ export type Herd = {
   isMilking?: boolean;
   isDry?: boolean;
   isCalfRearing?: boolean;
+  isCalf?: boolean;
+  isInCalf?: boolean;
   isHeifer?: boolean;
 };
 

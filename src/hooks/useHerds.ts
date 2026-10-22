@@ -14,19 +14,19 @@ export const useHerds = () =>
 
 const HERD_FACTS_KEY = "herd_facts";
 
-export type HerdFacts = { milking: string[]; calf: string[]; heifer: string[] };
+export type HerdFacts = { milking: string[]; calf: string[]; heifer: string[]; inCalf: string[] };
 
 /**
- * Which herds are milking (Livestock Settings) and which rear calves
- * (Herds.custom_is_calf_rearing), from the herd list the app already fetches.
+ * Which herds are milking (Livestock Settings) and which are calf, heifer and in-calf herds
+ * (Livestock Settings; Herds.custom_is_calf_rearing as the calf fallback), from the herd list the app already fetches.
  * The last answer is kept on the phone so the Animals filters work offline.
  */
 export function useHerdFacts(): HerdFacts {
   const { data } = useHerds();
-  const [kept, setKept] = useState<HerdFacts>({ milking: [], calf: [], heifer: [] });
+  const [kept, setKept] = useState<HerdFacts>({ milking: [], calf: [], heifer: [], inCalf: [] });
   useEffect(() => {
     storage.getItem(HERD_FACTS_KEY).then((raw) => {
-      try { if (raw) setKept({ heifer: [], ...JSON.parse(raw) }); } catch {}
+      try { if (raw) setKept({ heifer: [], inCalf: [], ...JSON.parse(raw) }); } catch {}
     });
   }, []);
   useEffect(() => {
@@ -38,6 +38,9 @@ export function useHerdFacts(): HerdFacts {
 
 const factsFrom = (herds: Herd[]): HerdFacts => ({
   milking: herds.filter((h) => h.isMilking).map((h) => h.n),
-  calf: herds.filter((h) => h.isCalfRearing).map((h) => h.n),
+  // Calf herds from Livestock Settings; the herd's own calf-rearing flag only
+  // when the farm has not filled that table in.
+  calf: (herds.some((h) => h.isCalf) ? herds.filter((h) => h.isCalf) : herds.filter((h) => h.isCalfRearing)).map((h) => h.n),
   heifer: herds.filter((h) => h.isHeifer).map((h) => h.n),
+  inCalf: herds.filter((h) => h.isInCalf).map((h) => h.n),
 });

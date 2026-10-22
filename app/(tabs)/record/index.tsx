@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Pill } from "@/components/Pill";
+import { font } from "@/constants/theme";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useColors } from "@/src/hooks/useColors";
@@ -55,7 +56,7 @@ export default function Record() {
       ) : null}
       {SECTIONS.map((sec) => (
         <View key={sec.title}>
-          <SectionTitle>{sec.title}</SectionTitle>
+          <SectionTitle style={s.section}>{sec.title}</SectionTitle>
           {sec.items.map((it) => {
             const onlineOnly = offline && it.href !== MILKING;
             return (
@@ -68,12 +69,12 @@ export default function Record() {
                 pressed && { backgroundColor: c.bgMuted },
               ]}
             >
-              <MaterialCommunityIcons name={it.icon} size={18} color={c.textMuted} />
+              <MaterialCommunityIcons name={it.icon} size={22} color={c.textMuted} />
               <Text style={s.text}>{it.label}</Text>
               {offline ? (
                 <Pill label={onlineOnly ? "online only" : "works offline"} tone={onlineOnly ? "default" : "success"} />
               ) : null}
-              <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
+              <MaterialCommunityIcons name="chevron-right" size={22} color={c.textSubtle} />
             </Pressable>
             );
           })}
@@ -88,10 +89,13 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     item: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 9,
-      paddingVertical: 10,
+      gap: 14,
+      minHeight: 54,
+      paddingVertical: 14,
+      paddingHorizontal: 4,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,
     },
-    text: { flex: 1, fontSize: 13, color: c.text },
+    section: { fontSize: 13.5, marginTop: 22, marginBottom: 6 },
+    text: { flex: 1, fontSize: 17, ...font("400"), color: c.text },
   });
