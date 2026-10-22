@@ -87,7 +87,7 @@ export default function RootLayout() {
   const authLoading = useAuthStore((s) => s.isLoading);
   const signedIn = useAuthStore((s) => s.isAuthenticated);
 
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
@@ -125,7 +125,15 @@ export default function RootLayout() {
 
   // Hold on a themed splash until fonts, theme preference, and the auth check
   // are all resolved — so we never flash the login screen on resume/cold start.
-  const ready = fontsLoaded && hydrated && !authLoading;
+  // A font that fails to load, or a step that never settles, must not hold the
+  // app on the spinner: after a few seconds it opens anyway (system font).
+  const [timedOut, setTimedOut] = React.useState(false);
+  React.useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
+  if (fontError) console.warn("[fonts] Poppins failed to load", fontError);
+  const ready = timedOut || ((fontsLoaded || !!fontError) && hydrated && !authLoading);
 
   React.useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
