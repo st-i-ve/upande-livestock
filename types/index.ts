@@ -16,6 +16,8 @@ export type Animal = {
   breed?: string | null;
   /** Server-relative file URL (`/files/...`) of the Animal image field. */
   image?: string | null;
+  /** ~240 px JPEG of `image`, for list rows and pickers. */
+  thumb?: string | null;
   dam?: string | null;
   sire?: string | null;
   status?: string | null;

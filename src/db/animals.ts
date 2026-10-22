@@ -16,6 +16,7 @@ export type ServerAnimal = {
   stage?: string | null;
   repro_status: string | null;
   image: string | null;
+  thumb?: string | null;
   dam: string | null;
   sire: string | null;
   parity: number | null;
@@ -27,7 +28,7 @@ type Row = Omit<ServerAnimal, "dob"> & { dob: string | null };
 
 const COLS = [
   "name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage",
-  "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified",
+  "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "modified",
 ] as const;
 
 /**
@@ -76,6 +77,7 @@ const toAnimal = (r: Row): Animal => ({
   tag: r.tag,
   breed: r.breed,
   image: r.image,
+  thumb: r.thumb,
   dam: r.dam,
   sire: r.sire,
   status: r.status,

@@ -48,6 +48,13 @@ const MIGRATIONS: string[][] = [
   [
     `DELETE FROM meta WHERE key = 'animals_server_time'`,
   ],
+  // 3 -> 4: a ~240 px thumbnail per animal for list rows. Rows on the phone have
+  // none and the server does not touch `modified` when it makes one, so drop the
+  // cursor for one full sync.
+  [
+    `ALTER TABLE animals ADD COLUMN thumb TEXT`,
+    `DELETE FROM meta WHERE key = 'animals_server_time'`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

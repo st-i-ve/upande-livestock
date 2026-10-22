@@ -14,10 +14,13 @@ import { STORAGE_KEYS, storage } from "@/src/services/storage";
  */
 export function AnimalImage({
   image,
+  thumb,
   style,
   animal,
 }: {
   image?: string | null;
+  /** The small version, for rows and pickers; the full `image` is used when absent or if it fails. */
+  thumb?: string | null;
   style?: StyleProp<ViewStyle>;
   /** Her sex, age and stage, to pick the generic picture when she has no photo. */
   animal?: KindFacts | null;
@@ -27,13 +30,15 @@ export function AnimalImage({
   const c = useColors();
   const base = useAuthStore((s) => s.instanceUrl);
   const [cookie, setCookie] = useState<string | null>(null);
-  const isPrivate = !!image && image.startsWith("/private/");
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const shown = thumb && !thumbFailed ? thumb : image;
+  const abs = (u: string) => (u.startsWith("/") ? `${base.replace(/\/+$/, "")}${u}` : u);
+  const isPrivate = !!shown && shown.startsWith("/private/");
+  const uri = shown ? abs(shown) : null;
   useEffect(() => {
     if (!isPrivate) return;
     storage.getItem(STORAGE_KEYS.COOKIE).then(setCookie);
   }, [isPrivate]);
-
-  const uri = image ? (image.startsWith("/") ? `${base.replace(/\/+$/, "")}${image}` : image) : null;
   const ready = !!uri && (!isPrivate || cookie);
 
   return (
@@ -50,7 +55,10 @@ export function AnimalImage({
           recyclingKey={uri!}
           contentFit="cover"
           transition={120}
-          onError={(e) => console.warn("[img] failed", uri, e?.error)}
+          onError={(e) => {
+            console.warn("[img] failed", uri, e?.error);
+            if (thumb && !thumbFailed) setThumbFailed(true);
+          }}
           style={{ width: "100%", height: "100%" }}
         />
       ) : (
