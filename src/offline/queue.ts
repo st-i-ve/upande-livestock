@@ -1,8 +1,10 @@
+import { discardCalfPhoto } from "@/src/frappe/calfPhoto";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
- * Persistent queue of mutations that failed because the device was offline
- * (or the request never reached the server). Each entry is dispatched by
+ * Persistent queue of MILKINGS that failed because the device was offline
+ * (or the request never reached the server). Every other record needs a live
+ * connection; other types here are only ever left over from older builds. Each entry is dispatched by
  * type via `src/offline/dispatcher.ts`.
  *
  * State is durable across app restarts. The queue is the single source of
@@ -16,7 +18,11 @@ export type PendingMutationType =
   | "Animal"
   | "CalfFeeding"
   | "AnimalDiagnosis"
+  | "Treatment"
+  /** Retired: the phone opens files only through a treatment now. */
   | "AnimalHealthCase"
+  /** Retired: the phone no longer posts stock or vet fees. Kept so an item
+   *  queued by an older build is reported rather than crashing the drain. */
   | "BatchDrugIssue"
   | "AnimalHealthCaseUpdate";
 
@@ -84,8 +90,14 @@ export const enqueue = async (
   return full;
 };
 
+/** A dropped or finished item no longer needs its durable calf photo copy. */
+const discardPhotos = (items: PendingMutation[]) => {
+  for (const m of items) discardCalfPhoto(m.payload?.calfPhoto?.uri);
+};
+
 export const remove = async (id: string): Promise<void> => {
   const q = await loadQueue();
+  discardPhotos(q.filter((m) => m.id === id));
   await persist(q.filter((m) => m.id !== id));
 };
 
@@ -108,6 +120,7 @@ export const markAttempt = async (
 };
 
 export const clear = async (): Promise<void> => {
+  discardPhotos(await loadQueue());
   await persist([]);
 };
 

@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "@/components/Button";
@@ -103,7 +104,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     br: { bottom: INSET, right: INSET },
     title: {
       fontSize: 18,
-      fontWeight: "600",
+      ...font("600"),
       color: c.text,
       textAlign: "center",
       marginBottom: 8,

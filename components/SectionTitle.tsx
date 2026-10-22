@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { StyleSheet, Text, type TextStyle } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -12,7 +13,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     t: {
       fontSize: 11,
-      fontWeight: "600",
+      ...font("600"),
       color: c.textMuted,
       textTransform: "uppercase",
       letterSpacing: 0.4,

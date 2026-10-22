@@ -1,7 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  LayoutAnimation, Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View,
+  type NativeScrollEvent, type NativeSyntheticEvent,
+} from "react-native";
 
 import { AnimalRow } from "@/components/AnimalRow";
 import { Chip, Chips } from "@/components/Chips";
@@ -10,38 +13,82 @@ import { Empty } from "@/components/Empty";
 import { ErrorState } from "@/components/ErrorState";
 import { Loader } from "@/components/Loader";
 import { Screen } from "@/components/Screen";
-import { RADIUS } from "@/constants/theme";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
+import { useAnimalGroups } from "@/src/stores/animalGroups";
 import { useAnimals } from "@/src/hooks/useAnimals";
+import { useHerdFacts, type HerdFacts } from "@/src/hooks/useHerds";
 import type { Animal } from "@/types";
 
 const FILTERS = [
   { id: "all", label: "All" },
-  { id: "Lactating", label: "Lactating" },
-  { id: "Heifer", label: "Heifers" },
-  { id: "Calf", label: "Calves" },
-  { id: "Pregnant", label: "In-calf" },
+  { id: "lactating", label: "Lactating" },
+  { id: "heifer", label: "Heifers" },
+  { id: "calf", label: "Calves" },
+  { id: "incalf", label: "In-calf" },
 ];
+
+const monthsOld = (dob: string) => {
+  const t = Date.parse(dob);
+  return Number.isNaN(t) ? Infinity : (Date.now() - t) / (30.44 * 86_400_000);
+};
+
+/** The farm's own definitions: milking herds from Livestock Settings, calf-rearing herds from Herds, stages from the server. */
+function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal) => boolean {
+  const milking = new Set(facts.milking);
+  const calfHerds = new Set(facts.calf);
+  const heiferHerds = new Set(facts.heifer);
+  const inCalfHerds = new Set(facts.inCalf);
+  switch (id) {
+    case "lactating": return (a) => milking.has(a.herd);
+    case "heifer":
+      // The farm's heifer herds when set; otherwise unserved females that are
+      // old enough not to be calves.
+      return heiferHerds.size > 0
+        ? (a) => heiferHerds.has(a.herd)
+        : (a) => a.stage === "heifer" && !!a.dob && monthsOld(a.dob) >= 6;
+    case "calf":
+      return anyCalfHerd
+        ? (a) => calfHerds.has(a.herd)
+        : (a) => !!a.dob && monthsOld(a.dob) < 6;
+    case "incalf":
+      // Only the farm's in-calf herds (bullying heifers, steamers) when set.
+      return inCalfHerds.size > 0
+        ? (a) => inCalfHerds.has(a.herd)
+        : (a) => a.stage === "confirmed" || a.stage === "dry";
+    default: return () => true;
+  }
+}
 
 export default function Animals() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [showTop, setShowTop] = useState(false);
+  const listRef = useRef<SectionList<Animal>>(null);
+  const openMap = useAnimalGroups((st) => st.open);
+  const toggleGroup = useAnimalGroups((st) => st.toggle);
+  const setAll = useAnimalGroups((st) => st.setAll);
   const { data: animals = [], isLoading, isRefetching, error, refetch } = useAnimals();
+  // Search runs in the local SQLite store (tag, name, herd), so it works offline.
+  const { data: found = animals } = useAnimals(query);
 
-  const list = useMemo(() => {
-    let l = animals;
-    if (filter !== "all") l = l.filter((a) => (a.repro || "").includes(filter));
-    if (query) {
-      const q = query.toLowerCase();
-      l = l.filter((a) => a.id.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
-    }
-    return l;
-  }, [animals, filter, query]);
+  const facts = useHerdFacts();
+  const matchers = useMemo(() => {
+    const any = facts.calf.length > 0;
+    return Object.fromEntries(FILTERS.map((f) => [f.id, matcher(f.id, facts, any)]));
+  }, [facts]);
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const f of FILTERS) out[f.id] = f.id === "all" ? animals.length : animals.filter(matchers[f.id]).length;
+    return out;
+  }, [animals, matchers]);
 
-  // Group the filtered list by herd for the collapsible tree.
+  const list = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
+
+  // Group the filtered list by herd.
   const groups = useMemo(() => {
     const map = new Map<string, Animal[]>();
     for (const a of list) {
@@ -53,63 +100,145 @@ export default function Animals() {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [list]);
 
+  const searching = query.trim().length > 0;
+  const isOpen = useCallback((herd: string) => searching || !!openMap[herd], [searching, openMap]);
+  const herds = useMemo(() => groups.map(([h]) => h), [groups]);
+  const allOpen = herds.length > 0 && herds.every((h) => isOpen(h));
+
+  // Collapsed groups contribute no rows, so ~400 animals stay cheap.
+  const sections = useMemo(
+    () =>
+      groups.map(([herd, items]) => ({
+        herd,
+        count: items.length,
+        data: isOpen(herd) ? items : [],
+      })),
+    [groups, isOpen],
+  );
+
+  const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  const toggleAll = () => {
+    animate();
+    setAll(herds, !allOpen);
+  };
+  const backToTop = () => {
+    animate();
+    setAll(herds, false);
+    listRef.current?.scrollToLocation({ sectionIndex: 0, itemIndex: 0, animated: true });
+    setShowTop(false);
+  };
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const show = e.nativeEvent.contentOffset.y > 500;
+    setShowTop((prev) => (prev === show ? prev : show));
+  };
+
   const subtitle = animals.length ? `${animals.length} animals` : "";
-  // Expand all groups while searching/filtering so matches are visible.
-  const expanded = !!query || filter !== "all";
+  const state = isLoading ? "loading" : error ? "error" : list.length === 0 ? "empty" : "ok";
 
   return (
-    <Screen
-      title="Animals"
-      subtitle={subtitle}
-      onRefresh={() => refetch()}
-      refreshing={isRefetching}
-    >
+    <Screen title="Animals" subtitle={subtitle || undefined} scroll={false} headerRight={(!searching && herds.length > 0 ? (
+          <Pressable onPress={toggleAll} hitSlop={8} style={s.toggleAll} accessibilityRole="button">
+            <MaterialCommunityIcons
+              name={allOpen ? "unfold-less-horizontal" : "unfold-more-horizontal"}
+              size={18}
+              color={c.text}
+            />
+            <Text style={s.toggleText}>{allOpen ? "Collapse all" : "Expand all"}</Text>
+          </Pressable>
+        ) : null)}>
       <View style={s.search}>
         <MaterialCommunityIcons name="magnify" size={18} color={c.textSubtle} />
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search by tag or name"
+          placeholder="Search by tag, name or herd"
           placeholderTextColor={c.textSubtle}
           style={s.input}
         />
       </View>
       <Chips>
         {FILTERS.map((f) => (
-          <Chip key={f.id} label={f.label} active={filter === f.id} onPress={() => setFilter(f.id)} />
+          <Chip key={f.id} label={`${f.label} ${counts[f.id] ?? 0}`} active={filter === f.id} onPress={() => setFilter(f.id)} />
         ))}
       </Chips>
-
-      {isLoading ? (
-        <Loader />
-      ) : error ? (
-        <ErrorState text={extractFrappeError(error)} onRetry={() => refetch()} />
-      ) : list.length === 0 ? (
-        <Empty text="No animals match" />
-      ) : (
-        groups.map(([herd, herdAnimals]) => (
-          <Collapsible
-            key={`${herd}-${expanded}`}
-            title={herd}
-            meta={`${herdAnimals.length} head`}
-            defaultOpen={expanded}
-          >
-            {herdAnimals.map((a) => (
+      {filter === "heifer" && facts.heifer.length === 0 ? (
+        <Text style={s.hint}>Set heifer herds in Livestock Settings</Text>
+      ) : null}
+      {filter === "incalf" && facts.inCalf.length === 0 ? (
+        <Text style={s.hint}>Set in-calf herds in Livestock Settings</Text>
+      ) : null}
+      {state === "ok" ? (
+        <SectionList
+          ref={listRef}
+          sections={sections}
+          keyExtractor={(a) => a.id}
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={64}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={() => refetch()}
+              tintColor={c.text}
+            />
+          }
+          renderSectionHeader={({ section }) => (
+            <Collapsible
+              title={section.herd}
+              meta={`${section.count} head`}
+              open={isOpen(section.herd)}
+              onToggle={() => toggleGroup(section.herd)}
+            />
+          )}
+          renderItem={({ item }) => (
+            <View style={s.rowIndent}>
               <AnimalRow
-                key={a.id}
-                a={a}
-                onPress={() => router.push(`/(tabs)/animals/${encodeURIComponent(a.id)}`)}
+                a={item}
+                onPress={() => router.push(`/(tabs)/animals/${encodeURIComponent(item.id)}`)}
               />
-            ))}
-          </Collapsible>
-        ))
+            </View>
+          )}
+        />
+      ) : (
+        <View>
+          {state === "loading" ? (
+            <Loader />
+          ) : state === "error" ? (
+            <ErrorState text={extractFrappeError(error)} onRetry={() => refetch()} />
+          ) : (
+            <Empty text="No animals match" />
+          )}
+        </View>
       )}
+
+
+      {showTop ? (
+        <Pressable onPress={backToTop} style={s.fab} accessibilityRole="button" accessibilityLabel="Back to top and collapse all">
+          <MaterialCommunityIcons name="chevron-up" size={26} color={c.bg} />
+        </Pressable>
+      ) : null}
     </Screen>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    hint: { fontSize: 12, fontFamily: FONT_FAMILY.regular, color: c.textMuted, marginTop: 6 },
+    toggleAll: {
+      flexDirection: "row", alignItems: "center", gap: 4,
+      paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth, borderColor: c.border,
+    },
+    toggleText: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: c.text },
+    rowIndent: { marginLeft: 24 },
+    fab: {
+      position: "absolute", right: 16, bottom: 16, width: 48, height: 48, borderRadius: 24,
+      backgroundColor: c.text, alignItems: "center", justifyContent: "center",
+      elevation: 6, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+    },
     search: {
       flexDirection: "row",
       alignItems: "center",

@@ -1,4 +1,6 @@
+import { useOnChange } from "@/src/hooks/useOnChange";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
@@ -17,6 +19,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -31,14 +34,16 @@ import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useAuthStore } from "@/src/auth/authStore";
-import { extractFrappeError } from "@/src/services/api";
+import { classifyError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
 
 // Login form fields never grow past 80% of the screen width so they stay
 // comfortable to read on tablets and large phones.
 const FIELD_WIDTH = Math.min(Math.round(Dimensions.get("window").width * 0.8), 400);
-// How long the logo must be held to reveal the hidden instance-URL field.
-const REVEAL_HOLD_MS = 3000;
+// How long the logo must be held to reveal the hidden instance-URL field. One
+// second, matching the Scout app — three was long enough that people let go
+// before anything happened and concluded the gesture did not exist.
+const REVEAL_HOLD_MS = 1000;
 // The URL field collapses back into the logo after this long with no activity.
 const IDLE_HIDE_MS = 5000;
 // Fully-expanded height of the URL field row (input + spacing below).
@@ -67,19 +72,19 @@ export default function LoginScreen() {
 
   // Reveal progress: 0 = URL hidden, 1 = URL field shown.
   const reveal = useSharedValue(0);
-  // Continuous breathing pulse for the status-dot glow.
+  // Halo pulse around the logo while no instance URL is set.
   const pulse = useSharedValue(0);
   const urlInputRef = useRef<RNTextInput | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedRef = useRef(false);
 
-  useEffect(() => {
-    if (storedEmail && !email) setEmail(storedEmail);
-  }, [storedEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnChange(storedEmail, (stored) => {
+    if (stored && !email) setEmail(stored);
+  });
 
-  useEffect(() => {
-    if (instanceUrl && !url) setUrl(instanceUrl);
-  }, [instanceUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnChange(instanceUrl, (stored) => {
+    if (stored && !url) setUrl(stored);
+  });
 
   const clearHideTimer = () => {
     if (hideTimer.current) {
@@ -108,6 +113,9 @@ export default function LoginScreen() {
 
   const revealUrl = () => {
     if (urlRevealed) return;
+    // A hidden gesture needs to confirm itself. Without this the only feedback
+    // is the field animating in, which is easy to miss mid-hold.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setUrlRevealed(true);
     reveal.value = withTiming(
       1,
@@ -122,14 +130,28 @@ export default function LoginScreen() {
 
   useEffect(() => clearHideTimer, []);
 
+  // The only way to set an instance URL is a long-press on the logo, and a
+  // hidden gesture needs an affordance. With no URL the logo pulses a halo to
+  // draw the eye to the thing you have to press; once one is set the halo stops
+  // and a green dot takes over as the "linked" indicator. There is no amber
+  // state any more — a dot that says "not configured" explains nothing about
+  // where to go next, and it sat below the logo rather than pointing at it.
   useEffect(() => {
-    // Radar-style ping: a ripple expands outward and fades, then repeats.
+    if (hasInstance) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
+    // One-directional on purpose: withRepeat(..., false) snaps back to 0 each
+    // pass, so every iteration is a clean outward ripple. Reversing would run
+    // the halo inward while it brightens, which reads as collapsing rather
+    // than radiating.
     pulse.value = withRepeat(
-      withTiming(1, { duration: 1500, easing: Easing.out(Easing.ease) }),
+      withTiming(1, { duration: 1600, easing: Easing.out(Easing.ease) }),
       -1,
       false,
     );
-  }, [pulse]);
+  }, [hasInstance, pulse]);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -148,7 +170,7 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password, url.trim());
     } catch (err) {
-      setError(extractFrappeError(err));
+      setError(classifyError(err).message);
     } finally {
       setLoading(false);
     }
@@ -171,10 +193,13 @@ export default function LoginScreen() {
     height: reveal.value * URL_FIELD_HEIGHT,
     opacity: reveal.value,
   }));
-  // Radar ping: the ripple grows and fades out from the dot.
-  const rippleStyle = useAnimatedStyle(() => ({
-    opacity: 0.8 * (1 - pulse.value),
-    transform: [{ scale: 1 + pulse.value * 0.8 }],
+  // A ring rather than a filled disc: the logo art is transparent and light
+  // mode has no backing disc to hide a fill behind, so a solid halo would wash
+  // across the mark. An expanding outline reads as a pulse against either
+  // background and stays inside the black-and-white palette.
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.45 * (1 - pulse.value),
+    transform: [{ scale: 0.78 + pulse.value * 0.5 }],
   }));
 
   return (
@@ -204,6 +229,13 @@ export default function LoginScreen() {
                   <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
                     <View style={s.logoBox}>
                       {dark ? <View style={s.disc} /> : null}
+                      {/* Behind the logo and out of layout, so the header never
+                          reflows and the mark itself never animates — the logo
+                          stays crisp while the ring travels. pointerEvents none
+                          keeps the long-press target on the Pressable. */}
+                      {!hasInstance ? (
+                        <Animated.View pointerEvents="none" style={[s.logoHalo, haloStyle]} />
+                      ) : null}
                       <Image
                         source={require("../../assets/images/upande_logo_no_bg.png")}
                         style={s.logo}
@@ -212,13 +244,15 @@ export default function LoginScreen() {
                     </View>
                   </Pressable>
 
-                  {/* Instance status: glowing green when a link is set, amber otherwise. */}
-                  <View style={s.statusRow}>
-                    <Animated.View
-                      style={[s.statusRipple, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }, rippleStyle]}
-                    />
-                    <View style={[s.statusDot, { backgroundColor: hasInstance ? STATUS_GREEN : STATUS_AMBER }]} />
-                  </View>
+                  {/* Only once a link is set. Before that the pulsing logo is
+                      the status, and it also says where to press. */}
+                  {hasInstance ? (
+                    <View style={s.statusRow}>
+                      <View style={[s.statusDot, { backgroundColor: STATUS_GREEN }]} />
+                    </View>
+                  ) : (
+                    <View style={s.statusRow} />
+                  )}
 
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
@@ -317,7 +351,6 @@ const RING = 220;
 const DISC = 190;
 const LOGO = 185;
 const STATUS_GREEN = "#2ECC71";
-const STATUS_AMBER = "#F39C12";
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
@@ -330,11 +363,13 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     // Instance status: a solid dot with an expanding radar-ping ripple,
     // matching the "check for updates" indicator. Green = link set, amber = not.
     statusRow: { width: 24, height: 24, alignItems: "center", justifyContent: "center", marginTop: 16, marginBottom: 4 },
-    statusRipple: {
+    logoHalo: {
       position: "absolute",
-      width: 10,
-      height: 10,
-      borderRadius: 5,
+      width: RING,
+      height: RING,
+      borderRadius: RING / 2,
+      borderWidth: 2,
+      borderColor: c.text,
     },
     statusDot: {
       width: 10,

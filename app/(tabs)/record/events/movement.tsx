@@ -1,40 +1,64 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+
 import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
+import { useOperator } from "@/src/hooks/useOperator";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import type { Animal } from "@/types";
-import { useAuthStore } from "@/src/auth/authStore";
+import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
 const REASONS = ["Routine age-out", "Repro status", "Other"] as const;
 
 export default function Movement() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: herds = [] } = useHerds();
+  const { data: eligibility } = useEligibility();
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
-  const [toHerd, setToHerd] = useState<string>("");
+  const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
+  const [toHerdPick, setToHerd] = useState<string>("");
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [error, setError] = useState<string | null>(null);
+
+  // Where the herd structure says these animals should go next. The ladder is
+  // ordered on the backend and this reads that order rather than guessing from
+  // herd names — "2-4" looks like a rule and is a label.
+  const suggested = useMemo(() => {
+    const from = Array.from(new Set(selected.map((a) => a.herd)));
+    if (from.length !== 1 || !eligibility) return null;
+    return eligibility.next_herd?.[from[0]] ?? null;
+  }, [selected, eligibility]);
 
   const fromHerd = selected.length === 0
     ? "—"
@@ -42,10 +66,11 @@ export default function Movement() {
       ? selected[0].herd
       : "Mixed (per animal)";
 
-  // Default the destination herd once the herd list arrives.
-  React.useEffect(() => {
-    if (!toHerd && herds.length) setToHerd(herds[0].n);
-  }, [herds, toHerd]);
+  // Default to where the ladder leads, and follow it when the selection changes
+  // to a different herd. Defaulting to herds[0] meant the form opened proposing
+  // an alphabetically-first herd that was almost never the right one.
+  const [toHerdTouched, setToHerdTouched] = useState(false);
+  const toHerd = toHerdTouched ? toHerdPick : suggested || herds[0]?.n || "";
 
   const mutation = useCreateAnimalEvent();
   const removeOne = (id: string) => setSelected((prev) => prev.filter((a) => a.id !== id));
@@ -53,7 +78,7 @@ export default function Movement() {
   const handleSubmit = async () => {
     setError(null);
     if (!operator) {
-      setError("Pick the operator (your Employee record) before submitting.");
+      setError(missingMessage);
       return;
     }
     if (selected.length === 0) {
@@ -64,28 +89,24 @@ export default function Movement() {
       setError("Pick a destination herd.");
       return;
     }
-    // Persist operator override so the next form pre-fills it.
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     const remarks = reason === "Other" ? otherReason : reason;
     // One Animal Event per moved animal — server script updates per-animal
     // current_herd. We sequence rather than parallelize so a partial failure
     // gives the user a clear "X of Y moved" message.
     let succeeded = 0;
-    let queued = 0;
     for (const a of selected) {
       try {
-        const r = await mutation.mutateAsync({
+        await mutation.mutateAsync({
           eventType: "Movement",
           animal: a.id,
           currentHerd: a.herd,
           toHerd,
           operator,
-          eventDate: todayISO(),
+          eventDate: isBackdating ? backdateDate : serverToday,
           remarks,
         });
-        if (r.queued) queued += 1;
-        else succeeded += 1;
+        succeeded += 1;
       } catch (err) {
         setError(
           `${succeeded} of ${selected.length} moved. Stopped at ${a.name}: ${extractFrappeError(err)}`,
@@ -95,16 +116,20 @@ export default function Movement() {
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
-    if (queued) parts.push(`${queued} queued (offline)`);
     Alert.alert("Movement recorded", parts.join(" · "));
-    router.replace(`/(tabs)/record/success?name=Movement`);
+    finish("Movement");
   };
 
   return (
-    <Screen title="Movement" subtitle="Move animals between herds" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
+    <Screen
+      title={titleFor("Movement", preset)}
+      subtitle="Move animals between herds"
+      back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      headerRight={isBackdating ? undefined : <BackdateButton type="movement" />}
+    >
+      {isBackdating ? <BackdateBanner /> : null}
 
       <Field label="Animals to move" help="Search by tag, or open the By herd tab to grab a whole herd.">
         <AnimalPickerButton
@@ -139,10 +164,30 @@ export default function Movement() {
           <Input value={fromHerd} editable={false} />
         </Field>
         <Field label="To herd" style={{ flex: 1 }}>
-          <Picker value={toHerd || (herds[0]?.n ?? "")} onChange={setToHerd} options={herds.map((h) => h.n)} />
+          <Picker
+            value={toHerd || (herds[0]?.n ?? "")}
+            onChange={(v) => {
+              setToHerdTouched(true);
+              setToHerd(v);
+            }}
+            options={herds.map((h) => h.n)}
+          />
+          {suggested ? (
+            <Text style={s.hint}>
+              {suggested === toHerd
+                ? `${suggested} is the next herd for these animals.`
+                : `The herd structure suggests ${suggested}.`}
+            </Text>
+          ) : null}
         </Field>
       </FieldRow>
-      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
+        </Field>
+      ) : (
+        <Field label="Date"><Input value={serverToday} editable={false} /></Field>
+      )}
 
       <Field label="Reason">
         <Chips>
@@ -159,9 +204,10 @@ export default function Movement() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit move"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />
@@ -186,8 +232,13 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,
     },
-    selName: { fontSize: 13, fontWeight: "600", color: c.text },
-    selId: { fontFamily: "monospace", fontSize: 11, fontWeight: "400", color: c.textSubtle },
+    selName: { fontSize: 13, ...font("600"), color: c.text },
+    selId: { fontSize: 11, ...font("400"), color: c.textSubtle },
+    hint: {
+      marginTop: 6,
+      fontSize: 12,
+      color: c.textMuted,
+    },
     selMeta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
     remove: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   });

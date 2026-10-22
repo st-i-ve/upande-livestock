@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { font } from "@/constants/theme";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
@@ -52,5 +53,5 @@ export function Avatar({
 
 const styles = StyleSheet.create({
   av: { alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
-  txt: { fontWeight: "600" },
+  txt: { ...font("600") },
 });

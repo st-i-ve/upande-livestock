@@ -1,7 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { ANIMAL_PHOTO_CREDITS } from "@/src/animalKind";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,13 +14,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
+import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
 import { usePendingCount } from "@/src/hooks/useQueueStatus";
+import { useLiveStore } from "@/src/realtime/liveStore";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -49,19 +53,50 @@ function Subheader({ children }: { children: React.ReactNode }) {
   return <Text style={s.subheader}>{children}</Text>;
 }
 
+// Read from the manifest, not from a constant somebody has to remember to bump.
+// The runtime version is what an over-the-air update must match, so it is worth
+// showing: two builds on the same app version can be on different runtimes.
+const appVersion =
+  Constants.expoConfig?.version || Constants.nativeAppVersion || APP.version;
+const runtimeVersion =
+  (Constants.expoConfig as any)?.runtimeVersion ||
+  (Constants as any).manifest?.runtimeVersion ||
+  null;
+// One row, one label per stage — a separate status line under it would be one
+// more thing to read on a screen used one-handed.
+const OTA_LABEL: Record<import("@/src/hooks/useOtaUpdate").OtaStage, string> = {
+  idle: "Check for updates",
+  checking: "Checking…",
+  none: "Check for updates",
+  available: "Update available",
+  downloading: "Downloading…",
+  ready: "Restart to finish",
+  error: "Check for updates",
+};
+
+const OTA_DIALOG: import("@/src/hooks/useOtaUpdate").OtaStage[] = [
+  "available",
+  "ready",
+  "none",
+  "error",
+];
+
+const runtimeLabel = runtimeVersion ? `Runtime ${runtimeVersion}` : "Runtime embedded";
+
 export default function Profile() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
-  const employeeName = useAuthStore((s) => s.employeeName);
-  const setEmployeeName = useAuthStore((s) => s.setEmployeeName);
   const logout = useAuthStore((s) => s.logout);
+  const isEmployee = useAuthStore((s) => s.isEmployee);
   const pending = usePendingCount();
   const online = useNetworkStatus();
+  const ota = useOtaUpdate();
+  const live = useLiveStore((x) => x.status);
 
-  const displayName = fullname || APP.user;
-  const subtitle = email || APP.farm;
+  const displayName = fullname || email || "Signed in";
+  const subtitle = email ?? "";
 
   const [confirmLogout, setConfirmLogout] = useState(false);
 
@@ -84,48 +119,58 @@ export default function Profile() {
           </View>
           <View style={{ marginLeft: 20, flex: 1, justifyContent: "center" }}>
             <Text style={s.name} numberOfLines={1}>{displayName}</Text>
-            <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
-            <Text style={s.caption} numberOfLines={1}>{APP.farm}</Text>
-          </View>
-        </View>
-
-        <View style={s.empWrapper}>
-          <Subheader>My employee</Subheader>
-          <View style={s.empBody}>
-            <EmployeePickerButton
-              value={employeeName}
-              onChange={(name) => setEmployeeName(name)}
-              placeholder="Tap to pick your Employee"
-            />
-            <Text style={s.empHint}>
-              Used as the default operator on every record you submit. Pick once; we remember it.
-            </Text>
+            {subtitle ? (
+              <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
+            ) : null}
+            {isEmployee === false ? (
+              <Text style={s.viewOnly}>View only — not linked to an employee</Text>
+            ) : null}
           </View>
         </View>
 
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
-          <Row
-            icon="tune-variant"
-            label="Configurations"
-            onPress={() => router.push("/(tabs)/profile/configurations")}
-          />
-          <Row
-            icon="cog"
-            label="Livestock settings"
-            onPress={() => router.push("/(tabs)/profile/settings")}
-          />
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
+          {/* The offline queue holds milkings only; this row only reports it. Tapping it
+              went to a pending-submissions screen that no longer exists, so the
+              count is shown here as plain status. */}
           <Row
             icon="cloud-upload-outline"
-            label={online === false ? "Offline · pending submissions" : "Pending submissions"}
-            onPress={() => router.push("/(tabs)/profile/pending" as any)}
+            label={online === false ? "Offline · milkings waiting to sync" : "Milkings waiting to sync"}
             right={
-              pending > 0 ? (
-                <View style={s.badge}>
-                  <Text style={s.badgeText}>{pending}</Text>
-                </View>
-              ) : undefined
+              <Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>
+            }
+          />
+
+          <Row
+            icon="broadcast"
+            label={
+              live === "live" ? "Live updates" : live === "reconnecting" ? "Live updates · reconnecting" : "Live updates · offline"
+            }
+            right={
+              <View
+                accessibilityLabel={`Live updates ${live}`}
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 5,
+                  backgroundColor: live === "live" ? c.text : live === "reconnecting" ? c.textMuted : c.danger,
+                  marginRight: 4,
+                }}
+              />
+            }
+          />
+
+          <Row
+            icon="cloud-download-outline"
+            label={OTA_LABEL[ota.stage]}
+            onPress={ota.stage === "checking" || ota.stage === "downloading" ? undefined : ota.check}
+            right={
+              ota.stage === "checking" || ota.stage === "downloading" ? (
+                <ActivityIndicator size="small" color={c.textMuted} />
+              ) : (
+                <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
+              )
             }
           />
 
@@ -135,9 +180,50 @@ export default function Profile() {
         </View>
 
         <Pressable style={s.versionContainer}>
-          <Text style={s.versionText}>Version {APP.version}</Text>
+          <Text style={s.versionText}>Version {appVersion}</Text>
+          <Text style={s.versionText}>{runtimeLabel}</Text>
+          <Text style={s.versionText}>
+            {"Photos: " + ANIMAL_PHOTO_CREDITS.map((x) => `${x.author}, ${x.licence}`).join("; ")}
+          </Text>
         </Pressable>
       </ScrollView>
+
+      {/* Only the settled stages get a dialog; checking and downloading show a
+          spinner on the row instead, so a slow network never traps the screen
+          behind a modal. Every stage has two real actions, because ConfirmModal
+          always renders both buttons and an "OK / Cancel" pair that do the same
+          thing is worse than giving the second one a job. */}
+      <ConfirmModal
+        visible={OTA_DIALOG.includes(ota.stage)}
+        title={
+          ota.stage === "available"
+            ? "Update available"
+            : ota.stage === "ready"
+              ? "Update downloaded"
+              : ota.stage === "none"
+                ? "Up to date"
+                : "Could not check"
+        }
+        message={ota.message}
+        cancelLabel={ota.stage === "ready" ? "Later" : ota.stage === "available" ? "Not now" : "Close"}
+        confirmLabel={
+          ota.stage === "available"
+            ? "Download"
+            : ota.stage === "ready"
+              ? "Restart now"
+              : ota.stage === "none"
+                ? "Check again"
+                : "Retry"
+        }
+        onCancel={ota.reset}
+        onConfirm={
+          ota.stage === "available"
+            ? ota.download
+            : ota.stage === "ready"
+              ? ota.apply
+              : ota.check
+        }
+      />
 
       <ConfirmModal
         visible={confirmLogout}
@@ -200,6 +286,12 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       fontFamily: FONT_FAMILY.medium,
       marginTop: 2,
     },
+    viewOnly: {
+      fontSize: 13,
+      color: c.danger,
+      fontFamily: FONT_FAMILY.medium,
+      marginTop: 4,
+    },
     menuWrapper: {
       marginHorizontal: 16,
       marginTop: 4,
@@ -261,6 +353,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       color: c.bg,
       fontSize: 11,
       fontFamily: FONT_FAMILY.semibold,
+    },
+    pendingCount: {
+      fontSize: 13,
+      color: c.textMuted,
+      fontFamily: FONT_FAMILY.medium,
     },
     empWrapper: {
       marginHorizontal: 16,

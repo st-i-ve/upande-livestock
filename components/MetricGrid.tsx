@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 
 export type Metric = { label: string; value: string | number; sub?: string; color?: string; small?: boolean };
@@ -31,7 +31,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     },
     label: { fontSize: 11, color: c.textMuted },
     value: {
-      fontSize: 22, fontWeight: "700", color: c.text,
+      fontSize: 22, ...font("700"), color: c.text,
       marginTop: 2, fontVariant: ["tabular-nums"],
       backgroundColor: c.bgMuted, padding: 10, borderRadius: RADIUS.md, overflow: "hidden",
     },

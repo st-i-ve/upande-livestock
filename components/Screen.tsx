@@ -5,12 +5,14 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FONT_FAMILY } from "@/constants/theme";
+import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
 
 export function Screen({
   title,
   subtitle,
   back,
+  headerRight,
   scroll = true,
   children,
   footer,
@@ -20,6 +22,8 @@ export function Screen({
   title: string;
   subtitle?: string;
   back?: boolean;
+  /** Rendered at the far right of the app bar, e.g. the amber Backdate control. */
+  headerRight?: React.ReactNode;
   scroll?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -30,6 +34,7 @@ export function Screen({
   const s = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();
   const nav = useNavigation();
+  const recheckEmployee = useAuthStore((st) => st.refreshEmployeeStatus);
   const canGoBack = nav.canGoBack();
   const showBack = !!back && canGoBack;
 
@@ -45,6 +50,7 @@ export function Screen({
           <Text style={s.title} numberOfLines={1}>{title}</Text>
           {subtitle ? <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
+        {headerRight ?? null}
       </View>
       {scroll ? (
         <ScrollView
@@ -52,7 +58,16 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           refreshControl={
             onRefresh ? (
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.text} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  // Pull-to-refresh also re-checks the employee link, so HR
+                  // linking a user reaches the phone without a log-out.
+                  void recheckEmployee();
+                  onRefresh();
+                }}
+                tintColor={c.text}
+              />
             ) : undefined
           }
         >

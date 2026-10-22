@@ -1,13 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { RADIUS } from "@/constants/theme";
+import { RADIUS, font } from "@/constants/theme";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useColors } from "@/src/hooks/useColors";
-import { avatarToneFor, initials, pillFor } from "@/services/utils";
+import { pillFor } from "@/services/utils";
 import type { Animal } from "@/types";
 
-import { Avatar } from "./Avatar";
+import { AnimalImage } from "./AnimalImage";
 import { Button } from "./Button";
 import { Pill } from "./Pill";
 
@@ -44,16 +44,10 @@ export function AnimalPickerSheet({
   const [view, setView] = useState<"all" | "herd">("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // The search runs in the local SQLite store, so the picker works offline.
   const { data: ALL = [], isLoading } = useAnimals();
-
-  const list = useMemo(() => {
-    let l = include ? ALL.filter(include) : ALL;
-    if (query) {
-      const q = query.toLowerCase();
-      l = l.filter((a) => a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
-    }
-    return l;
-  }, [ALL, include, query]);
+  const { data: found = ALL } = useAnimals(query);
+  const list = useMemo(() => (include ? found.filter(include) : found), [found, include]);
 
   // Group rows for the herd view: header → child animal rows.
   const herdRows = useMemo<GroupRow[]>(() => {
@@ -131,7 +125,7 @@ export function AnimalPickerSheet({
             {isSel ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
           </View>
         ) : null}
-        <Avatar text={initials(a.name)} tone={avatarToneFor(a)} size={30} />
+        <AnimalImage image={a.image} thumb={a.thumb} animal={a} style={{ width: 30, height: 30, borderRadius: 15 }} iconSize={15} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={s.itemName} numberOfLines={1}>{a.name}</Text>
           <Text style={s.itemMeta} numberOfLines={1}>{a.id} · {a.herd}</Text>
@@ -197,7 +191,7 @@ export function AnimalPickerSheet({
                     <View style={[s.cb, allSelected && { backgroundColor: c.text, borderColor: c.text }]}>
                       {allSelected ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
                     </View>
-                    <Text style={[s.itemName, { fontWeight: "700" }]}>Select all ({list.length})</Text>
+                    <Text style={[s.itemName, { ...font("700") }]}>Select all ({list.length})</Text>
                   </Pressable>
                 ) : null
               }
@@ -240,7 +234,7 @@ export function AnimalPickerSheet({
           {mode === "multi" && list.length > 0 ? (
             <View style={s.bar}>
               <Text style={s.barText}>
-                <Text style={{ fontWeight: "700" }}>{selected.size}</Text> selected
+                <Text style={{ ...font("700") }}>{selected.size}</Text> selected
               </Text>
               <Button label="Confirm" onPress={confirm} style={{ marginTop: 0, paddingHorizontal: 16 }} />
             </View>
@@ -266,12 +260,12 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
   },
   handle: { width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  title: { fontSize: 14, fontWeight: "600", color: c.text },
+  title: { fontSize: 14, ...font("600"), color: c.text },
   tabs: { flexDirection: "row", backgroundColor: c.bgMuted, borderRadius: RADIUS.md, padding: 3, marginBottom: 10 },
   tab: { flex: 1, paddingVertical: 6, borderRadius: 6, alignItems: "center" },
   tabActive: { backgroundColor: c.bg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.borderSubtle },
   tabText: { fontSize: 11, color: c.textMuted },
-  tabTextActive: { color: c.text, fontWeight: "600" },
+  tabTextActive: { color: c.text, ...font("600") },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -299,7 +293,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     borderWidth: 1.5, borderColor: c.border,
     alignItems: "center", justifyContent: "center",
   },
-  itemName: { fontSize: 13, fontWeight: "600", color: c.text },
+  itemName: { fontSize: 13, ...font("600"), color: c.text },
   itemMeta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
   groupHeader: {
     flexDirection: "row",
@@ -311,7 +305,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     marginTop: 6,
     borderRadius: RADIUS.sm,
   },
-  groupTitle: { flex: 1, fontSize: 12, fontWeight: "700", color: c.text },
+  groupTitle: { flex: 1, fontSize: 12, ...font("700"), color: c.text },
   groupCount: { fontSize: 11, color: c.textMuted },
   bar: {
     flexDirection: "row",

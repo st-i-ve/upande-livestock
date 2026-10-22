@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -36,7 +37,7 @@ export function Chip({
       onPress={onPress}
       style={[s.chip, active && { borderColor: t.border, borderWidth: 1 }]}
     >
-      <Text style={[s.text, active && { color: t.fg, fontWeight: "600" }]}>{label}</Text>
+      <Text style={[s.text, active && { color: t.fg, ...font("600") }]}>{label}</Text>
     </Pressable>
   );
 }

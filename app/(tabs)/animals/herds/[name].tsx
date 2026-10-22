@@ -1,6 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
 
 import { AnimalRow } from "@/components/AnimalRow";
 import { Banner } from "@/components/Banner";
@@ -11,23 +10,21 @@ import { Loader } from "@/components/Loader";
 import { MetricGrid } from "@/components/MetricGrid";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
-import { RADIUS } from "@/constants/theme";
-import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
+import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useAnimals } from "@/src/hooks/useAnimals";
-import { useHerd } from "@/src/hooks/useHerd";
+import { useHerds } from "@/src/hooks/useHerds";
 
 export default function HerdDetail() {
-  const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
+  const { canRecord } = useCanRecord();
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
-  // useHerd fetches the single doc with its ration_items child table inline.
-  const herdQ = useHerd(herdName);
+  // Read-only: rations and recipes are configured on the web.
+  const herdQ = useHerds();
   const animalsQ = useAnimals();
 
-  const h = herdQ.data ?? null;
+  const h = (herdQ.data ?? []).find((x) => x.n === herdName) ?? null;
 
   const inHerd = useMemo(
     () => (animalsQ.data ?? []).filter((a) => a.herd === herdName),
@@ -75,35 +72,8 @@ export default function HerdDetail() {
       <MetricGrid
         items={[
           { label: "Animals", value: h.cnt },
-          { label: "Cost centre", value: h.cc || "—", small: true },
         ]}
       />
-
-      {h.bom || h.ration.length > 0 ? (
-        <>
-          <SectionTitle>Feeding plan (TMR / BOM)</SectionTitle>
-          <View style={s.bom}>
-            {h.bom ? <Text style={s.bomTitle}>{h.bom}</Text> : null}
-            <Text style={s.bomSub}>
-              {h.ration.length
-                ? `${h.ration.length} ration item${h.ration.length === 1 ? "" : "s"}`
-                : "Linked BOM determines cost-per-kg DMI for this herd"}
-            </Text>
-            {h.ration.length > 0 ? (
-              <View style={s.rationList}>
-                {h.ration.map((r, i) => (
-                  <View key={`${r.name}-${i}`} style={s.rationRow}>
-                    <Text style={s.rationName} numberOfLines={1}>{r.name || "—"}</Text>
-                    {r.pct > 0 ? (
-                      <Text style={s.rationPct}>{r.pct}%</Text>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        </>
-      ) : null}
 
       <SectionTitle>
         Animals in herd {inHerd.length ? `(${inHerd.length} of ${h.cnt} shown)` : ""}
@@ -121,32 +91,13 @@ export default function HerdDetail() {
         <Empty text="No animals in this herd" />
       )}
 
-      <SectionTitle>Quick actions</SectionTitle>
-      <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/record/events/animal-feed")} />
-      <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/record/events/milk")} />
+      {canRecord ? (
+        <>
+          <SectionTitle>Quick actions</SectionTitle>
+          <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />
+          <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/animals/act/milk")} />
+        </>
+      ) : null}
     </Screen>
   );
 }
-
-const makeStyles = (c: ReturnType<typeof useColors>) =>
-  StyleSheet.create({
-    bom: {
-      backgroundColor: c.bgMuted,
-      padding: 12,
-      borderRadius: RADIUS.md,
-      marginBottom: 14,
-    },
-    bomTitle: { fontSize: 13, fontWeight: "600", color: c.text },
-    bomSub: { fontSize: 11, color: c.textMuted, marginTop: 3 },
-    rationList: { marginTop: 10, gap: 6 },
-    rationRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingVertical: 4,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: c.borderSubtle,
-    },
-    rationName: { flex: 1, fontSize: 12, color: c.text },
-    rationPct: { fontSize: 12, color: c.textMuted, fontVariant: ["tabular-nums"] },
-  });

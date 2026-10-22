@@ -1,12 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
+import { LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
 import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // Scout-style expandable section: a header row with a chevron that rotates
 // 0°→90° on open, and body content indented beneath it.
@@ -14,20 +10,27 @@ export function Collapsible({
   title,
   meta,
   defaultOpen = false,
+  open: openProp,
+  onToggle,
   children,
 }: {
   title: string;
   meta?: string;
   defaultOpen?: boolean;
-  children: React.ReactNode;
+  /** Controlled open state; omit for self-managed state. */
+  open?: boolean;
+  onToggle?: () => void;
+  children?: React.ReactNode;
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const [open, setOpen] = useState(defaultOpen);
+  const [inner, setInner] = useState(defaultOpen);
+  const open = openProp ?? inner;
 
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setOpen((v) => !v);
+    if (onToggle) onToggle();
+    else setInner((v) => !v);
   };
 
   return (
@@ -47,7 +50,7 @@ export function Collapsible({
         </View>
         {meta ? <Text style={s.meta} numberOfLines={1}>{meta}</Text> : null}
       </Pressable>
-      {open ? <View style={s.content}>{children}</View> : null}
+      {open && children ? <View style={s.content}>{children}</View> : null}
     </View>
   );
 }

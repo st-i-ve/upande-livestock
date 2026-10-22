@@ -11,9 +11,20 @@ export type Animal = {
   milkSafe: string | null;
   inTreatment: 0 | 1;
   pregnant: 0 | 1;
+  /** Set when the animal comes from the local store (animals_since). */
+  tag?: string | null;
+  breed?: string | null;
+  /** Server-relative file URL (`/files/...`) of the Animal image field. */
+  image?: string | null;
+  /** ~240 px JPEG of `image`, for list rows and pickers. */
+  thumb?: string | null;
+  dam?: string | null;
+  sire?: string | null;
+  status?: string | null;
+  /** The animal's stage from the local store; see STAGE_LABELS. */
+  stage?: string | null;
 };
 
-export type RationItem = { name: string; pct: number };
 
 export type Herd = {
   n: string;
@@ -23,12 +34,13 @@ export type Herd = {
   herdName?: string;
   cat: string;
   cnt: number;
-  cc: string;
-  bom: string;
-  ration: RationItem[];
-  kgPerHeadPerDay: number;
+  hasBom: boolean;
   isMilking?: boolean;
   isDry?: boolean;
+  isCalfRearing?: boolean;
+  isCalf?: boolean;
+  isInCalf?: boolean;
+  isHeifer?: boolean;
 };
 
 export type DrawerItem = {
@@ -42,14 +54,6 @@ export type DrawerItem = {
 export type DrawerGroup = { grp: string; its: DrawerItem[] };
 
 export type Tone = "info" | "success" | "warning" | "danger" | "muted";
-
-export type DailyMilkRow = {
-  herd: string;
-  cnt: number;
-  am: number | null;
-  pm: number | null;
-  expected: number;
-};
 
 export type Alert = {
   sev: "default" | "danger";

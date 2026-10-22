@@ -1,0 +1,263 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useMemo, useState } from "react";
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+import { Field } from "@/components/Field";
+import { Picker } from "@/components/Picker";
+import { FONT_FAMILY, RADIUS } from "@/constants/theme";
+import { qtyAt, type StockChoice } from "@/src/frappe/eventItems";
+import { useBatchPlan } from "@/src/hooks/useBatchPlan";
+import { useColors } from "@/src/hooks/useColors";
+
+export type StockPick = { itemCode: string; uom: string; warehouse: string; batch?: string };
+
+const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
+
+/**
+ * Item + store + what is in it, for any event line that issues stock.
+ *
+ * Same contract as the web StockPicker: `choices` are the event type's
+ * in-stock items (`items_by_event`), each carrying the store holding the most
+ * of it and every store holding any. Picking an item picks its store; the store
+ * can be moved to another that genuinely has the item. With no choices the event
+ * type has no stock set up (or the list did not load): the phone offers nothing
+ * to pick, because the stores are not readable by field staff and which items an
+ * event may use is configured on the web.
+ */
+export function StockItemFields({
+  choices,
+  value,
+  onChange,
+  qtyNeeded,
+  itemLabel = "Item",
+  icon = "pill",
+}: {
+  choices: StockChoice[] | undefined;
+  value: StockPick;
+  onChange: (next: StockPick) => void;
+  /** Total the line will draw, to flag a shortage. */
+  qtyNeeded?: number;
+  itemLabel?: string;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+}) {
+  const c = useColors();
+  const mapped = !!choices?.length;
+  const chosen = mapped ? choices!.find((x) => x.value === value.itemCode) : undefined;
+
+  const plan = useBatchPlan(value.itemCode, value.warehouse);
+  const avail = chosen ? (qtyAt(chosen, value.warehouse) ?? 0) : undefined;
+
+  const stores = chosen?.locations ?? [];
+  const storeText = (l: { warehouse: string; qty: number }) =>
+    `${l.warehouse} · ${fmt(l.qty)} ${chosen?.uom ?? value.uom}`.trim();
+
+  if (!mapped) {
+    return (
+      <Text style={{ fontSize: 12, color: c.textSubtle, marginBottom: 8 }}>
+        No stock is set up for this on the web yet, so there is nothing to pick. Ask the office
+        to map items to this event type.
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      <Field label={itemLabel}>
+        <ChoicePicker
+          choices={choices!}
+          value={value.itemCode}
+          icon={icon}
+          onPick={(ch) =>
+            onChange({ itemCode: ch.value, uom: ch.uom ?? "", warehouse: ch.warehouse ?? "", batch: "" })
+          }
+        />
+      </Field>
+      <Field label="Issue from store">
+        {stores.length ? (
+          <Picker
+            value={storeText(stores.find((l) => l.warehouse === value.warehouse) ?? stores[0])}
+            options={stores.map(storeText)}
+            onChange={(text) => {
+              const hit = stores.find((l) => storeText(l) === text);
+              if (hit) onChange({ ...value, warehouse: hit.warehouse, batch: "" });
+            }}
+          />
+        ) : (
+          <Text style={{ fontSize: 12, color: c.textSubtle }}>Pick an item first.</Text>
+        )}
+      </Field>
+      {plan?.tracked && plan.available.length ? (
+        <Field label="Batch" help="Left blank, the store picks first-expiry-first-out.">
+          <Picker
+            value={
+              plan.available
+                .map((b) => `${b.batch_no} · ${fmt(b.qty)}${b.expiry_date ? ` · exp ${b.expiry_date}` : ""}`)
+                .find((t) => t.startsWith(`${value.batch} ·`)) ?? ""
+            }
+            placeholder="Chosen by the store"
+            clearable
+            options={plan.available.map(
+              (b) => `${b.batch_no} · ${fmt(b.qty)}${b.expiry_date ? ` · exp ${b.expiry_date}` : ""}`,
+            )}
+            onChange={(t) => onChange({ ...value, batch: t ? t.split(" · ")[0] : "" })}
+          />
+        </Field>
+      ) : null}
+      {value.itemCode && value.warehouse && avail != null ? (
+        <Text
+          style={{
+            fontSize: 11,
+            marginBottom: 8,
+            color: qtyNeeded != null && qtyNeeded > avail ? c.danger : c.textMuted,
+          }}
+        >
+          {`Available in ${value.warehouse}: ${fmt(avail)}${value.uom ? " " + value.uom : ""}${
+            qtyNeeded != null && qtyNeeded > avail ? " — not enough" : ""
+          }`}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+function ChoicePicker({
+  choices,
+  value,
+  onPick,
+  icon,
+}: {
+  choices: StockChoice[];
+  value: string;
+  onPick: (c: StockChoice) => void;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+}) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const current = choices.find((x) => x.value === value);
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q
+      ? choices.filter((x) => `${x.item_name ?? ""} ${x.value}`.toLowerCase().includes(q))
+      : choices;
+  }, [choices, query]);
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [s.btn, pressed && { backgroundColor: c.bgMuted }]}
+      >
+        <MaterialCommunityIcons name={icon} size={16} color={c.textMuted} />
+        <Text style={[s.btnLabel, !current && { color: c.textSubtle }]} numberOfLines={1}>
+          {current ? current.item_name || current.value : "Select item…"}
+        </Text>
+        <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
+      </Pressable>
+      <Modal visible={open} transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
+          <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={s.header}>
+              <Text style={s.title}>Select item in stock</Text>
+              <Pressable onPress={() => setOpen(false)} hitSlop={8}>
+                <MaterialCommunityIcons name="close" size={20} color={c.text} />
+              </Pressable>
+            </View>
+            <View style={s.searchRow}>
+              <MaterialCommunityIcons name="magnify" size={16} color={c.textSubtle} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Type to filter"
+                placeholderTextColor={c.textSubtle}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={s.searchInput}
+              />
+            </View>
+            <FlatList
+              data={shown}
+              keyExtractor={(x) => x.value}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={<Text style={s.empty}>No matches</Text>}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => {
+                    onPick(item);
+                    setOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    s.row,
+                    item.value === value && { backgroundColor: c.bgMuted },
+                    pressed && { backgroundColor: c.bgMuted },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.name} numberOfLines={1}>{item.item_name || item.value}</Text>
+                    <Text style={s.meta} numberOfLines={1}>
+                      {fmt(item.qty ?? 0)} {item.uom ?? ""} in {item.warehouse}
+                      {(item.locations?.length ?? 0) > 1 ? ` (+${item.locations!.length - 1} more)` : ""}
+                    </Text>
+                  </View>
+                  {item.value === value ? <MaterialCommunityIcons name="check" size={18} color={c.text} /> : null}
+                </Pressable>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+const makeStyles = (c: ReturnType<typeof useColors>) =>
+  StyleSheet.create({
+    btn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    btnLabel: { flex: 1, fontSize: 13, color: c.text },
+    backdrop: { flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" },
+    sheet: {
+      backgroundColor: c.bg,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 36,
+      maxHeight: "85%",
+      minHeight: "55%",
+    },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+    title: { fontSize: 14, fontFamily: FONT_FAMILY.semibold, color: c.text },
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: RADIUS.md,
+      marginBottom: 8,
+    },
+    searchInput: { flex: 1, color: c.text, fontSize: 13, padding: 0 },
+    empty: { paddingVertical: 30, textAlign: "center", color: c.textSubtle, fontSize: 12 },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.borderSubtle,
+    },
+    name: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: c.text },
+    meta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
+  });

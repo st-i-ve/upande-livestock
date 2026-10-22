@@ -1,11 +1,8 @@
-import { createAnimal } from "@/src/frappe/animal";
 import { createAnimalEvent } from "@/src/frappe/animalEvent";
-import { createAnimalDiagnosis } from "@/src/frappe/animalDiagnosis";
+import { createCheckUp } from "@/src/frappe/checkUp";
+import { treatAnimal } from "@/src/frappe/treatment";
 import { createAnimalDisposal } from "@/src/frappe/animalDisposal";
-import { createAnimalHealthCase, updateAnimalHealthCase } from "@/src/frappe/animalHealthCase";
-import { createCalfFeeding } from "@/src/frappe/calfFeeding";
 import { createMilkRecording } from "@/src/frappe/milkRecording";
-import { submitBatchDrugIssue } from "@/src/frappe/batchDrugIssue";
 import { extractFrappeError } from "@/src/services/api";
 
 import {
@@ -17,20 +14,65 @@ import {
 } from "./queue";
 
 /**
+ * Items an older build queued before stock and vet fees became the server's job.
+ * Rejected as an application-level error (it carries a `response`), so the
+ * drain reports it on the Pending screen and moves on rather than treating it
+ * as a dead network and stalling everything behind it.
+ */
+async function retiredBatchDrugIssue(): Promise<never> {
+  const err: any = new Error(
+    "This drug / vet-fee entry was queued by an older version of the app, which posted stock from the phone. Re-enter it on the web, then discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
+/** Health files are opened through a treatment, and closed on the web. Anything an
+ *  older build queued is reported on the Pending screen rather than replayed. */
+async function retiredHealthCase(): Promise<never> {
+  const err: any = new Error(
+    "Health files are opened by recording a treatment and closed on the web. Record it again there, then discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
+/** Per-session calf feeding never had a home on this backend. Reported, not posted. */
+async function retiredCalfFeeding(): Promise<never> {
+  const err: any = new Error(
+    "Per-session calf feeding is not recorded from the phone. Discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
+/** The phone no longer creates animals: a purchase is `buy_in_animal` and a calf
+ *  is made by the birth, both on the server. Anything queued by an old build is
+ *  surfaced on the Pending screen rather than posted to fields that are gone. */
+async function retiredAnimalCreate(): Promise<never> {
+  const err: any = new Error(
+    "New animals are no longer created from the phone. Register this one on the web, then discard this item.",
+  );
+  err.response = { status: 410 };
+  throw err;
+}
+
+/**
  * Registry mapping each PendingMutationType to the function that submits it.
- * Adding a new offline-aware mutation: add a member to PendingMutationType,
- * wire its createXxx here, and call enqueue with that type in the hook.
+ * Only MILKING is queued by this build (see `tryDirectOrEnqueue`). The other
+ * handlers stay so an item an older build queued still drains when online.
  */
 const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
   AnimalEvent: createAnimalEvent,
   MilkRecording: createMilkRecording,
   AnimalDisposal: createAnimalDisposal,
-  Animal: createAnimal,
-  CalfFeeding: createCalfFeeding,
-  AnimalDiagnosis: createAnimalDiagnosis,
-  AnimalHealthCase: createAnimalHealthCase,
-  BatchDrugIssue: submitBatchDrugIssue,
-  AnimalHealthCaseUpdate: updateAnimalHealthCase,
+  Animal: retiredAnimalCreate,
+  CalfFeeding: retiredCalfFeeding,
+  AnimalDiagnosis: createCheckUp,
+  Treatment: treatAnimal,
+  AnimalHealthCase: retiredHealthCase,
+  BatchDrugIssue: retiredBatchDrugIssue,
+  AnimalHealthCaseUpdate: retiredHealthCase,
 };
 
 /**
@@ -41,6 +83,16 @@ export const dispatchDirect = (
   type: PendingMutationType,
   payload: any,
 ): Promise<any> => HANDLERS[type](payload);
+
+/** A queued milking the server refuses on a closed window is more than a day
+ *  old; say what to do about it. The item stays queued for retry or discard. */
+// The "late offline syncs are switched off" refusal is the server's own words and
+// passes through untouched; it is not a window problem the manager fixes by
+// opening backdating.
+const tooOldMessage = (item: PendingMutation, message: string): string =>
+  item.type === "MilkRecording" && !/switched off/i.test(message) && /backdating is closed|more than a day old/i.test(message)
+    ? "This milking is more than a day old — ask the Livestock Manager to open backdating, then retry."
+    : message;
 
 let draining = false;
 
@@ -69,9 +121,11 @@ export const drainQueue = async (): Promise<DrainResult> => {
         await remove(item.id);
         succeeded += 1;
       } catch (err) {
-        const message = extractFrappeError(err);
+        const message = tooOldMessage(item, extractFrappeError(err));
         await markAttempt(item.id, message);
-        const isNetwork = !(err as any)?.response;
+        // A refusal the server wrote (OpsError: HTTP 200 + {error}) carries no
+        // `response` but is not a dead network; it must not stall the queue.
+        const isNetwork = isOfflineError(err);
         errors.push({ id: item.id, message });
         if (isNetwork) {
           // Network problem — stop draining; we'll try again on next signal.
@@ -93,6 +147,12 @@ export const drainQueue = async (): Promise<DrainResult> => {
 export const isOfflineError = (err: unknown): boolean => {
   const e = err as any;
   if (!e) return false;
+  // An operations endpoint that answers `{error: "..."}` does so with HTTP 200
+  // and no axios response attached to the thrown error. Without this check it
+  // looks identical to being offline, and a refused entry — a cow with no open
+  // service, a store that cannot cover the dose — would be queued and retried
+  // forever instead of shown to the operator.
+  if (e.isServerRejection) return false;
   // No HTTP response means we never got past the network — typical when
   // offline, DNS fails, or the server is unreachable.
   if (!e.response) return true;

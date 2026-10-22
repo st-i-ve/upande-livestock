@@ -1,78 +1,102 @@
-import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
-import { useAuthStore } from "@/src/auth/authStore";
+import { VetPicker } from "@/components/VetPicker";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
-import { useServicedPendingPd } from "@/src/hooks/useServicedPendingPd";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
+import { useEligibility } from "@/src/hooks/useEligibility";
+import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
 type Result = "Confirmed" | "Not Pregnant" | "Aborted";
 
 export default function PD() {
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missingMessage } = useOperator();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
   const [selected, setSelected] = useState<Animal[]>([]);
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
   const [result, setResult] = useState<Result>("Confirmed");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
-  const { data: servedIds, isLoading: filterLoading } = useServicedPendingPd();
+  const { vets, vet, setVet } = useVetChoice();
+  // The server decides who has a service awaiting a check, using the same rule
+  // create_pregnancy_diagnosis enforces on submit. Deriving a second list here
+  // is how a picker ends up offering a cow the server then refuses.
+  const { data: eligibility, isLoading: filterLoading } = useEligibility();
+  const diagnosable = useMemo(
+    () => new Set(eligibility?.diagnosable ?? []),
+    [eligibility],
+  );
 
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow.");
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     let succeeded = 0;
-    let queued = 0;
     for (const a of selected) {
       try {
-        const r = await mutation.mutateAsync({
+        await mutation.mutateAsync({
           eventType: "Pregnancy Diagnosis",
           animal: a.id,
           currentHerd: a.herd,
           operator,
-          eventDate: todayISO(),
+          vet: vet || undefined,
+          eventDate: isBackdating ? backdateDate : serverToday,
           diagnosisResult: result,
           remarks: remarks || undefined,
         });
-        if (r.queued) queued += 1;
-        else succeeded += 1;
+        succeeded += 1;
       } catch (err) {
         setError(
-          `${succeeded + queued} of ${selected.length} diagnosed. Stopped at ${a.name}: ${extractFrappeError(err)}`,
+          `${succeeded} of ${selected.length} diagnosed. Stopped at ${a.name}: ${extractFrappeError(err)}`,
         );
         return;
       }
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} marked ${result}`);
-    if (queued) parts.push(`${queued} queued (offline)`);
     Alert.alert(
       "PD recorded",
       `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
     );
-    router.replace("/(tabs)/record/success?name=Pregnancy diagnosis");
+    finish("Pregnancy diagnosis");
   };
 
   return (
-    <Screen title="Pregnancy diagnosis" subtitle="Confirm or rule out" back>
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
+    <Screen
+      title={titleFor("Pregnancy diagnosis", preset)}
+      subtitle="Confirm or rule out"
+      back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      headerRight={isBackdating ? undefined : <BackdateButton type="pd" />}
+    >
+      {isBackdating ? <BackdateBanner /> : null}
       <Field
         label="Cow(s)"
         help={
@@ -86,17 +110,23 @@ export default function PD() {
           title="Select served cows"
           placeholder={
             filterLoading
-              ? "Loading served animals…"
+              ? "Loading cows awaiting a check…"
               : selected.length
                 ? `${selected.length} selected — tap to change`
-                : "Search served cow..."
+                : "Search cow awaiting a check..."
           }
-          include={(a) => a.sex === "F" && (servedIds ? servedIds.has(a.id) : false)}
+          include={(a) => a.sex === "F" && diagnosable.has(a.id)}
           value={selected}
           onPickMulti={setSelected}
         />
       </Field>
-      <Field label="Diagnosis date"><Input value={todayISO()} editable={false} /></Field>
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
+        </Field>
+      ) : (
+        <Field label="Diagnosis date"><Input value={serverToday} editable={false} /></Field>
+      )}
       <Field label="Result">
         <Chips>
           {(["Confirmed", "Not Pregnant", "Aborted"] as const).map((r) => (
@@ -104,15 +134,17 @@ export default function PD() {
           ))}
         </Chips>
       </Field>
+      <VetPicker vets={vets} value={vet} onChange={setVet} />
       <Field label="Remarks">
-        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Vet observations..." />
+        <Textarea value={remarks} onChangeText={setRemarks} placeholder="Observations..." />
       </Field>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit PD"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

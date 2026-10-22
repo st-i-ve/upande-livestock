@@ -6,43 +6,19 @@ export type FileAsset = {
   mimeType: string;
 };
 
-export type AttachFileInput = {
-  doctype: string;
-  docname: string;
-  asset: FileAsset;
-  /** Post-mortems are sensitive — default true (private File doc). */
-  isPrivate?: boolean;
-};
-
-export type AttachFileResult = {
-  fileName: string;
-  fileUrl: string;
-};
-
 /**
- * Uploads a file to Frappe and attaches it to the given doc via the
- * standard /api/method/upload_file endpoint. Returns the resulting File
- * doc's name + URL. Throws on HTTP / Frappe errors.
+ * Upload a file that is not attached to any document yet and return its URL —
+ * for a picture the server will adopt as a field value (a calf's `image`).
  */
-export async function attachFile(input: AttachFileInput): Promise<AttachFileResult> {
+export async function uploadFile(asset: FileAsset, isPrivate = false): Promise<string> {
   const client = await getClient();
   const form = new FormData();
-  // React Native FormData accepts the { uri, name, type } shape directly.
-  form.append("file", {
-    uri: input.asset.uri,
-    name: input.asset.name,
-    type: input.asset.mimeType,
-  } as any);
-  form.append("doctype", input.doctype);
-  form.append("docname", input.docname);
-  form.append("is_private", input.isPrivate === false ? "0" : "1");
-
+  form.append("file", { uri: asset.uri, name: asset.name, type: asset.mimeType } as any);
+  form.append("is_private", isPrivate ? "1" : "0");
   const res = await client.post("/api/method/upload_file", form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  const file = res.data?.message;
-  if (!file?.name) {
-    throw new Error("Upload succeeded but Frappe returned no File doc.");
-  }
-  return { fileName: file.name, fileUrl: file.file_url || "" };
+  const url = res.data?.message?.file_url;
+  if (!url) throw new Error("Upload succeeded but Frappe returned no file URL.");
+  return url as string;
 }

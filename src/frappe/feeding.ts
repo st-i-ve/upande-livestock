@@ -1,4 +1,5 @@
 import { getClient } from "@/src/services/api";
+import { OpsError } from "@/src/frappe/opsError";
 
 /**
  * Animal feeding — two-stage flow backed by whitelisted methods in
@@ -10,23 +11,54 @@ import { getClient } from "@/src/services/api";
  *      to the herd (Material Issue), attributed to the logged-in employee.
  */
 
-const METHOD_PREFIX = "upande_livestock.api.feeding";
+// This used to call upande_livestock.api.feeding — the engine underneath the
+// feed endpoints, which carried no permission check at all, so the handset was
+// manufacturing feed and moving stock unguarded. The engine is no longer
+// whitelisted; this goes through the guarded mobile entry point.
+const RECORD_FEEDING =
+  "upande_livestock.serverscripts.mobile.record_feeding.record_feeding";
 
 const callMethod = async <T = any>(
-  fn: string,
+  action: "info" | "day" | "manufacture" | "issue" | "manual",
   args: Record<string, any>,
 ): Promise<T> => {
   const client = await getClient();
-  const res = await client.post(`/api/method/${METHOD_PREFIX}.${fn}`, args);
-  return (res.data?.message ?? res.data) as T;
+  const res = await client.post(`/api/method/${RECORD_FEEDING}`, {
+    payload: { action, ...args },
+  });
+  const message = res.data?.message ?? res.data;
+  // The server answers a refusal (e.g. a backdated run the store could not
+  // have covered) with `{error: "..."}` in the body rather than raising, so it
+  // survives the desk's HTML blocks verbatim. Without this check that message
+  // never surfaces here — the caller gets a 200 that looks like a result.
+  if (message?.error) throw new OpsError(message.error, message.code);
+  return message as T;
 };
 
-export type FeedBreakdownRow = {
+/** One ingredient of a run, as the server computed it.
+ *
+ *  TWO QUANTITIES, TWO UNITS, AND THEY ARE NOT INTERCHANGEABLE.
+ *
+ *    recipeQty / recipeUom  what the BOM says and what the mixer works to.
+ *                           Hay is written 2 kg per head on this farm.
+ *    requiredQty / uom      the same amount in the item's STOCK unit, which is
+ *                           what leaves the store. That same hay is stocked in
+ *                           BALE at 0.07 bale/kg, so 222 kg reads as 15.54 BALE.
+ *
+ *  Anything the operator TYPES is in recipe units — the server converts, using
+ *  the herd's own BOM, and it is the only place that may. Seeding an editable
+ *  field from requiredQty would send a fourteenth of the hay under a kg label. */
+export type FeedLine = {
   itemCode: string;
   itemName: string;
-  perHeadQty: number;
-  totalQty: number;
+  /** Whole-run amount in the recipe's unit (already heads x per-head). */
+  recipeQty: number;
+  recipeUom: string;
+  /** The same amount in the item's stock unit. Display only. */
+  requiredQty: number;
   uom: string;
+  conversionFactor: number;
+  shortQty: number;
 };
 
 export type HerdFeedInfo = {
@@ -40,7 +72,7 @@ export type HerdFeedInfo = {
   uom: string;
   store: string;
   availableInStore: number;
-  breakdown: FeedBreakdownRow[];
+  lines: FeedLine[];
 };
 
 export type ManufactureResult = {
@@ -51,23 +83,19 @@ export type ManufactureResult = {
   produced_qty: number;
   uom: string;
   store: string;
+  /** "System" for the normal path, "Manual" when a hand-tuned recipe and head
+   *  count were submitted instead — echoed by the server on every run so the
+   *  screen can say which one just happened. */
+  feed_mode: string;
   transfer_stock_entry: string;
   manufacture_stock_entry: string;
 };
 
-export type FeedResult = {
-  stock_entry: string;
-  herd: string;
-  production_item: string;
-  issued_qty: number;
-  uom: string;
-  store: string;
-  employee: string | null;
-};
-
-/** Preview: per-head BOM scaled by head count + how much finished feed is in the store. */
+/** Preview: the herd's BOM scaled by head count + how much finished feed is in
+ *  the store. Backed by `feeding_program()`, which is what the "info" action
+ *  actually resolves to — see the mapping note on `lines` below. */
 export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
-  const m = await callMethod("get_herd_feed_info", { herd });
+  const m = await callMethod("info", { herd });
   return {
     herd: m.herd,
     bomNo: m.bom_no,
@@ -79,23 +107,80 @@ export const getHerdFeedInfo = async (herd: string): Promise<HerdFeedInfo> => {
     uom: m.uom ?? "",
     store: m.store ?? "",
     availableInStore: Number(m.available_in_store ?? 0),
-    breakdown: (m.breakdown ?? []).map((b: any) => ({
-      itemCode: b.item_code,
-      itemName: b.item_name,
-      perHeadQty: Number(b.per_head_qty ?? 0),
-      totalQty: Number(b.total_qty ?? 0),
-      uom: b.uom ?? "",
+    // `lines`, not `breakdown`. The "info" action resolves to feeding_program()
+    // -> _engine.get_herd_feeding_program(), whose payload has no `breakdown`
+    // key at all — that one belongs to get_herd_feed_info(), which nothing
+    // calls. Mapping it meant every consumer of this got an empty array: the
+    // System tab's raw-materials list drew nothing, and the Manual tab seeded
+    // from nothing and said "No ingredients" for every herd.
+    //
+    // Do NOT "fix" that by switching the endpoint to get_herd_feed_info():
+    // its per_head_qty is required_qty / heads, and required_qty is in STOCK
+    // units. Hay would seed the editable kg box with 0.14 instead of 2.
+    lines: (m.lines ?? []).map((l: any) => ({
+      itemCode: l.item_code,
+      itemName: l.item_name,
+      recipeQty: Number(l.recipe_qty ?? 0),
+      recipeUom: l.recipe_uom ?? l.uom ?? "",
+      requiredQty: Number(l.required_qty ?? 0),
+      uom: l.uom ?? "",
+      conversionFactor: Number(l.conversion_factor ?? 1),
+      shortQty: Number(l.short_qty ?? 0),
     })),
   };
 };
 
-/** Stage A — manufacture the herd's TMR into the feed store. */
-export const manufactureHerdFeed = (herd: string): Promise<ManufactureResult> =>
-  callMethod("manufacture_herd_feed", { herd });
+/** How much of today's ration this herd has had, and what is still owed.
+ *
+ *  The farm feeds twice a day, so "what does this herd need" is not the
+ *  question at the parlour — "what is owed now" is. Read from what was issued,
+ *  so a run someone entered by hand counts too. */
+export type FeedDayStatus = {
+  herd: string;
+  heads: number;
+  runsPerDay: number;
+  dayKg: number;
+  issuedKg: number;
+  remainingKg: number;
+  runsDone: number;
+  suggestedPortion: number;
+  complete: boolean;
+};
 
-/** Stage B — issue `qty` of the manufactured feed to the herd (Material Issue). */
-export const feedHerd = (
+export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => {
+  const m = await callMethod<any>("day", { herd });
+  return {
+    herd: m.herd,
+    heads: Number(m.heads ?? 0),
+    runsPerDay: Number(m.runs_per_day ?? 2),
+    dayKg: Number(m.day_kg ?? 0),
+    issuedKg: Number(m.issued_kg ?? 0),
+    remainingKg: Number(m.remaining_kg ?? 0),
+    runsDone: Number(m.runs_done ?? 0),
+    suggestedPortion: Number(m.suggested_portion ?? 1),
+    complete: !!m.complete,
+  };
+};
+
+/** Stage A — mix the herd's TMR and issue it, all in one.
+ *
+ *  `portion` is the fraction of the day this run covers: the farm feeds twice,
+ *  so 0.5 twice makes a day. Take it from `getFeedDayStatus` rather than
+ *  assuming a half — a herd already fed once is owed the remainder.
+ *
+ *  `postingDate` backdates the whole run. The server refuses it if the store
+ *  could not have covered it that day, and says which day would work.
+ *
+ *  `bomNo` is the recipe the herd-feed screen's picker chose — the standing
+ *  ration by default, or a previously-used BOM the operator picked instead.
+ *  Sent through as `bom_no`: `record_feeding.py`'s "manufacture" action reads
+ *  it and validates it server-side (submitted, same production item, belongs
+ *  to the herd — including the two herds whose standing BOM is shared).
+ *  Omitting it behaves exactly as before, mixing the herd's registered BOM. */
+export const manufactureHerdFeed = (
   herd: string,
-  qty: number,
-  employee?: string,
-): Promise<FeedResult> => callMethod("feed_herd", { herd, qty, employee });
+  portion = 1,
+  postingDate?: string,
+  bomNo?: string,
+): Promise<ManufactureResult> =>
+  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo });

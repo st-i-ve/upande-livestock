@@ -1,10 +1,11 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import type { Animal } from "@/types";
-import { avatarToneFor, initials, pillFor } from "@/services/utils";
+import { STAGE_LABELS, pillFor } from "@/services/utils";
 
-import { Avatar } from "./Avatar";
+import { AnimalImage } from "./AnimalImage";
 import { Pill } from "./Pill";
 import { Row } from "./Row";
 
@@ -14,11 +15,14 @@ export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => voi
   const p = pillFor(a);
   return (
     <Row
-      left={<Avatar text={initials(a.name)} tone={avatarToneFor(a)} />}
+      left={<AnimalImage image={a.image} thumb={a.thumb} animal={a} style={{ width: 38, height: 38, borderRadius: 19 }} />}
       title={
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
           <Text style={s.name}>{a.name}</Text>
           <Text style={s.id}>{a.id}</Text>
+          {a.stage ? (
+            <Text style={s.stage} testID="stage-chip">{STAGE_LABELS[a.stage] ?? a.stage}</Text>
+          ) : null}
         </View>
       }
       meta={meta ?? `${a.herd} · ${a.lastWt} kg`}
@@ -30,6 +34,10 @@ export function AnimalRow({ a, onPress, meta }: { a: Animal; onPress?: () => voi
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    name: { fontSize: 16, fontWeight: "600", color: c.text },
-    id: { fontSize: 13, color: c.textSubtle, fontFamily: "monospace" },
+    name: { fontSize: 16, ...font("600"), color: c.text },
+    stage: {
+      fontSize: 11, ...font("600"), color: c.textSubtle, borderWidth: 1, borderColor: c.border,
+      borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, overflow: "hidden",
+    },
+    id: { fontSize: 13, color: c.textSubtle, ...font("400") },
   });

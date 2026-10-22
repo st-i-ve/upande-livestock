@@ -1,26 +1,34 @@
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
+import { BackdateBanner } from "@/components/BackdateBanner";
+import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
+import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
-import { EmployeePickerButton } from "@/components/EmployeePickerButton";
+import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
-import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { VetPicker } from "@/components/VetPicker";
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-import { useAuthStore } from "@/src/auth/authStore";
+import { useBackdate } from "@/src/hooks/useBackdate";
+import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
+import { useOperator } from "@/src/hooks/useOperator";
+import { useVetChoice } from "@/src/hooks/useVets";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
-import { findStoreShortage } from "@/src/frappe/stock";
-import { storeQtyKey, useStoreQtyMap } from "@/src/hooks/useStoreQty";
+import { AvailableStockButton } from "@/components/AvailableStockButton";
+import { StockItemFields } from "@/components/StockItemFields";
+import { findShortage, stockOutcomeText, stockWarningsOf } from "@/src/frappe/eventItems";
+import { useEventItems } from "@/src/hooks/useEventItems";
+import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useHerds } from "@/src/hooks/useHerds";
-import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 
 type DCTRow = {
   id: number;
@@ -34,26 +42,29 @@ type DCTRow = {
 export default function Dryoff() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const defaultOperator = useAuthStore((s) => s.employeeName);
-  const setStoredOperator = useAuthStore((s) => s.setEmployeeName);
   const { data: herds = [] } = useHerds();
-  const { data: settings } = useLivestockSettings();
-  const defaultDrugWarehouse = settings?.custom_drug_warehouse || "";
+  // Drugs only where Drying Off posts stock, as the server's rule says.
+  const { choices: stockChoices, consumes } = useEventItems("Drying Off");
+  const { refreshing, onRefresh } = usePullToRefresh();
+  useRefreshOnFocus();
 
-  const [operator, setOperator] = useState<string | null>(defaultOperator);
+  const { operator, missingMessage } = useOperator();
+  const { vets, vet, setVet } = useVetChoice();
+  const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
+  const { today: serverToday } = useBackdatingWindow();
+  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
-  const [toHerd, setToHerd] = useState<string>("");
+  const preset = usePresetAnimal();
+  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  const finish = useFinishRecording();
+  const [toHerdPick, setToHerd] = useState<string>("");
+  const dryHerd = herds.find((h) => h.isDry)?.n ?? herds.find((h) => /steamer|dry/i.test(h.n))?.n ?? herds[0]?.n ?? "";
+  const toHerd = toHerdPick || dryHerd;
   const [dctRows, setDctRows] = useState<DCTRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   // Default destination: a dry-flagged herd if one exists (per Livestock Settings).
-  useEffect(() => {
-    if (!toHerd && herds.length) {
-      const dry = herds.find((h) => h.isDry);
-      setToHerd(dry?.n ?? herds.find((h) => /steamer|dry/i.test(h.n))?.n ?? herds[0].n);
-    }
-  }, [herds, toHerd]);
-
   const addDct = () =>
     setDctRows((prev) => [
       ...prev,
@@ -62,7 +73,7 @@ export default function Dryoff() {
         itemCode: "",
         qty: "1",
         uom: "",
-        sourceWarehouse: defaultDrugWarehouse,
+        sourceWarehouse: "",
         withdrawalDays: "",
       },
     ]);
@@ -73,50 +84,39 @@ export default function Dryoff() {
 
   const mutation = useCreateAnimalEvent();
 
-  // Live on-hand stock per DCT row, so the operator sees the store level.
-  const availQuery = useStoreQtyMap(
-    dctRows.map((r) => ({
-      itemCode: r.itemCode.trim(),
-      warehouse: r.sourceWarehouse || defaultDrugWarehouse,
-    })),
-  );
-
   const handleSubmit = async () => {
     setError(null);
-    if (!operator) return setError("Pick the operator before submitting.");
+    setWarning(null);
+    if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to dry off.");
     if (!toHerd) return setError("Pick a destination herd.");
 
-    const drugIssues: AnimalDrugIssueInput[] = dctRows
+    const drugIssues: AnimalDrugIssueInput[] = (consumes ? dctRows : [])
       .filter((d) => d.itemCode.trim() && Number(d.qty) > 0)
       .map((d) => ({
         itemCode: d.itemCode.trim(),
         qty: Number(d.qty),
         uom: d.uom || undefined,
-        sourceWarehouse: d.sourceWarehouse || defaultDrugWarehouse || undefined,
+        sourceWarehouse: d.sourceWarehouse || undefined,
         withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
       }));
-    const missingWh = drugIssues.find((d) => !d.sourceWarehouse);
-    if (missingWh) {
-      return setError(
-        "Pick a source warehouse on every DCT row (or set Drug warehouse in Livestock Settings).",
-      );
-    }
-
-    // Block over-issue before creating the Material Issue.
-    const shortage = await findStoreShortage(
+    // Heads-up only. The server saves a short issue as a draft (today) or
+    // refuses it with its own message (backdated); the phone never blocks.
+    const shortage = await findShortage(
+      stockChoices,
       drugIssues.map((d) => ({
         itemCode: d.itemCode,
         warehouse: d.sourceWarehouse as string,
-        qtyNeeded: d.qty,
+        qtyNeeded: d.qty * selected.length,
       })),
     );
-    if (shortage) return setError(shortage);
+    if (shortage) setWarning(shortage);
 
-    if (operator !== defaultOperator) await setStoredOperator(operator);
 
     let succeeded = 0;
-    let queued = 0;
+    const replies: any[] = [];
+    // A cow the server refuses is skipped with its reason; the others still dry off.
+    const skipped: { name: string; reason: string }[] = [];
     for (const a of selected) {
       try {
         const r = await mutation.mutateAsync({
@@ -124,36 +124,47 @@ export default function Dryoff() {
           animal: a.id,
           currentHerd: a.herd,
           operator,
-          eventDate: todayISO(),
+          vet: vet || undefined,
+          eventDate: isBackdating ? backdateDate : serverToday,
           toHerd,
           drugIssues: drugIssues.length ? drugIssues : undefined,
         });
-        if (r.queued) queued += 1;
-        else succeeded += 1;
+        succeeded += 1;
+        replies.push(r);
       } catch (err) {
-        setError(
-          `${succeeded} of ${selected.length} dried off. Stopped at ${a.name}: ${extractFrappeError(err)}`,
-        );
-        return;
+        skipped.push({ name: a.name, reason: extractFrappeError(err) });
       }
     }
+    if (succeeded === 0) {
+      setError(`Nothing was recorded.\n${skipped.map((k) => `${k.name}: ${k.reason}`).join("\n")}`);
+      return;
+    }
     const parts: string[] = [];
-    if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
-    if (queued) parts.push(`${queued} queued (offline)`);
-    Alert.alert("Drying off recorded", parts.join(" · "));
-    router.replace("/(tabs)/record/success?name=Drying off");
+    parts.push(`Recorded ${succeeded} · Skipped ${skipped.length}${succeeded ? ` (moved to ${toHerd})` : ""}`);
+    for (const k of skipped) parts.push(`${k.name}: ${k.reason}`);
+    const stockNote = stockOutcomeText(replies);
+    Alert.alert(
+      stockNote ? "Drying off saved — stock issue pending" : "Drying off recorded",
+      [parts.join("\n"), stockNote, ...stockWarningsOf(replies)].filter(Boolean).join("\n\n"),
+    );
+    finish("Drying off");
   };
 
   return (
-    <Screen title="Drying off" subtitle="From a milking herd" back>
+    <Screen
+      title={titleFor("Drying off", preset)}
+      subtitle="From a milking herd"
+      back
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      headerRight={isBackdating ? undefined : <BackdateButton type="dryoff" />}
+    >
+      {isBackdating ? <BackdateBanner /> : null}
       <Banner tone="info">
         The destination herd defaults to the dry / steamers herd; you can override below. Add DCT
         drugs to apply the same treatment to every selected cow.
       </Banner>
 
-      <Field label="Operator">
-        <EmployeePickerButton value={operator} onChange={setOperator} />
-      </Field>
 
       <Field label="Cow(s) to dry off">
         <AnimalPickerButton
@@ -168,50 +179,37 @@ export default function Dryoff() {
       <Field label="To herd">
         <Picker value={toHerd} onChange={setToHerd} options={herds.map((h) => h.n)} />
       </Field>
-      <Field label="Date"><Input value={todayISO()} editable={false} /></Field>
+      <VetPicker vets={vets} value={vet} onChange={setVet} />
+      {isBackdating ? (
+        <Field label="Date it happened">
+          <DateField value={backdateDate} onChange={setBackdateDate} maximumDate={fromISODate(serverToday)} />
+        </Field>
+      ) : (
+        <Field label="Date"><Input value={serverToday} editable={false} /></Field>
+      )}
 
+      {consumes ? (
+        <>
+          <AvailableStockButton eventType="Drying Off" />
       <Field
         label="DCT drugs (applied to every selected cow)"
-        help={
-          defaultDrugWarehouse
-            ? `Each row issues stock and posts a vet expense JE per cow. Source warehouse defaults to ${defaultDrugWarehouse}.`
-            : "Each row issues stock and posts a vet expense JE per cow. Pick a source warehouse per row."
-        }
+        help="Each row issues stock for every selected cow; the server posts it. Picking an item picks the store that holds it; change it if another has stock."
       >
         {dctRows.length === 0 ? (
           <Text style={s.empty}>No DCT drugs. Tap “Add drug” if you administered any.</Text>
         ) : null}
         {dctRows.map((r) => (
           <View key={r.id} style={s.row}>
-            <Field label="Item">
-              <FrappeSearchPicker
-                doctype="Item"
-                value={r.itemCode || null}
-                onChange={(name, row) =>
-                  updateDct(r.id, { itemCode: name, uom: row?.stock_uom || "" })
-                }
-                fields={["name", "item_name", "item_code", "stock_uom"]}
-                displayField="item_name"
-                metaField="item_code"
-                searchField="item_name"
-                filters={[["disabled", "=", 0], ["is_stock_item", "=", 1]]}
-                icon="pill"
-              />
-            </Field>
-            <Field label="Issue from warehouse">
-              <FrappeSearchPicker
-                doctype="Warehouse"
-                value={r.sourceWarehouse || null}
-                onChange={(name) => updateDct(r.id, { sourceWarehouse: name })}
-                fields={["name", "warehouse_name"]}
-                displayField="warehouse_name"
-                searchField="warehouse_name"
-                filters={[["disabled", "=", 0]]}
-                icon="warehouse"
-              />
-            </Field>
+            <StockItemFields
+              choices={stockChoices}
+              value={{ itemCode: r.itemCode, uom: r.uom, warehouse: r.sourceWarehouse }}
+              onChange={(v) =>
+                updateDct(r.id, { itemCode: v.itemCode, uom: v.uom, sourceWarehouse: v.warehouse })
+              }
+              qtyNeeded={Number(r.qty) * Math.max(selected.length, 1)}
+            />
             <FieldRow>
-              <Field label="Qty" style={{ flex: 1 }}>
+              <Field label="Qty per cow" style={{ flex: 1 }}>
                 <Input
                   value={r.qty}
                   onChangeText={(t) => updateDct(r.id, { qty: t })}
@@ -223,26 +221,11 @@ export default function Dryoff() {
                 <Input value={r.uom} editable={false} placeholder="—" />
               </Field>
             </FieldRow>
-            {r.itemCode.trim() && (r.sourceWarehouse || defaultDrugWarehouse)
-              ? (() => {
-                  const wh = r.sourceWarehouse || defaultDrugWarehouse;
-                  const avail = availQuery.data?.[storeQtyKey(r.itemCode.trim(), wh)];
-                  const short = avail != null && Number(r.qty) > avail;
-                  return (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        marginBottom: 8,
-                        color: short ? c.danger : c.textMuted,
-                      }}
-                    >
-                      {availQuery.isLoading || avail == null
-                        ? `Checking stock in ${wh}…`
-                        : `Available in ${wh}: ${avail}${r.uom ? " " + r.uom : ""}${short ? " — not enough" : ""}`}
-                    </Text>
-                  );
-                })()
-              : null}
+            <Text style={s.total}>
+              {selected.length > 0 && Number(r.qty) > 0
+                ? `${r.qty} × ${selected.length} cow${selected.length === 1 ? "" : "s"} = ${Math.round(Number(r.qty) * selected.length * 1000) / 1000}${r.uom ? ` ${r.uom}` : ""}`
+                : "Pick cows to see the total"}
+            </Text>
             <Field label="Withdrawal days">
               <Input
                 value={r.withdrawalDays}
@@ -256,12 +239,16 @@ export default function Dryoff() {
         ))}
         <Button label="Add drug" icon="plus" variant="outline" onPress={addDct} />
       </Field>
+        </>
+      ) : null}
 
+      {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
+      <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit dry-off"}
-        disabled={mutation.isPending || selected.length === 0}
+        disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />
@@ -276,6 +263,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       padding: 11,
       borderRadius: RADIUS.md,
       marginBottom: 7,
+    },
+    total: {
+      color: c.textMuted,
+      fontSize: 12,
+      marginBottom: 8,
     },
     empty: {
       color: c.textSubtle,

@@ -12,14 +12,12 @@ import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { useAuthStore } from "@/src/auth/authStore";
 import { applyHerdMoves, computePendingHerdMoves } from "@/src/frappe/herdTransitions";
-import { useAnimals } from "@/src/hooks/useAnimals";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError } from "@/src/services/api";
 
 export default function HerdsList() {
   const { data: herds = [], isLoading, isRefetching, error, refetch } = useHerds();
-  const { data: animals = [] } = useAnimals();
   const { data: settings } = useLivestockSettings();
   const operator = useAuthStore((s) => s.employeeName);
 
@@ -33,14 +31,23 @@ export default function HerdsList() {
       Alert.alert("Sign-in required", "We need your employee ID to record the Movement events. Sign out and back in.");
       return;
     }
-    const moves = computePendingHerdMoves(animals, settings);
-    if (moves.length === 0) {
-      Alert.alert("No moves needed", "Every animal is already in the right age-bucket herd.");
+    let moves;
+    try {
+      moves = await computePendingHerdMoves();
+    } catch (e: any) {
+      Alert.alert("Could not read the ladder", e?.message || "Try again in a moment.");
       return;
     }
+    if (moves.length === 0) {
+      Alert.alert("No moves needed", "Every animal is on the rung the ladder puts it on.");
+      return;
+    }
+    // Overdue first: forty animals ready to move must not bury the one that is
+    // three months late.
+    moves.sort((a, b) => Number(b.overdue) - Number(a.overdue));
     const preview = moves
       .slice(0, 10)
-      .map((m) => `• ${m.animal.name} (${m.animal.herd || "—"}) → ${m.toHerd} · ${m.reason}`)
+      .map((m) => `• ${m.label} (${m.fromHerd || "—"}) → ${m.toHerd}${m.overdue ? " — overdue" : ""}`)
       .join("\n");
     const more = moves.length > 10 ? `\n…and ${moves.length - 10} more.` : "";
 
@@ -59,7 +66,7 @@ export default function HerdsList() {
               const ok = results.filter((r) => r.ok).length;
               const failed = results.length - ok;
               Alert.alert(
-                "Age transitions complete",
+                "Ladder moves complete",
                 `${ok} moved${failed ? ` · ${failed} failed` : ""}.`,
               );
               refetch();
@@ -72,10 +79,9 @@ export default function HerdsList() {
     );
   };
 
-  const hasBucketsConfigured =
-    !!settings?.custom_weaning_herd ||
-    !!settings?.custom_weaner_herd ||
-    !!settings?.custom_bulling_heifer_herd;
+  // The ladder is a table, not three fields. One configured rung is enough for
+  // the button to have something to do.
+  const hasBucketsConfigured = (settings?.growth_ladder?.length ?? 0) > 0;
 
   return (
     <Screen
@@ -113,7 +119,7 @@ export default function HerdsList() {
             key={h.n}
             left={<Avatar icon="fence" />}
             title={h.n}
-            meta={`${h.cat || "—"} · ${h.cnt} head${h.cc ? ` · ${h.cc}` : ""}`}
+            meta={`${h.cat || "—"} · ${h.cnt} head`}
             chevron
             onPress={() => router.push(`/(tabs)/animals/herds/${encodeURIComponent(h.n)}`)}
           />

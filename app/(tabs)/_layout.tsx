@@ -1,10 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
-import { Tabs } from "expo-router";
+import type { BottomTabBarButtonProps } from "expo-router/js-tabs";
+import { Tabs, router } from "expo-router";
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CowIcon } from "@/components/CowIcon";
+import { LiveToast } from "@/components/LiveToast";
+import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 
 const ICON_SIZE = 31;
@@ -12,7 +15,9 @@ const BAR_CONTENT_HEIGHT = 58;
 const CIRCLE_DIAMETER = 50;
 const CIRCLE_LIFT = 10;
 
-function RecordTabButton(props: BottomTabBarButtonProps) {
+type RecordTabButtonProps = Pick<BottomTabBarButtonProps, "onPress" | "onLongPress" | "accessibilityState">;
+
+function RecordTabButton(props: RecordTabButtonProps) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const selected = props.accessibilityState?.selected;
@@ -21,7 +26,7 @@ function RecordTabButton(props: BottomTabBarButtonProps) {
       onPress={props.onPress}
       onLongPress={props.onLongPress}
       accessibilityRole="button"
-      accessibilityLabel="Record"
+      accessibilityLabel="Log a livestock event"
       accessibilityState={{ selected }}
       android_ripple={null}
       style={s.recordCell}
@@ -36,8 +41,10 @@ function RecordTabButton(props: BottomTabBarButtonProps) {
 export default function TabLayout() {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { canRecord } = useCanRecord();
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -60,47 +67,38 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "home" : "home-outline"} size={ICON_SIZE} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="animals"
         options={{
           title: "Animals",
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="cow" size={ICON_SIZE} color={color} />
+            <CowIcon size={ICON_SIZE + 3} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="record"
-        options={{
-          tabBarLabel: () => null,
-          tabBarButton: (props) => <RecordTabButton {...props} />,
-        }}
-      />
-      <Tabs.Screen
-        name="alerts"
-        options={{
-          title: "Alerts",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "bell" : "bell-outline"} size={ICON_SIZE} color={color} />
-          ),
-          tabBarBadge: 5,
-          tabBarBadgeStyle: {
-            backgroundColor: c.danger,
-            color: "#fff",
-            fontSize: 10,
-            fontWeight: "600",
-            minWidth: 16,
-            height: 16,
-            lineHeight: 16,
+        listeners={{
+          // Tapping Record always lands on the menu, never on whichever record
+          // screen was left open in its stack.
+          tabPress: () => {
+            try {
+              router.dismissTo("/(tabs)/record");
+            } catch {
+              // not mounted yet: the tab opens on its menu anyway
+            }
           },
+        }}
+        options={{
+          // No Employee, no recording: the tab is not there at all.
+          href: canRecord ? undefined : null,
+          tabBarLabel: () => null,
+          tabBarButton: (props) => (
+            <RecordTabButton
+              onPress={props.onPress}
+              onLongPress={props.onLongPress}
+              accessibilityState={props.accessibilityState}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -113,6 +111,8 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <LiveToast />
+    </>
   );
 }
 

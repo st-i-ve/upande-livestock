@@ -1,76 +1,49 @@
 import { getClient } from "@/src/services/api";
-
-export type EmployeeOption = {
-  name: string;          // Employee ID, used as link value (e.g. "HR-EMP-01478")
-  employeeName: string;  // display name (e.g. "Otieno David Ger")
-  userId: string | null; // linked Frappe User email if any
-};
-
-const mapEmployee = (row: any): EmployeeOption => ({
-  name: row.name,
-  employeeName: row.employee_name || row.name,
-  userId: row.user_id ?? null,
-});
+import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
- * Find the Employee record linked to a given Frappe user (the email used to
- * log in). Returns null if no Employee row has `user_id = email`.
+ * Who the signed-in user is on the farm's books.
+ *
+ * A user with no Employee linked to them is view-only: the server refuses every
+ * record they try to make. The phone only mirrors that so it can hide the
+ * buttons; it never decides.
+ *
+ * This used to read /api/resource/Employee, which the farm roles are not allowed
+ * to read, so a milker with an Employee still looked unlinked. The answer now
+ * rides on `posting_day`, which the server works out for any signed-in user.
  */
-export const getEmployeeForUser = async (
-  email: string,
-): Promise<EmployeeOption | null> => {
-  const client = await getClient();
-  const res = await client.get("/api/resource/Employee", {
-    params: {
-      fields: JSON.stringify(["name", "employee_name", "user_id"]),
-      filters: JSON.stringify([["user_id", "=", email]]),
-      limit_page_length: 1,
-    },
-  });
-  const rows = (res.data?.data ?? []) as any[];
-  return rows[0] ? mapEmployee(rows[0]) : null;
+export type EmployeeStatus = {
+  isEmployee: boolean;
+  employee: string | null;
+  employeeName: string | null;
 };
 
-/**
- * Search Active employees by name fragment, capped at `limit`. Backed by
- * Frappe's `like` filter — Frappe matches on `employee_name` and `name`.
- */
-export const searchEmployees = async (
-  query: string,
-  limit = 20,
-): Promise<EmployeeOption[]> => {
+const METHOD = "/api/method/upande_livestock.serverscripts.settings.posting_day.posting_day";
+
+/** Fresh from the server. Throws when the server cannot be reached. */
+export const fetchEmployeeStatus = async (): Promise<EmployeeStatus> => {
   const client = await getClient();
-  const filters: any[] = [["status", "=", "Active"]];
-  const trimmed = query.trim();
-  if (trimmed) {
-    filters.push(["employee_name", "like", `%${trimmed}%`]);
+  const res = await client.get(METHOD);
+  const m = res.data?.message;
+  if (!m || m.error || typeof m.is_employee !== "boolean") {
+    throw new Error("posting_day gave no employee answer");
   }
-  const res = await client.get("/api/resource/Employee", {
-    params: {
-      fields: JSON.stringify(["name", "employee_name", "user_id"]),
-      filters: JSON.stringify(filters),
-      limit_page_length: limit,
-      order_by: "employee_name asc",
-    },
-  });
-  const rows = (res.data?.data ?? []) as any[];
-  return rows.map(mapEmployee);
+  const status: EmployeeStatus = {
+    isEmployee: m.is_employee,
+    employee: m.employee ?? null,
+    employeeName: m.employee_name ?? null,
+  };
+  await storage.setItem(STORAGE_KEYS.EMPLOYEE_STATUS, JSON.stringify(status));
+  return status;
 };
 
-export const getEmployee = async (
-  name: string,
-): Promise<EmployeeOption | null> => {
-  if (!name) return null;
-  const client = await getClient();
+/** The last answer, for offline. Null when there never was one. */
+export const cachedEmployeeStatus = async (): Promise<EmployeeStatus | null> => {
   try {
-    const res = await client.get(
-      `/api/resource/Employee/${encodeURIComponent(name)}`,
-    );
-    const row = res.data?.data;
-    if (!row) return null;
-    return mapEmployee(row);
-  } catch (err: any) {
-    if (err?.response?.status === 404) return null;
-    throw err;
+    const raw = await storage.getItem(STORAGE_KEYS.EMPLOYEE_STATUS);
+    const v = raw ? JSON.parse(raw) : null;
+    return v && typeof v.isEmployee === "boolean" ? (v as EmployeeStatus) : null;
+  } catch {
+    return null;
   }
 };

@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { font } from "@/constants/theme";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -35,5 +36,5 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderBottomColor: c.borderSubtle,
     },
     k: { color: c.textMuted, fontSize: 12 },
-    v: { color: c.text, fontSize: 12, fontWeight: "600", textAlign: "right" },
+    v: { color: c.text, fontSize: 12, ...font("600"), textAlign: "right" },
   });

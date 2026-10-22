@@ -1,6 +1,6 @@
 import React from "react";
 
-import { FONT_FAMILY } from "@/constants/theme";
+import { fontFamilyFor } from "@/constants/theme";
 
 // RN 0.81's Text is a plain function component (no `.render`), so the old
 // Text.render monkey-patch was a silent no-op. Instead we redefine the
@@ -9,23 +9,17 @@ import { FONT_FAMILY } from "@/constants/theme";
 // face and a uniform font size. Every `import { Text } from "react-native"`
 // resolves through this getter, so this applies app-wide.
 
-// Weight → Poppins face. Bold is toned down: heavy weights resolve to SemiBold
-// so the UI reads calmer, with emphasis carried by SemiBold not a heavy Bold.
-const WEIGHT_TO_FAMILY: Record<string, string> = {
-  "500": FONT_FAMILY.medium,
-  "600": FONT_FAMILY.semibold,
-  "700": FONT_FAMILY.semibold,
-  "800": FONT_FAMILY.semibold,
-  "900": FONT_FAMILY.semibold,
-  bold: FONT_FAMILY.semibold,
-};
+const MONO = new Set(["monospace", "sans-serif", "serif", "normal", "System"]);
 
 function resolveFamily(flat: any): string {
-  if (flat?.fontFamily) return flat.fontFamily;
-  const w = flat?.fontWeight;
-  if (w !== undefined && w !== null) return WEIGHT_TO_FAMILY[String(w)] ?? FONT_FAMILY.regular;
-  return FONT_FAMILY.regular;
+  const f = flat?.fontFamily;
+  if (f && !MONO.has(f)) return f;
+  return fontFamilyFor(flat?.fontWeight);
 }
+
+// Nested <Text> inherits its parent's face, so only the outermost text (and any
+// text that sets its own family or weight) gets the default injected.
+const InText = React.createContext(false);
 
 // Uniform, larger type scale (raised floor). Sizes >= 30 pass through
 // (intentional display text like the login title); Text with no explicit size
@@ -48,22 +42,50 @@ if (!RN.__poppinsTextPatched) {
   const StyleSheet = RN.StyleSheet;
 
   const PoppinsText = React.forwardRef(function PoppinsText(props: any, ref: any) {
+    const nested = React.useContext(InText);
+    const flat = StyleSheet.flatten(props.style);
+    const own = flat?.fontFamily && !MONO.has(flat.fontFamily);
+    const fontFamily = resolveFamily(flat);
+    const fontSize = snapFontSize(flat?.fontSize);
+    const inherit = nested && !own && flat?.fontWeight == null;
+    const el = React.createElement(OriginalText, {
+      ...props,
+      ref,
+      style: [inherit ? null : { fontFamily }, props.style, inherit ? null : fontFamily === flat?.fontFamily ? null : { fontWeight: "normal" }, fontSize != null ? { fontSize } : null],
+    });
+    return nested ? el : React.createElement(InText.Provider, { value: true }, el);
+  });
+  (PoppinsText as any).displayName = "PoppinsText";
+
+  // TextInput (and its placeholder) take their face from the style too.
+  const OriginalInput = RN.TextInput;
+  const PoppinsInput = React.forwardRef(function PoppinsInput(props: any, ref: any) {
     const flat = StyleSheet.flatten(props.style);
     const fontFamily = resolveFamily(flat);
     const fontSize = snapFontSize(flat?.fontSize);
-    return React.createElement(OriginalText, {
+    return React.createElement(OriginalInput, {
       ...props,
       ref,
-      style: [{ fontFamily }, props.style, fontSize != null ? { fontSize } : null],
+      style: [{ fontFamily }, props.style, { fontWeight: "normal" }, fontSize != null ? { fontSize } : null],
     });
   });
-  (PoppinsText as any).displayName = "PoppinsText";
+  (PoppinsInput as any).displayName = "PoppinsTextInput";
+  try {
+    Object.assign(PoppinsInput, OriginalInput);
+  } catch {
+    // statics are a convenience only
+  }
 
   try {
     Object.defineProperty(RN, "Text", {
       configurable: true,
       enumerable: true,
       get: () => PoppinsText,
+    });
+    Object.defineProperty(RN, "TextInput", {
+      configurable: true,
+      enumerable: true,
+      get: () => PoppinsInput,
     });
     RN.__poppinsTextPatched = true;
   } catch {
