@@ -34,6 +34,18 @@ const FILTERS = [
 ];
 
 /** `#rgb`, `#rrggbb` or `rgb(...)` with an alpha. */
+// Header opacity down its height: 1 until GLASS_START, then
+// alpha(t) = 1 - (1 - GLASS_MIN) * (e^(k·u) - 1) / (e^k - 1), u = progress through
+// the fade — flat at first, dropping fastest at the very bottom edge.
+const GLASS_START = 0.55;
+const GLASS_MIN = 0.62;
+const GLASS_K = 3.5;
+const GLASS_STOPS: [number, number][] = [0, GLASS_START, 0.7, 0.8, 0.88, 0.94, 1].map((t) => {
+  const u = Math.max(0, (t - GLASS_START) / (1 - GLASS_START));
+  const a = 1 - (1 - GLASS_MIN) * (Math.exp(GLASS_K * u) - 1) / (Math.exp(GLASS_K) - 1);
+  return [t, Math.round(a * 1000) / 1000];
+});
+
 function withAlpha(color: string, a: number): string {
   const hex = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})/i);
   if (hex) {
@@ -205,10 +217,12 @@ export default function Animals() {
           setHeaderH((prev) => (prev === h ? prev : h));
         }}
       >
-        {/* Glass: the theme background is solid at the top and thins to ~40% at the bottom edge. */}
+        {/* Glass: solid for most of the header, then an inverse-exponential fall-off
+            in the last stretch, so only the bottom edge is frosted. */}
         <LinearGradient
           pointerEvents="none"
-          colors={[withAlpha(c.bg, 1), withAlpha(c.bg, 0.4)]}
+          colors={GLASS_STOPS.map(([, a]) => withAlpha(c.bg, a)) as unknown as readonly [string, string, ...string[]]}
+          locations={GLASS_STOPS.map(([t]) => t) as unknown as readonly [number, number, ...number[]]}
           style={StyleSheet.absoluteFill}
         />
         <View style={s.titleRow}>
