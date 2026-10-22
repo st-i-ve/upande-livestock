@@ -21,6 +21,7 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
 import { usePendingCount } from "@/src/hooks/useQueueStatus";
+import { useLiveStore } from "@/src/realtime/liveStore";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -92,6 +93,7 @@ export default function Profile() {
   const pending = usePendingCount();
   const online = useNetworkStatus();
   const ota = useOtaUpdate();
+  const live = useLiveStore((x) => x.status);
 
   const displayName = fullname || email || "Signed in";
   const subtitle = email ?? "";
@@ -137,6 +139,25 @@ export default function Profile() {
             label={online === false ? "Offline · milkings waiting to sync" : "Milkings waiting to sync"}
             right={
               <Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>
+            }
+          />
+
+          <Row
+            icon="broadcast"
+            label={
+              live === "live" ? "Live updates" : live === "reconnecting" ? "Live updates · reconnecting" : "Live updates · offline"
+            }
+            right={
+              <View
+                accessibilityLabel={`Live updates ${live}`}
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 5,
+                  backgroundColor: live === "live" ? c.text : live === "reconnecting" ? c.textMuted : c.danger,
+                  marginRight: 4,
+                }}
+              />
             }
           />
 

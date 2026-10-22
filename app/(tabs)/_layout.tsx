@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CowIcon } from "@/components/CowIcon";
+import { LiveToast } from "@/components/LiveToast";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -43,6 +44,7 @@ export default function TabLayout() {
   const { canRecord } = useCanRecord();
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -109,6 +111,8 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <LiveToast />
+    </>
   );
 }
 

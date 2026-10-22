@@ -25,6 +25,7 @@ import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { startAnimalSync } from "@/src/db/sync";
 import { startAutoDrain } from "@/src/offline/autoDrain";
+import { startRealtime } from "@/src/realtime/realtime";
 import { queryClient } from "@/src/services/queryClient";
 import { useScheme, useThemeStore } from "@/src/theme/themeStore";
 
@@ -107,6 +108,13 @@ export default function RootLayout() {
   React.useEffect(() => {
     if (!signedIn) return;
     return startAnimalSync();
+  }, [signedIn]);
+
+  // Live updates: a socket to the farm's server while signed in and in the
+  // foreground, so what others record reaches this phone within seconds.
+  React.useEffect(() => {
+    if (!signedIn) return;
+    return startRealtime();
   }, [signedIn]);
 
   // Who the user is on the farm's books (view-only without an Employee): asked

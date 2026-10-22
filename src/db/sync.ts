@@ -52,6 +52,24 @@ export function syncAnimals(opts: { full?: boolean } = {}): Promise<void> {
   return inFlight;
 }
 
+let queued: Promise<void> | null = null;
+
+/**
+ * A sync that starts after something is known to have changed. When one is
+ * already in flight it may have read before that change, so one more is queued
+ * behind it (any number of callers share that one) rather than reusing it.
+ */
+export function syncAnimalsSoon(): Promise<void> {
+  if (!inFlight) return syncAnimals();
+  if (!queued) {
+    queued = inFlight.then(() => {
+      queued = null;
+      return syncAnimals();
+    });
+  }
+  return queued;
+}
+
 /** Logout: drop the local herd so the next person to sign in starts empty. */
 export async function clearLocalData(): Promise<void> {
   await clearDb();
