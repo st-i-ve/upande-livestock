@@ -69,12 +69,12 @@ export default function Record() {
                 pressed && { backgroundColor: c.bgMuted },
               ]}
             >
-              <MaterialCommunityIcons name={it.icon} size={22} color={c.textMuted} />
+              <MaterialCommunityIcons name={it.icon} size={20} color={c.textMuted} />
               <Text style={s.text}>{it.label}</Text>
               {offline ? (
                 <Pill label={onlineOnly ? "online only" : "works offline"} tone={onlineOnly ? "default" : "success"} />
               ) : null}
-              <MaterialCommunityIcons name="chevron-right" size={22} color={c.textSubtle} />
+              <MaterialCommunityIcons name="chevron-right" size={20} color={c.textSubtle} />
             </Pressable>
             );
           })}
@@ -90,12 +90,12 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 14,
-      minHeight: 54,
-      paddingVertical: 14,
+      minHeight: 48,
+      paddingVertical: 10,
       paddingHorizontal: 4,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,
     },
-    section: { fontSize: 13.5, marginTop: 22, marginBottom: 6 },
-    text: { flex: 1, fontSize: 17, ...font("400"), color: c.text },
+    section: { fontSize: 12, marginTop: 18, marginBottom: 4 },
+    text: { flex: 1, fontSize: 16, ...font("600"), color: c.text },
   });
