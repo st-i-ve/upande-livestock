@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { cachedEmployeeStatus, fetchEmployeeStatus } from "@/src/frappe/employee";
+import { isQualityOnly } from "@/src/auth/roles";
 import { setNotEmployeeHandler } from "@/src/frappe/opsError";
 import { clearLocalData, syncAnimals } from "@/src/db/sync";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
@@ -23,6 +24,9 @@ interface AuthState {
    *  `null` until known; treated as "may record" so a first paint never flashes
    *  the restriction at an employee — the server decides either way. */
   isEmployee: boolean | null;
+  /** The livestock roles the server says this user holds; `null` until known.
+   *  Cached like `isEmployee`: a failed lookup keeps the last answer. */
+  roles: string[] | null;
   /** Ask the server who this user is; offline, keep the last answer. */
   refreshEmployeeStatus: () => Promise<void>;
 
@@ -45,13 +49,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fullname: null,
   employeeName: null,
   isEmployee: null,
+  roles: null,
 
   refreshEmployeeStatus: async () => {
     try {
       const st = await fetchEmployeeStatus();
       if (st.employee) await storage.setItem(STORAGE_KEY_EMPLOYEE, st.employee);
       else await storage.removeItem(STORAGE_KEY_EMPLOYEE);
-      set({ isEmployee: st.isEmployee, employeeName: st.employee });
+      // A server that sent no roles must not erase the ones we know.
+      set({
+        isEmployee: st.isEmployee,
+        employeeName: st.employee,
+        roles: st.roles ?? get().roles,
+      });
     } catch (e) {
       // Offline or the server is busy: keep what we last knew.
       console.warn("[auth] employee status refresh failed", e);
@@ -82,6 +92,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         fullname,
         employeeName: employee,
         isEmployee: status ? status.isEmployee : null,
+        roles: status ? status.roles : null,
       });
     } catch (e) {
       console.error("[auth] checkAuth failed", e);
@@ -102,10 +113,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // offline. No Employee means view-only. Login succeeds either way.
     let employeeName: string | null = null;
     let isEmployee: boolean | null = null;
+    let roles: string[] | null = null;
     try {
       const st = await fetchEmployeeStatus();
       isEmployee = st.isEmployee;
       employeeName = st.employee;
+      roles = st.roles;
       if (st.employee) await storage.setItem(STORAGE_KEY_EMPLOYEE, st.employee);
       else await storage.removeItem(STORAGE_KEY_EMPLOYEE);
     } catch (e) {
@@ -119,10 +132,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       fullname: data?.full_name ?? null,
       employeeName,
       isEmployee,
+      roles,
     });
     // The whole herd, once, so the phone works offline from here on. Not
-    // awaited: a slow sync must not hold up signing in.
-    void syncAnimals({ full: true });
+    // awaited: a slow sync must not hold up signing in. A user whose only role is
+    // Livestock Quality may not read animals, so there is nothing to sync.
+    if (!isQualityOnly(roles)) void syncAnimals({ full: true });
   },
 
   logout: async () => {
@@ -137,6 +152,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       fullname: null,
       employeeName: null,
       isEmployee: null,
+      roles: null,
     });
   },
 
@@ -163,7 +179,12 @@ setNotEmployeeHandler(() => {
   useAuthStore.setState({ isEmployee: false, employeeName: null });
   void storage.setItem(
     STORAGE_KEYS.EMPLOYEE_STATUS,
-    JSON.stringify({ isEmployee: false, employee: null, employeeName: null }),
+    JSON.stringify({
+      isEmployee: false,
+      employee: null,
+      employeeName: null,
+      roles: useAuthStore.getState().roles,
+    }),
   );
 });
 

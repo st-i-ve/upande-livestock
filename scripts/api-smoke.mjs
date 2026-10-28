@@ -46,6 +46,12 @@
  *     make the reads the app makes for its screens and to record what its role
  *     records, with no ERPNext role. A 403 or "not permitted" fails the step.
  *     Roles' writes need WRITE=1 (and SMOKE_ANIMALS / SMOKE_HERD).
+ * QUALITY (optional step group): SMOKE_QUALITY_USER / SMOKE_QUALITY_PASSWORD, a user
+ *   holding ONLY Livestock Quality plus an Employee with user_id set. It must be told
+ *   its role by posting_day (roles == ["Livestock Quality"]), read both quality pages,
+ *   file milk quality against SMOKE_QUALITY_RECORDING (default: the milking the WRITE
+ *   steps recorded; the filing step is skipped when there is neither), and be refused
+ *   for milking, events and feeding. Remove that user and its Employee afterwards.
  * Remove those users, their Employees and everything they recorded afterwards.
  * Point it at a development site only.
  */
@@ -62,6 +68,8 @@ const VET_INT = process.env.SMOKE_VET_INTERNAL;
 const VET_POSTS = process.env.SMOKE_VET_POSTS === "1";
 const NONEMP_USER = process.env.SMOKE_NONEMP_USER;
 const NONEMP_PASS = process.env.SMOKE_NONEMP_PASSWORD;
+const QUALITY_USER = process.env.SMOKE_QUALITY_USER;
+const QUALITY_PASS = process.env.SMOKE_QUALITY_PASSWORD;
 const ROLES = process.env.SMOKE_ROLES ? JSON.parse(process.env.SMOKE_ROLES) : null;
 if (!URL_ || !USER || !PASS) {
   console.error("Set LIVESTOCK_URL, LIVESTOCK_USER and LIVESTOCK_PASSWORD.");
@@ -442,6 +450,7 @@ async function writes() {
       herd: HERD, milking_time: "05:30", recording_date: today, total_yield_kg: 120, discarded_kg: 5, net_yield_kg: 115,
       discard_reason: "Mastitis", cows_milked: 10, operator: op, remarks: "smoke" } }));
     track("Milk Recording", m.name);
+    ctx.milking = m.name; // the quality group files lab figures against it
     const doc = await got("Milk Recording", m.name);
     same(doc, { herd: HERD, total_yield_kg: 120, discarded_kg: 5, cows_milked: 10 }, "milk recording");
     return m.name;
@@ -731,6 +740,53 @@ async function perRole() {
   }
 }
 
+/** The lab role: files quality, and is refused everything else. */
+async function qualityUser() {
+  const who = "Livestock Quality";
+  await step("auth", `${who}: login`, () => login(QUALITY_USER, QUALITY_PASS));
+  await step(who, "posting_day tells the phone the role (roles == [Livestock Quality], is_employee)", async () => {
+    const m = msgOf(await get(`${M}.settings.posting_day.posting_day`));
+    need(m, ["today", "is_employee", "roles"], "posting_day");
+    if (JSON.stringify(m.roles) !== JSON.stringify(["Livestock Quality"])) throw new Error(`roles ${JSON.stringify(m.roles)}`);
+    if (!m.is_employee) throw new Error("test user has no Employee");
+  });
+  await step(who, "quality.quality_options (Milk quality segment)", async () => {
+    const m = msgOf(await post(`${M}.quality.quality_options.quality_options`, { days: 60 }));
+    need(m, ["mode", "required_in_lab", "scc_ceiling", "pending", "recent", "can_write"], "quality_options");
+    if (!m.can_write) throw new Error("can_write is false for the quality role");
+    return `${m.pending.length} pending, ${m.recent.length} filed`;
+  });
+  await step(who, "quality.quality_vs_feed (Feed quality segment)", async () => {
+    const m = msgOf(await post(`${M}.quality.quality_vs_feed.quality_vs_feed`, { payload: { days: 90 } }));
+    need(m, ["days", "from_date", "to_date", "windows", "herds", "weeks"], "quality_vs_feed");
+    return `${m.herds.length} herds`;
+  });
+  const recording = process.env.SMOKE_QUALITY_RECORDING || ctx.milking;
+  if (recording) {
+    await step(who, "quality.record_milk_quality files lab figures", async () => {
+      const m = msgOf(await post(`${M}.quality.record_milk_quality.record_milk_quality`, { payload: { recording, bulk_scc: 180, fat_percent: 3.8, protein_percent: 3.2, lab_test_date: today } }));
+      need(m, ["name", "bulk_scc", "fat_percent", "protein_percent", "over_ceiling", "still_pending"], "record_milk_quality");
+      if (m.bulk_scc !== 180) throw new Error(`bulk_scc ${m.bulk_scc}`);
+      return m.name;
+    });
+  }
+  const refused = (name, call) =>
+    step(who, `${name} is refused`, async () => {
+      const r = await call();
+      const m = r.data?.message;
+      if (r.status === 200 && m && !m.error) throw new Error(`was accepted: ${JSON.stringify(m)?.slice(0, 120)}`);
+      if (m?.code === "not_employee") throw new Error("refused as not an employee, not by role");
+      track("Milk Recording", m?.name);
+    });
+  await refused("record_milking", () => post(`${M}.mobile.record_milking.record_milking`, { payload: { herd: HERD || "x", milking_time: "05:30", recording_date: today, total_yield_kg: 1, cows_milked: 1 } }));
+  await refused("record_animal_event Heat Detection", () => post(`${M}.mobile.record_animal_event.record_animal_event`, { payload: { type: "Heat Detection", animal: F1 || ctx.animal || "x", event_date: today } }));
+  await refused("record_feeding manufacture", () => post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "manufacture", herd: ctx.feedHerd || "x", portion: 0.01, posting_date: today } }));
+}
+
+if (QUALITY_USER && QUALITY_PASS) {
+  ctx.animal ||= F1;
+  await qualityUser();
+}
 if (NONEMP_USER && NONEMP_PASS) {
   ctx.animal ||= F1;
   await nonEmployee();

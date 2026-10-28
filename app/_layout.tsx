@@ -23,6 +23,7 @@ import "react-native-reanimated";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
+import { isQualityOnly } from "@/src/auth/roles";
 import { startAnimalSync } from "@/src/db/sync";
 import { startAutoDrain } from "@/src/offline/autoDrain";
 import { startRealtime } from "@/src/realtime/realtime";
@@ -59,6 +60,7 @@ function AuthGate() {
   const segments = useSegments();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const qualityOnly = isQualityOnly(useAuthStore((s) => s.roles));
 
   React.useEffect(() => {
     if (isLoading) return;
@@ -66,9 +68,10 @@ function AuthGate() {
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/(tabs)/animals");
+      // The lab role has one view; everyone else lands on the animals.
+      router.replace(qualityOnly ? "/(tabs)/quality" : "/(tabs)/animals");
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, router, qualityOnly]);
 
   return null;
 }
@@ -87,6 +90,9 @@ export default function RootLayout() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const authLoading = useAuthStore((s) => s.isLoading);
   const signedIn = useAuthStore((s) => s.isAuthenticated);
+  // Animals, live updates and the herd sync are all about animals, which the lab
+  // role may not read: skip them for a user whose only role is Livestock Quality.
+  const qualityOnly = isQualityOnly(useAuthStore((s) => s.roles));
 
   const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
@@ -106,16 +112,16 @@ export default function RootLayout() {
   // Keep the local animals current while signed in: a sync now (the full set
   // on a first run) and a delta each time the app returns to the foreground.
   React.useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn || qualityOnly) return;
     return startAnimalSync();
-  }, [signedIn]);
+  }, [signedIn, qualityOnly]);
 
   // Live updates: a socket to the farm's server while signed in and in the
   // foreground, so what others record reaches this phone within seconds.
   React.useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn || qualityOnly) return;
     return startRealtime();
-  }, [signedIn]);
+  }, [signedIn, qualityOnly]);
 
   // Who the user is on the farm's books (view-only without an Employee): asked
   // at sign-in, and again each time the app returns to the foreground so HR

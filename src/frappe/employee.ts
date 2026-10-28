@@ -16,6 +16,9 @@ export type EmployeeStatus = {
   isEmployee: boolean;
   employee: string | null;
   employeeName: string | null;
+  /** The livestock roles the user holds (only the app's own). `null` when the
+   *  server did not say (an older server): the app then keeps its normal tabs. */
+  roles: string[] | null;
 };
 
 const METHOD = "/api/method/upande_livestock.serverscripts.settings.posting_day.posting_day";
@@ -32,6 +35,7 @@ export const fetchEmployeeStatus = async (): Promise<EmployeeStatus> => {
     isEmployee: m.is_employee,
     employee: m.employee ?? null,
     employeeName: m.employee_name ?? null,
+    roles: Array.isArray(m.roles) ? m.roles.map(String) : null,
   };
   await storage.setItem(STORAGE_KEYS.EMPLOYEE_STATUS, JSON.stringify(status));
   return status;
@@ -42,7 +46,8 @@ export const cachedEmployeeStatus = async (): Promise<EmployeeStatus | null> => 
   try {
     const raw = await storage.getItem(STORAGE_KEYS.EMPLOYEE_STATUS);
     const v = raw ? JSON.parse(raw) : null;
-    return v && typeof v.isEmployee === "boolean" ? (v as EmployeeStatus) : null;
+    if (!v || typeof v.isEmployee !== "boolean") return null;
+    return { ...v, roles: Array.isArray(v.roles) ? v.roles : null } as EmployeeStatus;
   } catch {
     return null;
   }

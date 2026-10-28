@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import React from "react";
 
+import { QualityOnlyGate } from "@/components/QualityOnlyGate";
 import { RecordGate } from "@/components/RecordGate";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -9,14 +10,16 @@ import { useColors } from "@/src/hooks/useColors";
 export default function RecordStackLayout() {
   const c = useColors();
   return (
-    <RecordGate>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: c.bg },
-          animation: "fade",
-        }}
-      />
-    </RecordGate>
+    <QualityOnlyGate>
+      <RecordGate>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: c.bg },
+            animation: "fade",
+          }}
+        />
+      </RecordGate>
+    </QualityOnlyGate>
   );
 }

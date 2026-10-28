@@ -8,12 +8,16 @@ import { Pill } from "@/components/Pill";
 import { font } from "@/constants/theme";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
+import { useAuthStore } from "@/src/auth/authStore";
+import { canSeeQuality } from "@/src/auth/roles";
 import { useColors } from "@/src/hooks/useColors";
 import { useOffline } from "@/components/OnlineOnlyNotice";
 
 type Item = { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; href: string };
 
 const MILKING = "/(tabs)/record/events/milk";
+
+const QUALITY = "/(tabs)/quality";
 
 const SECTIONS: { title: string; items: Item[] }[] = [
   { title: "Daily routine", items: [
@@ -46,6 +50,15 @@ export default function Record() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const offline = useOffline();
+  // Managers, and anyone who also holds the lab role, may open the Quality view.
+  const quality = canSeeQuality(useAuthStore((st) => st.roles));
+  const sections = quality
+    ? [
+        ...SECTIONS.slice(0, -1),
+        { title: "Lab", items: [{ icon: "flask-outline" as const, label: "Quality", href: QUALITY }] },
+        SECTIONS[SECTIONS.length - 1],
+      ]
+    : SECTIONS;
   return (
     <Screen title="Livestock events" subtitle="Pick what you observed or did">
       {offline ? (
@@ -54,7 +67,7 @@ export default function Record() {
           needs one because it moves stock or is checked by the server live.
         </Banner>
       ) : null}
-      {SECTIONS.map((sec) => (
+      {sections.map((sec) => (
         <View key={sec.title}>
           <SectionTitle style={s.section}>{sec.title}</SectionTitle>
           {sec.items.map((it) => {
