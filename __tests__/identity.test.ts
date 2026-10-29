@@ -15,9 +15,9 @@ describe("Mutara app identity", () => {
   it("runs its own runtime version", () => {
     expect(e.runtimeVersion).toBe("1.1.0-mutarabeeffrappe16");
   });
-  it("keeps Kaitet's EAS project out; the id is a placeholder until the user creates one", () => {
+  it("keeps Kaitet's EAS project out; it has its own project id", () => {
     expect(JSON.stringify(e)).not.toContain("0640a515");
-    expect(e.extra.eas.projectId).toBe("00000000-0000-0000-0000-000000000000");
+    expect(e.extra.eas.projectId).toBe("f6f49a81-310e-4c2d-a446-6641bfc3e0c9");
   });
   it("login pre-fills the Mutara site", () => {
     expect(DEFAULT_INSTANCE_URL).toBe("https://mutara.132.145.18.63.nip.io");

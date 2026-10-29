@@ -198,8 +198,8 @@ export default function LoginScreen() {
   // across the mark. An expanding outline reads as a pulse against either
   // background and stays inside the black-and-white palette.
   const haloStyle = useAnimatedStyle(() => ({
-    opacity: 0.45 * (1 - pulse.value),
-    transform: [{ scale: 0.78 + pulse.value * 0.5 }],
+    opacity: 0.55 * (1 - pulse.value),
+    transform: [{ scale: 0.85 + pulse.value * 0.4 }],
   }));
 
   return (
@@ -228,7 +228,7 @@ export default function LoginScreen() {
                 <View style={s.header}>
                   <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
                     <View style={s.logoBox}>
-                      {dark ? <View style={s.disc} /> : null}
+                      <View style={s.disc} />
                       {/* Behind the logo and out of layout, so the header never
                           reflows and the mark itself never animates — the logo
                           stays crisp while the ring travels. pointerEvents none
@@ -348,8 +348,8 @@ export default function LoginScreen() {
 }
 
 const RING = 220;
-const DISC = 190;
-const LOGO = 185;
+const DISC = 220;
+const LOGO = 200;
 const STATUS_GREEN = "#2ECC71";
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
@@ -368,8 +368,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       width: RING,
       height: RING,
       borderRadius: RING / 2,
-      borderWidth: 2,
-      borderColor: c.text,
+      backgroundColor: "#ffffff",
     },
     statusDot: {
       width: 10,
@@ -387,8 +386,10 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     title: {
       color: c.text,
       letterSpacing: 1,
-      fontSize: 40,
-      lineHeight: 48,
+      fontFamily: "Poppins_400Regular",
+      fontSize: 36,
+      lineHeight: 44,
+      textAlign: "center",
       marginTop: 6,
     },
     urlWrap: { overflow: "hidden" },
