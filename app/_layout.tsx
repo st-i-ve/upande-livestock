@@ -26,6 +26,7 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { startAnimalSync } from "@/src/db/sync";
 import { startRealtime } from "@/src/realtime/realtime";
 import { queryClient } from "@/src/services/queryClient";
+import { homeOf, isShoats, useAnimalType } from "@/src/shoats/animalType";
 import { useScheme, useThemeStore } from "@/src/theme/themeStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -58,16 +59,26 @@ function AuthGate() {
   const segments = useSegments();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const animalType = useAnimalType((s) => s.type);
+  const typeHydrated = useAnimalType((s) => s.hydrated);
 
   React.useEffect(() => {
-    if (isLoading) return;
-    const inAuthGroup = segments[0] === "(auth)";
+    if (isLoading || !typeHydrated) return;
+    const top = segments[0] as string | undefined;
+    const inAuthGroup = top === "(auth)";
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/(tabs)/animals");
+      // After login: straight to the animal type the phone remembers, else ask.
+      router.replace(homeOf(animalType));
+    } else if (isAuthenticated && !animalType && top !== "choose") {
+      router.replace("/choose");
+    } else if (isAuthenticated && animalType) {
+      // A switch of type leaves the other type's screens behind.
+      if (top === "(tabs)" && isShoats(animalType)) router.replace(homeOf(animalType));
+      else if (top === "(shoats)" && animalType === "cattle") router.replace(homeOf(animalType));
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, typeHydrated, animalType, segments, router]);
 
   return null;
 }
@@ -82,6 +93,8 @@ export default function RootLayout() {
   const palette = dark ? DARK : LIGHT;
 
   const hydrate = useThemeStore((s) => s.hydrate);
+  const hydrateType = useAnimalType((s) => s.hydrate);
+  const typeHydrated = useAnimalType((s) => s.hydrated);
   const hydrated = useThemeStore((s) => s.hydrated);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const authLoading = useAuthStore((s) => s.isLoading);
@@ -96,8 +109,9 @@ export default function RootLayout() {
 
   React.useEffect(() => {
     hydrate();
+    hydrateType();
     checkAuth();
-  }, [hydrate, checkAuth]);
+  }, [hydrate, hydrateType, checkAuth]);
 
   // Keep the local animals current while signed in: a sync now (the full set
   // on a first run) and a delta each time the app returns to the foreground.
@@ -137,7 +151,7 @@ export default function RootLayout() {
     return () => clearTimeout(t);
   }, []);
   if (fontError) console.warn("[fonts] Poppins failed to load", fontError);
-  const ready = timedOut || ((fontsLoaded || !!fontError) && hydrated && !authLoading);
+  const ready = timedOut || ((fontsLoaded || !!fontError) && hydrated && typeHydrated && !authLoading);
 
   React.useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
@@ -166,7 +180,9 @@ export default function RootLayout() {
                 }}
               >
                 <Stack.Screen name="(auth)" />
+                <Stack.Screen name="choose" />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="(shoats)" />
               </Stack>
               <StatusBar style={dark ? "light" : "dark"} />
             </ThemeProvider>

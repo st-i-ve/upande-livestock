@@ -21,6 +21,7 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
 import { useLiveStore } from "@/src/realtime/liveStore";
+import { LABEL, useAnimalType } from "@/src/shoats/animalType";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -92,6 +93,7 @@ export default function Profile() {
   const online = useNetworkStatus();
   const ota = useOtaUpdate();
   const live = useLiveStore((x) => x.status);
+  const animalType = useAnimalType((x) => x.type);
 
   const displayName = fullname || email || "Signed in";
   const subtitle = email ?? "";
@@ -128,6 +130,11 @@ export default function Profile() {
 
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
+          <Row
+            icon="swap-horizontal"
+            label={`Animal type · ${animalType ? LABEL[animalType] : "not chosen"}`}
+            onPress={() => router.push("/choose")}
+          />
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
           <Row
             icon={online === false ? "wifi-off" : "wifi"}
