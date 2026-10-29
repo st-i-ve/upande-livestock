@@ -1,21 +1,22 @@
 {
   "expo": {
-    "name": "Upande Livestock",
-    "slug": "upande-livestock",
+    "name": "Upande Livestock Mutara",
+    "slug": "upande-livestock-mutara",
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/upande_logo_no_bg.png",
-    "scheme": "upandelivestock",
+    "scheme": "upandelivestockmutara",
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/0640a515-d7f3-4710-a550-8cf6b8934b7e"
+      "url": "https://u.expo.dev/00000000-0000-0000-0000-000000000000"
     },
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.upande.livestockmutara"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +26,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.stivewithani.upandelivestock"
+      "package": "com.upande.livestockmutara"
     },
     "web": {
       "output": "static",
@@ -48,8 +49,8 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Upande Livestock uses the camera to photograph a newborn calf so the picture lands on the animal's record.",
-          "photosPermission": "Upande Livestock needs access to your photos only if you choose an existing picture instead of taking one."
+          "cameraPermission": "Upande Livestock Mutara uses the camera to photograph a newborn calf so the picture lands on the animal's record.",
+          "photosPermission": "Upande Livestock Mutara needs access to your photos only if you choose an existing picture instead of taking one."
         }
       ],
       "@react-native-community/datetimepicker",
@@ -63,11 +64,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "runtimeVersion": "1.1.0-kaitetdairyfrappe16",
+    "runtimeVersion": "1.1.0-mutarabeeffrappe16",
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0640a515-d7f3-4710-a550-8cf6b8934b7e"
+        "projectId": "00000000-0000-0000-0000-000000000000"
       }
     }
   }

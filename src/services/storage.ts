@@ -7,7 +7,6 @@ export const STORAGE_KEYS = {
   INSTANCE_URL_BACKUP: "instanceurl_backup",
   EMAIL: "email",
   FULLNAME: "fullname",
-  PENDING_QUEUE: "pending_queue",
   /** Last `posting_day` answer: server today + whether backdating is open. */
   POSTING_DAY: "posting_day",
   /** Last answer to "is this user linked to an Employee?" (view-only when not). */
@@ -20,6 +19,9 @@ export const STORAGE_KEYS = {
  *  default — the user must explicitly enter (or accept) a URL on first
  *  login. Kept exported for the login form to render as a hint. */
 export const INSTANCE_URL_PLACEHOLDER = "https://your-site.c.frappe.cloud";
+
+/** Mutara's site: the login pre-fills it, so the herdsman types only his email and password. */
+export const DEFAULT_INSTANCE_URL = "https://mutara.132.145.18.63.nip.io";
 
 export const storage = {
   async getItem(key: string): Promise<string | null> {

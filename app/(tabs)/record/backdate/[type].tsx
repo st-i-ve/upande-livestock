@@ -9,7 +9,6 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 
 import Calving from "../events/calving";
 import Diagnosis from "../events/diagnosis";
-import Dryoff from "../events/dryoff";
 import GenericEvent from "../events/[type]";
 import Movement from "../events/movement";
 import PD from "../events/pd";
@@ -28,7 +27,6 @@ import Weight from "../events/weight";
  * `vaccination`, ...) resolves correctly with no extra plumbing.
  */
 const SCREENS: Record<string, ComponentType> = {
-  dryoff: Dryoff,
   movement: Movement,
   service: Service,
   pd: PD,

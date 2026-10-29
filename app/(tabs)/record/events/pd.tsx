@@ -11,8 +11,12 @@ import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, Input, Textarea } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { SireChooser } from "@/components/SireChooser";
 import { VetPicker } from "@/components/VetPicker";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
+import { mergeWarnings } from "@/src/beef/kinship";
+import { useHerdFacts } from "@/src/hooks/useHerds";
+import { useSireChoice } from "@/src/hooks/useSireChoice";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useEligibility } from "@/src/hooks/useEligibility";
@@ -52,15 +56,37 @@ export default function PD() {
     [eligibility],
   );
 
+  // Natural mating leaves no service on file. A cow with no open service can still
+  // be diagnosed: the vet's perceived conception date (or foetal age) makes the
+  // Natural Service, and the sire is the bull who was in her herd then.
+  const noService = selected.filter((a) => !diagnosable.has(a.id));
+  const needsConception = result === "Confirmed" && noService.length > 0;
+  const [conception, setConception] = useState("");
+  const [weeks, setWeeks] = useState("");
+  const single = needsConception && selected.length === 1 ? selected[0] : null;
+  const sire = useSireChoice(single, conception, !!single && !!conception);
+  const facts = useHerdFacts();
+  const breedingKey = facts.breeding.join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const breedingHerds = useMemo(() => new Set(facts.breeding), [breedingKey]);
+
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow.");
+    if (needsConception && !conception && !(Number(weeks) > 0)) {
+      return setError("These cows have no service on file: give the perceived conception date, or the foetal age in weeks.");
+    }
+    if (single && sire.needsChoice) {
+      return setError("More than one bull was with her then: pick the sire, or choose Unknown.");
+    }
 
     let succeeded = 0;
+    const replies: any[] = [];
     for (const a of selected) {
       try {
-        await mutation.mutateAsync({
+        const noSvc = !diagnosable.has(a.id) && result === "Confirmed";
+        const rep = await mutation.mutateAsync({
           eventType: "Pregnancy Diagnosis",
           animal: a.id,
           currentHerd: a.herd,
@@ -68,8 +94,13 @@ export default function PD() {
           vet: vet || undefined,
           eventDate: isBackdating ? backdateDate : serverToday,
           diagnosisResult: result,
+          conceptionDate: noSvc && conception ? conception : undefined,
+          foetalAgeWeeks: noSvc && !conception && Number(weeks) > 0 ? Number(weeks) : undefined,
+          sireAnimal: noSvc && single && sire.sireAnimal ? sire.sireAnimal : undefined,
+          sireUnknown: noSvc && single && sire.sireUnknown ? true : undefined,
           remarks: remarks || undefined,
         });
+        replies.push(rep);
         succeeded += 1;
       } catch (err) {
         setError(
@@ -80,9 +111,19 @@ export default function PD() {
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} marked ${result}`);
+    const made = replies.filter((x) => x?.service_created).length;
+    const sireLines = replies
+      .map((x, i) => (x?.service_created && x?.sire_animal ? `${selected[i]?.name}: sire ${x.sire_animal}${x.sire_inferred ? " (inferred)" : ""}` : ""))
+      .filter(Boolean);
+    const warned = mergeWarnings(...replies.map((x) => (Array.isArray(x?.warnings) ? x.warnings : [])));
     Alert.alert(
       "PD recorded",
-      `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
+      [
+        `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
+        made ? `${made} natural service${made === 1 ? "" : "s"} recorded at the conception date.` : "",
+        ...sireLines,
+        ...warned,
+      ].filter(Boolean).join("\n\n"),
     );
     finish("Pregnancy diagnosis");
   };
@@ -102,20 +143,21 @@ export default function PD() {
         help={
           filterLoading
             ? "Loading served animals…"
-            : "Only animals with an open service. Pick one or many — same result applied to each."
+            : "Served cows, or any cow bred naturally: with no service on file, give the conception date below."
         }
       >
         <AnimalPickerButton
           mode="multi"
-          title="Select served cows"
+          title="Select cows"
+          preferHerds={breedingHerds}
           placeholder={
             filterLoading
               ? "Loading cows awaiting a check…"
               : selected.length
                 ? `${selected.length} selected — tap to change`
-                : "Search cow awaiting a check..."
+                : "Search cow or heifer..."
           }
-          include={(a) => a.sex === "F" && diagnosable.has(a.id)}
+          include={(a) => a.sex === "F" && a.repro !== "Calf"}
           value={selected}
           onPickMulti={setSelected}
         />
@@ -134,6 +176,23 @@ export default function PD() {
           ))}
         </Chips>
       </Field>
+      {needsConception ? (
+        <>
+          <Banner tone="info">
+            {noService.length === 1 ? `${noService[0].name} has` : `${noService.length} cows have`} no service on
+            file. The perceived conception date makes the natural service.
+          </Banner>
+          <Field label="Perceived conception date" help="From the vet or the herdsman. Or give the foetal age instead.">
+            <DateField value={conception} onChange={setConception} maximumDate={fromISODate(serverToday)} placeholder="Pick the conception date" />
+          </Field>
+          {!conception ? (
+            <Field label="Foetal age (weeks)" help="Used only when there is no conception date.">
+              <Input value={weeks} onChangeText={setWeeks} keyboardType="numeric" placeholder="e.g. 12" />
+            </Field>
+          ) : null}
+          {single && conception ? <SireChooser choice={sire} /> : null}
+        </>
+      ) : null}
       <VetPicker vets={vets} value={vet} onChange={setVet} />
       <Field label="Remarks">
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Observations..." />

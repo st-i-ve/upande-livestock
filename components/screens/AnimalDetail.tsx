@@ -17,6 +17,7 @@ import { AnimalPhotos, Viewer } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { kindOf } from "@/src/animalKind";
 import { extractFrappeError } from "@/src/services/api";
+import type { AnimalProfile } from "@/src/frappe/animal";
 import { useAnimal, useAnimalProfile } from "@/src/hooks/useAnimal";
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
 import { useAnimalGallery } from "@/src/hooks/useAnimalGallery";
@@ -30,7 +31,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   // The local copy answers first (and offline); the server adds what only it
-  // knows: her stage, days in milk and any treatment.
+  // knows: the stage, the breeding note and any treatment.
   const local = useLocalAnimal(id);
   const online = useAnimal(id);
   const profileQ = useAnimalProfile(id);
@@ -38,7 +39,14 @@ export function AnimalDetail({ id }: { id: string }) {
   const gallery = useAnimalGallery(id).data?.photos ?? [];
   const [viewing, setViewing] = useState<number | null>(null);
   const a = local.data
-    ? { ...local.data, inTreatment: online.data?.inTreatment ?? 0, milkSafe: online.data?.milkSafe ?? null }
+    ? {
+        ...local.data,
+        inTreatment: online.data?.inTreatment ?? 0,
+        stream: online.data?.stream ?? null,
+        breedingNote: online.data?.breedingNote ?? null,
+        breedingNoteBy: online.data?.breedingNoteBy ?? null,
+        breedingNoteOn: online.data?.breedingNoteOn ?? null,
+      }
     : (online.data ?? null);
   // The stored stage answers offline; the live profile, when there is one, wins.
   const stage = profile?.stage ?? local.data?.stage ?? null;
@@ -66,7 +74,9 @@ export function AnimalDetail({ id }: { id: string }) {
       date: e.eventDate,
       title: e.eventType,
       desc:
-        e.diagnosisResult != null
+        e.eventType === "Movement" && e.remarks
+          ? `${e.newHerd ? `To ${e.newHerd}: ` : ""}${e.remarks}`
+          : e.diagnosisResult != null
           ? `Result: ${e.diagnosisResult}`
           : e.newHerd
             ? `New herd: ${e.newHerd}`
@@ -104,20 +114,16 @@ export function AnimalDetail({ id }: { id: string }) {
 
   const kind = kindOf({ ...a, stage });
   const isFemaleAdult = kind === "cow" || kind === "heifer";
-  // In calf and milking: she has calved (so she is a cow, not an in-calf heifer).
-  const lactating = (a.parity ?? 0) > 0 || profile?.cycle.daysInMilk != null;
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
+  // Weight is the first thing a herdsman does with an animal, so it comes first.
   const actions: Action[] = [
+    { label: "Weigh", route: "weight", icon: "scale" },
     { label: "Check up", route: "diagnosis", icon: "magnify" },
     ...(isFemaleAdult ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
     { label: "Treat", route: "treatment", icon: "medical-bag" },
-    ...(isFemaleAdult && stage === "served" ? [{ label: "PD", route: "pd", icon: "stethoscope" } as Action] : []),
-    ...(isFemaleAdult && stage === "confirmed" && lactating
-      ? [{ label: "Dry off", route: "dryoff", icon: "water-off" } as Action]
-      : []),
+    ...(isFemaleAdult ? [{ label: "PD", route: "pd", icon: "stethoscope" } as Action] : []),
     { label: "Vaccinate", route: "vaccination", icon: "needle" },
     { label: "Deworm", route: "deworming", icon: "bug-outline" },
-    { label: "Weigh", route: "weight", icon: "scale" },
     { label: "Move", route: "movement", icon: "arrow-left-right" },
   ];
 
@@ -131,7 +137,7 @@ export function AnimalDetail({ id }: { id: string }) {
     >
       {a.inTreatment ? (
         <Banner tone="danger">
-          Under treatment{a.milkSafe ? ` · milk safe from ${a.milkSafe}` : ""}
+          Under treatment
         </Banner>
       ) : null}
 
@@ -166,17 +172,33 @@ export function AnimalDetail({ id }: { id: string }) {
         <Viewer photos={gallery} start={viewing} onClose={() => setViewing(null)} />
       ) : null}
 
+      <WeightSection
+        lastWt={a.lastWt}
+        profile={profile}
+        canRecord={canRecord}
+        onWeigh={() => router.push(`/(tabs)/animals/act/weight?animal=${encodeURIComponent(id)}` as never)}
+      />
+
       <View style={s.facts}>
         <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
         <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
         <Fact label="Dam" value={a.dam || "—"} />
         <Fact label="Sire" value={a.sire || "—"} />
         <Fact label="Parity" value={String(a.parity ?? 0)} />
-        <Fact label="Weight" value={a.lastWt ? `${a.lastWt} kg` : "—"} />
-        {profile?.cycle.daysInMilk != null ? (
-          <Fact label="Days in milk" value={`${profile.cycle.daysInMilk}`} />
-        ) : null}
+        {a.stream ? <Fact label="Stream" value={a.stream} /> : null}
       </View>
+
+      {a.breedingNote ? (
+        <>
+          <SectionTitle>Breeding note</SectionTitle>
+          <View style={s.note} testID="breeding-note">
+            <Text style={s.noteText}>{a.breedingNote}</Text>
+            <Text style={s.noteMeta}>
+              {[a.breedingNoteBy, a.breedingNoteOn].filter(Boolean).join(" · ") || "Selection move"}
+            </Text>
+          </View>
+        </>
+      ) : null}
 
       {canRecord && actions.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.actions}>
@@ -220,6 +242,40 @@ export function AnimalDetail({ id }: { id: string }) {
   );
 }
 
+/** The first section on the page: last weight, gain against target, and the Weigh button. */
+function WeightSection({
+  lastWt,
+  profile,
+  canRecord,
+  onWeigh,
+}: {
+  lastWt: number;
+  profile: AnimalProfile | null;
+  canRecord: boolean;
+  onWeigh: () => void;
+}) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
+  const gain = profile?.gain;
+  const last = gain?.trend?.length ? gain.trend[gain.trend.length - 1] : null;
+  const adg = gain?.herd_adg ?? gain?.lifetime_adg ?? null;
+  return (
+    <View style={s.weightBox} testID="weight-section">
+      <View style={{ flex: 1 }}>
+        <Text style={s.weightLabel}>Weight</Text>
+        <Text style={s.weightValue}>{lastWt ? `${lastWt} kg` : "Not weighed"}</Text>
+        <Text style={s.weightMeta}>
+          {[
+            last ? `on ${last.date}` : null,
+            adg != null ? `${adg.toFixed(2)} kg/day${gain?.target_adg_kg ? ` (target ${gain.target_adg_kg})` : ""}` : null,
+          ].filter(Boolean).join(" · ") || "No gain figure yet"}
+        </Text>
+      </View>
+      {canRecord ? <Button label="Weigh" icon="scale" onPress={onWeigh} /> : null}
+    </View>
+  );
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   const c = useColors();
   return (
@@ -247,6 +303,16 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     heroBadgeText: { fontSize: 11, ...font("600"), color: "#fff", textTransform: "uppercase", letterSpacing: 0.8 },
     heroMeta: { flexShrink: 1, fontSize: 13, color: "#fff" },
     facts: { flexDirection: "row", flexWrap: "wrap", marginBottom: 12 },
+    weightBox: {
+      flexDirection: "row", alignItems: "center", gap: 12, padding: 14, marginBottom: 12,
+      borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.bgMuted,
+    },
+    weightLabel: { fontSize: 10, ...font("500"), letterSpacing: 1, textTransform: "uppercase", color: c.textSubtle },
+    weightValue: { fontSize: 26, ...font("700"), color: c.text },
+    weightMeta: { fontSize: 12, color: c.textMuted },
+    note: { padding: 12, borderRadius: 12, backgroundColor: c.bgMuted, marginBottom: 12, gap: 4 },
+    noteText: { fontSize: 14, lineHeight: 20, color: c.text },
+    noteMeta: { fontSize: 11, color: c.textSubtle },
     actions: { gap: 14, paddingVertical: 4, paddingRight: 8 },
     action: { alignItems: "center", width: 64, gap: 5 },
     actionCircle: {

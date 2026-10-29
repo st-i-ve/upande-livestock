@@ -8,7 +8,7 @@ import { useColors } from "@/src/hooks/useColors";
 
 /** ISO `YYYY-MM-DD` in the device's own timezone. `toISOString()` is UTC and
  *  rolls backwards east of Greenwich: Kenya is UTC+3, so anything recorded
- *  before 03:00 local would file itself under yesterday. The morning milking
+ *  before 03:00 local would file itself under yesterday. An early-morning weighing
  *  is the one that starts early. */
 export const toISODate = (d: Date): string => {
   const pad = (n: number) => String(n).padStart(2, "0");

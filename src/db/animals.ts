@@ -12,7 +12,7 @@ export type ServerAnimal = {
   dob: string | null;
   herd: string | null;
   status: string | null;
-  /** heifer | fresh | open | served | confirmed | dry | retired, worked out by the server. */
+  /** heifer | fresh | open | served | confirmed | retired, worked out by the server. */
   stage?: string | null;
   repro_status: string | null;
   image: string | null;
@@ -71,7 +71,6 @@ const toAnimal = (r: Row): Animal => ({
   dim: null,
   parity: r.parity ?? 0,
   lastWt: r.last_weight_kg ?? 0,
-  milkSafe: null,
   inTreatment: 0,
   pregnant: String(r.repro_status ?? "").toLowerCase().includes("pregnant") ? 1 : 0,
   tag: r.tag,

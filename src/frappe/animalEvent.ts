@@ -23,7 +23,6 @@ export type AnimalEventType =
   | "Service"
   | "Pregnancy Diagnosis"
   | "Calving"
-  | "Drying Off"
   | "Birth"
   | "Vaccination"
   | "Deworming"
@@ -60,12 +59,25 @@ type EventSpecificInput =
       serviceType?: "A.I." | "Natural";
       semenItem?: string;
       semenWarehouse?: string;
+      /** Free text: an outside bull or a straw's bull. */
       sire?: string;
+      /** The farm's own bull (an Animal). The user's choice always wins over inference. */
+      sireAnimal?: string;
+      /** The herdsman wants no sire on this service. */
+      sireUnknown?: boolean;
+      /** Natural service: the date the conception is thought to have happened. */
+      conceptionDate?: string;
     }
   | {
       eventType: "Pregnancy Diagnosis";
       diagnosisResult: "Confirmed" | "Not Pregnant" | "Aborted";
       relatedService?: string;
+      /** With no open service: the vet's perceived conception date makes the Natural Service. */
+      conceptionDate?: string;
+      /** Or foetal age in weeks, from which the server works the date. */
+      foetalAgeWeeks?: number;
+      sireAnimal?: string;
+      sireUnknown?: boolean;
     }
   | {
       eventType: "Calving" | "Birth";
@@ -92,11 +104,6 @@ type EventSpecificInput =
       calfPhoto?: FileAsset;
       calfBreed?: string;
       calfHealthStatus?: "Healthy" | "Weak" | "Needs Attention" | "Critical";
-    }
-  | {
-      eventType: "Drying Off";
-      toHerd: string;
-      drugIssues?: AnimalDrugIssueInput[];
     }
   | {
       eventType: "Vaccination" | "Deworming" | "Hoof Trimming" | "Dehorning";
@@ -143,6 +150,8 @@ export type EventListRow = {
   currentHerd: string | null;
   newHerd: string | null;
   diagnosisResult: string | null;
+  /** Free text on the event; for a selection move, the herdsman's note. */
+  remarks: string | null;
   activityCost: number;
   /** `custom_is_backdated` — set when the event was entered for a past day. */
   isBackdated: boolean;
@@ -159,6 +168,7 @@ const EVENT_LIST_FIELDS = [
   "current_herd",
   "new_herd",
   "diagnosis_result",
+  "remarks",
   "docstatus",
   "custom_is_backdated",
   "custom_feed_mode",
@@ -172,6 +182,7 @@ const mapEvent = (row: any): EventListRow => ({
   currentHerd: row.current_herd ?? null,
   newHerd: row.new_herd ?? null,
   diagnosisResult: row.diagnosis_result ?? null,
+  remarks: row.remarks ?? null,
   // Livestock Event carries no activity-cost column; the vet fee lives on its
   // own Journal Entry. Reported as 0 rather than dropped, so the reports that
   // sum this field keep their shape.
@@ -294,6 +305,9 @@ export const createAnimalEvent = async (
         service_type: input.serviceType,
         service_date: common.event_date,
         sire: input.sire,
+        sire_animal: input.sireAnimal || undefined,
+        sire_unknown: input.sireUnknown ? 1 : undefined,
+        conception_date: input.conceptionDate || undefined,
         // What the straw used is a stock line, sent only when the screen showed
         // one (the Service event type posts stock). The server issues it as the
         // named Stock Entry "Livestock Service", one per event, from this store
@@ -309,6 +323,10 @@ export const createAnimalEvent = async (
         diagnosis_date: common.event_date,
         diagnosis_result: input.diagnosisResult,
         related_service: input.relatedService,
+        conception_date: input.conceptionDate || undefined,
+        foetal_age_weeks: input.foetalAgeWeeks || undefined,
+        sire_animal: input.sireAnimal || undefined,
+        sire_unknown: input.sireUnknown ? 1 : undefined,
         diagnosis_remarks: input.remarks,
       });
 
@@ -365,13 +383,6 @@ export const createAnimalEvent = async (
       for (const c of calves) if (c.photo) discardCalfPhoto(c.photo.uri);
       return { ...reply, photo };
     }
-
-    case "Drying Off":
-      return callOp("Drying Off", {
-        ...common,
-        new_herd: input.toHerd,
-        drugs: mapDrugRows(input.drugIssues),
-      });
 
     case "Vaccination":
     case "Deworming":

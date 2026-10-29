@@ -13,12 +13,6 @@ export type LivestockSettingsDoc = {
   custom_default_company?: string;
   custom_default_credit_account?: string;
 
-  // --- milk ----------------------------------------------------------------
-  custom_milk_item?: string;
-  custom_milk_target_warehouse?: string;
-  custom_milk_discard_warehouse?: string;
-  custom_milking_stock_entry_type?: string;
-
   // --- stores --------------------------------------------------------------
   // No drug/semen warehouse here: each Livestock Event Type owns its Default Store,
   // served per event by `items_by_event` (see src/frappe/eventItems.ts).
@@ -32,8 +26,6 @@ export type LivestockSettingsDoc = {
 
   // --- lifecycle herds -----------------------------------------------------
   incalf_heifer_herd?: string;
-  high_yield_herd?: string;
-  low_yield_herd?: string;
   steamer_herd?: string;
 
   /** Ordered rungs: herd, the days an animal spends on it, where it goes next. */

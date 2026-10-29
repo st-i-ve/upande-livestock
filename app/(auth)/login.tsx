@@ -254,7 +254,7 @@ export default function LoginScreen() {
                     <View style={s.statusRow} />
                   )}
 
-                  <Text style={s.title}>Upande Livestock</Text>
+                  <Text style={s.title}>Upande Livestock Mutara</Text>
                 </View>
 
                 <Animated.View

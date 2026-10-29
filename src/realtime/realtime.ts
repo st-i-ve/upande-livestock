@@ -10,7 +10,7 @@ import { useLiveStore } from "./liveStore";
 
 /**
  * Live updates. The server broadcasts `livestock_changed` (ids only, never
- * data) whenever an animal, event, milking, stock entry, health case, vet or
+ * data) whenever an animal, event, stock entry, health case, vet or
  * the settings change. The phone hears it, runs the delta sync and refreshes
  * the screens that show what changed, so another person's work appears within
  * seconds without a pull-to-refresh.
@@ -47,7 +47,7 @@ const invalidate = (...keys: string[]) => {
 const STOCK_KEYS = ["health-options", "livestock-stock", "batch-plan"];
 const SETTINGS_KEYS = ["livestock-settings", "posting-day", "vets", "health-options", "eligibility"];
 const ANIMAL_KEYS = ["animal", "animal-profile", "animal-events", "animal-gallery", "animal-standing"];
-const LIST_KEYS = ["herds", "herd", "milk", "health-cases", "diagnoses", "disposals"];
+const LIST_KEYS = ["herds", "herd", "health-cases", "diagnoses", "disposals"];
 
 let socket: Socket | null = null;
 let active = AppState.currentState === "active";

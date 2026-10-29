@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { RADIUS, font } from "@/constants/theme";
+import { breedingFirst } from "@/src/beef/breeding";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { useColors } from "@/src/hooks/useColors";
 import { pillFor } from "@/services/utils";
@@ -23,6 +24,7 @@ export function AnimalPickerSheet({
   mode,
   title,
   include,
+  preferHerds,
   onPickSingle,
   onPickMulti,
   emptyAction,
@@ -33,6 +35,8 @@ export function AnimalPickerSheet({
   mode: PickerMode;
   title: string;
   include?: (a: Animal) => boolean;
+  /** Herds whose animals are listed first (the breeding herds, for Service and PD). */
+  preferHerds?: Set<string>;
   onPickSingle?: (a: Animal) => void;
   onPickMulti?: (a: Animal[]) => void;
   emptyAction?: { label: string; onPress: () => void };
@@ -47,7 +51,10 @@ export function AnimalPickerSheet({
   // The search runs in the local SQLite store, so the picker works offline.
   const { data: ALL = [], isLoading } = useAnimals();
   const { data: found = ALL } = useAnimals(query);
-  const list = useMemo(() => (include ? found.filter(include) : found), [found, include]);
+  const list = useMemo(() => {
+    const kept = include ? found.filter(include) : found;
+    return preferHerds && preferHerds.size ? breedingFirst(kept, preferHerds) : kept;
+  }, [found, include, preferHerds]);
 
   // Group rows for the herd view: header → child animal rows.
   const herdRows = useMemo<GroupRow[]>(() => {

@@ -14,7 +14,7 @@ import { useCallback, useState } from "react";
  * Three steps, deliberately not collapsed into one: check tells you whether
  * something exists, fetch downloads it, reload restarts into it. Restarting
  * without asking would discard whatever the operator was part-way through
- * typing, and this app is used one-handed at a milking parlour.
+ * typing, and this app is used one-handed in the field.
  */
 export type OtaStage =
   | "idle"

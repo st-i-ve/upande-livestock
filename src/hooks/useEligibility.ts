@@ -5,17 +5,16 @@ import { getClient } from "@/src/services/api";
 /**
  * Who may be offered for what, straight from the backend.
  *
- * The app used to decide this locally — milking filtered on a `custom_is_milking`
- * flag someone had ticked on each herd. That is right until a herd is renamed or
- * a new one is added, at which point the app quietly offers the wrong animals
- * and nobody notices until a milking is recorded against a dry cow.
+ * The app used to decide this locally. That is right until a herd is renamed or
+ * a new one is added, at which point the app quietly offers the wrong animals.
  *
  * The backend derives all of it from Herd Movement settings, so there is one
  * answer rather than two that can disagree. One call rather than four, because a
  * farm network is not a place to spend round trips.
  */
 export type Eligibility = {
-  milking_herds: string[];
+  /** Every Breeding-class herd (mating groups); they are service herds. */
+  breeding_herds: string[];
   heifer_herds: string[];
   service_herds: string[];
   service_wait_days: number;
@@ -31,10 +30,32 @@ export type Eligibility = {
   calf_herds: { female: string | null; male: string | null };
   /** Animals with a service still awaiting its pregnancy check. */
   diagnosable: string[];
+  /** Calves at or past the separation age, with where each may go. */
+  separation_due: SeparationDue[];
+};
+
+export type SeparationOption = {
+  stream: "Heifer" | "Feedlot" | "Breeding" | string;
+  /** Suggested destination herd; null when the herdsman must choose. */
+  herd: string | null;
+  /** Breeding stream: the herds he may choose from. */
+  herds?: string[];
+};
+
+export type SeparationDue = {
+  animal: string;
+  label: string;
+  sex: string;
+  herd: string;
+  age_days: number;
+  over_days: number;
+  weight_kg: number | null;
+  options: SeparationOption[];
 };
 
 const EMPTY: Eligibility = {
-  milking_herds: [],
+  breeding_herds: [],
+  separation_due: [],
   heifer_herds: [],
   service_herds: [],
   service_wait_days: 0,

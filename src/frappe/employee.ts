@@ -9,7 +9,7 @@ import { STORAGE_KEYS, storage } from "@/src/services/storage";
  * buttons; it never decides.
  *
  * This used to read /api/resource/Employee, which the farm roles are not allowed
- * to read, so a milker with an Employee still looked unlinked. The answer now
+ * to read, so a herdsman with an Employee still looked unlinked. The answer now
  * rides on `posting_day`, which the server works out for any signed-in user.
  */
 export type EmployeeStatus = {

@@ -12,6 +12,7 @@ export function AnimalPickerButton({
   mode = "single",
   title = "Select animal",
   include,
+  preferHerds,
   emptyAction,
   onPickSingle,
   onPickMulti,
@@ -22,6 +23,8 @@ export function AnimalPickerButton({
   mode?: PickerMode;
   title?: string;
   include?: (a: Animal) => boolean;
+  /** Herds whose animals are listed first. */
+  preferHerds?: Set<string>;
   emptyAction?: { label: string; onPress: () => void };
   onPickSingle?: (a: Animal) => void;
   onPickMulti?: (list: Animal[]) => void;
@@ -52,6 +55,7 @@ export function AnimalPickerButton({
         mode={mode}
         title={title}
         include={include}
+        preferHerds={preferHerds}
         emptyAction={emptyAction}
         initialSelectedIds={initialIds}
         onPickSingle={(a) => {

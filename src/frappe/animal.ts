@@ -9,6 +9,12 @@ export type AnimalDetail = Animal & {
   sire: string | null;
   dam: string | null;
   status: string | null;
+  /** Males: "Feedlot" or "Breeding", set by the move that decided it. */
+  stream: string | null;
+  /** The herdsman's note from the selection move, who wrote it and when. */
+  breedingNote: string | null;
+  breedingNoteBy: string | null;
+  breedingNoteOn: string | null;
 };
 
 const sexFromFrappe = (raw: any): "F" | "M" =>
@@ -27,7 +33,6 @@ export const mapAnimal = (row: AnimalRow): Animal => ({
   dim: null,
   parity: row.parity ?? 0,
   lastWt: row.last_weight_kg ?? 0,
-  milkSafe: null,
   inTreatment: 0,
   pregnant: pregnantFromRepro(row.repro_status),
 });
@@ -36,8 +41,12 @@ const mapAnimalDetail = (row: AnimalRow): AnimalDetail => ({
   ...mapAnimal(row),
   acquisitionDate: row.acquisition_date ?? null,
   origin: row.origin ?? null,
-  sire: row.sire_name ?? null,
+  sire: row.sire_name || row.sire || null,
   dam: row.dam ?? null,
+  stream: row.stream || null,
+  breedingNote: row.breeding_note || null,
+  breedingNoteBy: row.breeding_note_by || null,
+  breedingNoteOn: row.breeding_note_on || null,
   status: row.status ?? null,
   tag: row.tag_number ?? null,
   breed: row.breed ?? null,
@@ -54,12 +63,18 @@ export type AnimalProfile = {
   herd: string;
   breed: string | null;
   bornOn: string | null;
-  stage: "heifer" | "fresh" | "open" | "served" | "confirmed" | "dry" | "retired";
+  stage: "heifer" | "fresh" | "open" | "served" | "confirmed" | "retired";
   photo: string | null;
   dam: string | null;
   sire: string | null;
-  cycle: { daysInMilk: number | null };
-};
+  cycle?: Record<string, unknown>;
+  /** Weight and daily-gain trend; ADG is null until two weighings exist. */
+  gain?: {
+    trend: { date: string; weight_kg: number; adg_kg: number | null }[];
+    lifetime_adg: number | null;
+    herd_adg: number | null;
+    target_adg_kg: number | null;
+  };};
 
 /**
  * What the desk's Animals page shows about her — the same `animal_profile` call,
@@ -74,8 +89,8 @@ export const getAnimalProfile = async (id: string): Promise<AnimalProfile | null
 };
 
 /**
- * One animal's online extras: the open health file's withdrawal date and "in
- * treatment". Best effort: a user without health permissions simply sees no
+ * One animal's online extras: "in treatment", the herdsman's breeding note and the
+ * stream. Best effort: a user without health permissions simply sees no
  * treatment banner, and the screen still opens.
  */
 export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
@@ -94,7 +109,7 @@ export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
   const cases = await client
     .get("/api/resource/Livestock Health Case", {
       params: {
-        fields: JSON.stringify(["name", "milk_safe_date"]),
+        fields: JSON.stringify(["name"]),
         filters: JSON.stringify([
           ["animal", "=", id],
           ["docstatus", "=", 1],
@@ -107,7 +122,6 @@ export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
   const open = cases?.data?.data?.[0];
   if (open) {
     detail.inTreatment = 1;
-    detail.milkSafe = open.milk_safe_date ?? null;
   }
   return detail;
 };

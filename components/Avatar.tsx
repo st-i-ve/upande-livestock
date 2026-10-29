@@ -4,7 +4,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
 
-export type AvatarTone = "calf" | "bull" | "dry" | "warning" | "danger" | "default";
+export type AvatarTone = "calf" | "bull" | "warning" | "danger" | "default";
 
 export function Avatar({
   text,
@@ -24,7 +24,6 @@ export function Avatar({
     default: { bg: c.bgMuted, fg: c.text },
     calf:    { bg: c.bgMuted, fg: c.text },
     bull:    { bg: c.bgMuted, fg: c.text },
-    dry:     { bg: c.bgMuted, fg: c.textMuted },
     warning: { bg: c.bgMuted, fg: c.warning },
     danger:  { bg: "transparent", fg: c.danger },
   };

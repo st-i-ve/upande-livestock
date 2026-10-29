@@ -70,22 +70,14 @@ export default function Calving() {
   >("Unknown");
   const [coatNote, setCoatNote] = useState("");
   const [calves, setCalves] = useState<CalfRow[]>(() => [blankCalf()]);
-  const [toHerdPick, setToHerd] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   const pregnantCount = animals.filter((a) => a.pregnant).length;
 
-  // Default dam destination: Livestock Settings → high_yield_herd if set,
-  // otherwise the first milking herd, otherwise the first available herd.
-  const fromSettings = settings?.high_yield_herd;
-  const defaultToHerd =
-    fromSettings && herds.some((h) => h.n === fromSettings)
-      ? fromSettings
-      : (herds.find((h) => h.isMilking)?.n ?? herds[0]?.n ?? "");
-  const toHerd = toHerdPick || defaultToHerd;
-
-  // Default calf herd, per calf: Female -> female_calf_herd, Male -> male_calf_herd.
+  // A calf is born into its dam's herd and stays with her until the separation age.
+  // Only a dam with no herd falls back to Livestock Settings' calf herd for the sex.
   const defaultCalfHerd = (sex: "Female" | "Male") => {
+    if (dam?.herd && herds.some((h) => h.n === dam.herd)) return dam.herd;
     const t = sex === "Female" ? settings?.female_calf_herd : settings?.male_calf_herd;
     return t && herds.some((h) => h.n === t) ? t : (herds[0]?.n ?? "");
   };
@@ -135,7 +127,6 @@ export default function Calving() {
         operator,
         eventDate: isBackdating ? backdateDate : serverToday,
         calvingOutcome: outcome as "Live Birth" | "Still Birth",
-        toHerd: toHerd || undefined,
         calves:
           outcome === "Live Birth"
             ? calves.map(
@@ -169,6 +160,11 @@ export default function Calving() {
           "Calving recorded",
           `${dam.name} calved ${born.length === 1 ? "one calf" : `${born.length} calves`}:\n${lines}${photoLine}`,
         );
+        const extra = [
+          r?.service_created ? "No service was on file: the natural service was created 280 days before the calving." : "",
+          ...(Array.isArray(r?.warnings) ? r.warnings : []),
+        ].filter(Boolean);
+        if (extra.length) Alert.alert("Note", extra.join("\n"));
         router.replace("/(tabs)/record/success?name=Calving");
         return;
       }
@@ -189,16 +185,15 @@ export default function Calving() {
     >
       {isBackdating ? <BackdateBanner /> : null}
       {pregnantCount === 0 ? (
-        <Banner tone="warning">No pregnant cows on record.</Banner>
+        <Banner tone="info">No pregnant cows on record; a calving can still be recorded.</Banner>
       ) : null}
 
 
-      <Field label="Dam (mother)" help="If your cow isn't here, she has no pregnancy on record. Use the + button to add a Pregnancy Diagnosis first.">
+      <Field label="Dam (mother)" help="With no pregnancy on file, the server takes conception as 280 days before the calving date and records the natural service for you.">
         <AnimalPickerButton
-          title="Select dam (pregnant only)"
-          placeholder="Search pregnant cow..."
-          include={(a) => a.pregnant === 1}
-          emptyAction={{ label: "Add pregnancy", onPress: () => router.push("/(tabs)/record/events/pd") }}
+          title="Select dam"
+          placeholder="Search cow or heifer..."
+          include={(a) => a.sex === "F" && a.repro !== "Calf"}
           value={dam}
           onPickSingle={setDam}
         />
@@ -220,13 +215,6 @@ export default function Calving() {
           />
         </Field>
       </FieldRow>
-
-      <Field
-        label="Dam moves to herd"
-        help={settings?.high_yield_herd ? "Default from Livestock Settings → Lactating herd." : "Pick the milking group the dam will join."}
-      >
-        <Picker value={toHerd} onChange={setToHerd} options={herds.map((h) => h.n)} />
-      </Field>
 
       {outcome === "Abortion" ? (
         <>
@@ -273,7 +261,7 @@ export default function Calving() {
                 <>
                   <Field
                     label="Calf moves to herd"
-                    help={c.sex === "Female" ? "Default: heifer herd from Livestock Settings." : "Default: bull herd from Livestock Settings."}
+                    help="Default: the dam's herd. He or she stays with the dam until the calf separation age."
                   >
                     <Picker
                       value={c.herdPick || defaultCalfHerd(c.sex)}

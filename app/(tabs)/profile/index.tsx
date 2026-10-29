@@ -20,7 +20,6 @@ import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
-import { usePendingCount } from "@/src/hooks/useQueueStatus";
 import { useLiveStore } from "@/src/realtime/liveStore";
 
 type RowProps = {
@@ -90,7 +89,6 @@ export default function Profile() {
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
   const isEmployee = useAuthStore((s) => s.isEmployee);
-  const pending = usePendingCount();
   const online = useNetworkStatus();
   const ota = useOtaUpdate();
   const live = useLiveStore((x) => x.status);
@@ -131,15 +129,10 @@ export default function Profile() {
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
-          {/* The offline queue holds milkings only; this row only reports it. Tapping it
-              went to a pending-submissions screen that no longer exists, so the
-              count is shown here as plain status. */}
           <Row
-            icon="cloud-upload-outline"
-            label={online === false ? "Offline · milkings waiting to sync" : "Milkings waiting to sync"}
-            right={
-              <Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>
-            }
+            icon={online === false ? "wifi-off" : "wifi"}
+            label={online === false ? "Offline · recording needs a connection" : "Online"}
+            right={<View />}
           />
 
           <Row

@@ -1,12 +1,11 @@
 import { create } from "zustand";
 
 import { cachedEmployeeStatus, fetchEmployeeStatus } from "@/src/frappe/employee";
-import { isQualityOnly } from "@/src/auth/roles";
 import { setNotEmployeeHandler } from "@/src/frappe/opsError";
 import { clearLocalData, syncAnimals } from "@/src/db/sync";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
-import { STORAGE_KEYS, storage } from "@/src/services/storage";
+import { DEFAULT_INSTANCE_URL, STORAGE_KEYS, storage } from "@/src/services/storage";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -44,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
   /** Empty on a fresh install — the user enters a Frappe site URL on the
    *  login screen. Persisted as soon as login is attempted. */
-  instanceUrl: "",
+  instanceUrl: DEFAULT_INSTANCE_URL,
   email: null,
   fullname: null,
   employeeName: null,
@@ -87,7 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
       set({
         isAuthenticated: !!cookie,
-        instanceUrl: url || "",
+        instanceUrl: url || DEFAULT_INSTANCE_URL,
         email,
         fullname,
         employeeName: employee,
@@ -103,7 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: async (email, password, url) => {
-    const target = (url || get().instanceUrl || "").trim();
+    const target = (url || get().instanceUrl || DEFAULT_INSTANCE_URL).trim();
     if (!target) {
       throw new Error("Enter a Frappe instance URL before signing in.");
     }
@@ -135,9 +134,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       roles,
     });
     // The whole herd, once, so the phone works offline from here on. Not
-    // awaited: a slow sync must not hold up signing in. A user whose only role is
-    // Livestock Quality may not read animals, so there is nothing to sync.
-    if (!isQualityOnly(roles)) void syncAnimals({ full: true });
+    // awaited: a slow sync must not hold up signing in.
+    void syncAnimals({ full: true });
   },
 
   logout: async () => {

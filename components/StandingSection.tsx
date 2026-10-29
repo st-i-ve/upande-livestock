@@ -58,9 +58,6 @@ export function StandingSection({ id }: { id: string }) {
           {d.metrics.map((m) => (
             <MetricBar key={m.key} m={m} />
           ))}
-          {!d.per_animal_milk ? (
-            <Text style={s.note}>Milk per animal is not recorded, so yield is not compared.</Text>
-          ) : null}
         </View>
       )}
     </>

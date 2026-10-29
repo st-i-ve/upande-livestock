@@ -7,8 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CowIcon } from "@/components/CowIcon";
 import { LiveToast } from "@/components/LiveToast";
-import { isQualityOnly } from "@/src/auth/roles";
-import { useAuthStore } from "@/src/auth/authStore";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -44,9 +42,6 @@ export default function TabLayout() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { canRecord } = useCanRecord();
-  // Lab role: the Quality view and Profile only. The other tabs are hidden (and
-  // their routes gated, so a deep link meets a polite message, not a form).
-  const qualityOnly = isQualityOnly(useAuthStore((s) => s.roles));
 
   return (
     <>
@@ -74,7 +69,6 @@ export default function TabLayout() {
       <Tabs.Screen
         name="animals"
         options={{
-          href: qualityOnly ? null : undefined,
           title: "Animals",
           tabBarIcon: ({ color }) => (
             <CowIcon size={ICON_SIZE + 3} color={color} />
@@ -96,7 +90,7 @@ export default function TabLayout() {
         }}
         options={{
           // No Employee, no recording: the tab is not there at all.
-          href: canRecord && !qualityOnly ? undefined : null,
+          href: canRecord ? undefined : null,
           tabBarLabel: () => null,
           tabBarButton: (props) => (
             <RecordTabButton
@@ -104,18 +98,6 @@ export default function TabLayout() {
               onLongPress={props.onLongPress}
               accessibilityState={props.accessibilityState}
             />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="quality"
-        options={{
-          // A tab only for the lab role. Everyone else with access reaches it
-          // from the Record menu (the route stays, the button does not).
-          href: qualityOnly ? undefined : null,
-          title: "Quality",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "flask" : "flask-outline"} size={ICON_SIZE} color={color} />
           ),
         }}
       />

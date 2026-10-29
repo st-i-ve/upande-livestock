@@ -7,6 +7,7 @@ import {
 } from "react-native";
 
 import { AnimalRow } from "@/components/AnimalRow";
+import { BreedingCards } from "@/components/BreedingCards";
 import { Chip, Chips } from "@/components/Chips";
 import { Collapsible } from "@/components/Collapsible";
 import { Empty } from "@/components/Empty";
@@ -18,15 +19,17 @@ import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimalGroups } from "@/src/stores/animalGroups";
 import { useAnimals } from "@/src/hooks/useAnimals";
-import { useHerdFacts, type HerdFacts } from "@/src/hooks/useHerds";
+import { breedingCards } from "@/src/beef/breeding";
+import { useBeefSettings, useHerdFacts, useHerds, type HerdFacts } from "@/src/hooks/useHerds";
 import type { Animal } from "@/types";
 
 const FILTERS = [
   { id: "all", label: "All" },
-  { id: "lactating", label: "Lactating" },
+  { id: "breeding", label: "Breeding" },
   { id: "heifer", label: "Heifers" },
   { id: "calf", label: "Calves" },
   { id: "incalf", label: "In-calf" },
+  { id: "bulls", label: "Bulls" },
 ];
 
 const monthsOld = (dob: string) => {
@@ -34,14 +37,15 @@ const monthsOld = (dob: string) => {
   return Number.isNaN(t) ? Infinity : (Date.now() - t) / (30.44 * 86_400_000);
 };
 
-/** The farm's own definitions: milking herds from Livestock Settings, calf-rearing herds from Herds, stages from the server. */
+/** The farm's own definitions: breeding herds from Herds (class Breeding), calf and heifer herds from Livestock Settings, stages from the server. */
 function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal) => boolean {
-  const milking = new Set(facts.milking);
+  const breeding = new Set(facts.breeding);
   const calfHerds = new Set(facts.calf);
   const heiferHerds = new Set(facts.heifer);
   const inCalfHerds = new Set(facts.inCalf);
   switch (id) {
-    case "lactating": return (a) => milking.has(a.herd);
+    case "breeding": return (a) => breeding.has(a.herd);
+    case "bulls": return (a) => a.sex === "M" && monthsOld(a.dob) >= 12;
     case "heifer":
       // The farm's heifer herds when set; otherwise unserved females that are
       // old enough not to be calves.
@@ -56,7 +60,7 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
       // Only the farm's in-calf herds (bullying heifers, steamers) when set.
       return inCalfHerds.size > 0
         ? (a) => inCalfHerds.has(a.herd)
-        : (a) => a.stage === "confirmed" || a.stage === "dry";
+        : (a) => a.stage === "confirmed";
     default: return () => true;
   }
 }
@@ -76,6 +80,13 @@ export default function Animals() {
   const { data: found = animals } = useAnimals(query);
 
   const facts = useHerdFacts();
+  const { data: herdRows = [] } = useHerds();
+  const beef = useBeefSettings();
+  // The breeding herds as highlighted cards, shown above the list under Breeding.
+  const cards = useMemo(
+    () => (filter === "breeding" ? breedingCards(herdRows, animals, beef.breedingBullMinAgeMonths) : []),
+    [filter, herdRows, animals, beef.breedingBullMinAgeMonths],
+  );
   const matchers = useMemo(() => {
     const any = facts.calf.length > 0;
     return Object.fromEntries(FILTERS.map((f) => [f.id, matcher(f.id, facts, any)]));
@@ -167,8 +178,16 @@ export default function Animals() {
       {filter === "incalf" && facts.inCalf.length === 0 ? (
         <Text style={s.hint}>Set in-calf herds in Livestock Settings</Text>
       ) : null}
+      {filter === "breeding" && facts.breeding.length === 0 ? (
+        <Text style={s.hint}>No herd is class Breeding yet</Text>
+      ) : null}
       {state === "ok" ? (
         <SectionList
+          ListHeaderComponent={
+            cards.length ? (
+              <BreedingCards cards={cards} onOpen={(h) => router.push(`/(tabs)/animals/herds/${encodeURIComponent(h)}`)} />
+            ) : null
+          }
           ref={listRef}
           sections={sections}
           keyExtractor={(a) => a.id}

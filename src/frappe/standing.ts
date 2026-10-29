@@ -22,7 +22,6 @@ export type Standing = {
   animal: string;
   herd: { name: string; n: number };
   group: { key: string; label: string; n: number };
-  per_animal_milk: boolean;
   metrics: StandingMetric[];
 };
 

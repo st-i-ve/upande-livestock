@@ -12,6 +12,7 @@ import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
@@ -23,7 +24,16 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import type { Animal } from "@/types";
 import { useEligibility } from "@/src/hooks/useEligibility";
-import { useHerds } from "@/src/hooks/useHerds";
+import { useBeefSettings, useHerds } from "@/src/hooks/useHerds";
+import { useKinshipPreview } from "@/src/hooks/useKinshipPreview";
+import {
+  NOTE_MIN_LENGTH,
+  SELECTION_NOTE_PROMPT,
+  isBreedingHerd,
+  selectionAnimals,
+  selectionNoteError,
+} from "@/src/beef/breeding";
+import { mergeWarnings } from "@/src/beef/kinship";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { extractFrappeError } from "@/src/services/api";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
@@ -46,6 +56,9 @@ export default function Movement() {
   const [reason, setReason] = useState<typeof REASONS[number]>("Routine age-out");
   const [otherReason, setOtherReason] = useState("");
   const [selected, setSelected] = useState<Animal[]>([]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [confirmWarn, setConfirmWarn] = useState(false);
+  const beef = useBeefSettings();
   const preset = usePresetAnimal();
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
   const finish = useFinishRecording();
@@ -72,10 +85,18 @@ export default function Movement() {
   const [toHerdTouched, setToHerdTouched] = useState(false);
   const toHerd = toHerdTouched ? toHerdPick : suggested || herds[0]?.n || "";
 
+  // A bull going into a Breeding herd from outside one is a *selection*: it decides
+  // his stream, and the herdsman must write why he is kept. The server enforces
+  // the same rule; the form asks first.
+  const selection = useMemo(() => selectionAnimals(selected, toHerd, herds), [selected, toHerd, herds]);
+  const toBreeding = isBreedingHerd(herds, toHerd);
+  // Inbreeding: shown before Save, never a block.
+  const kin = useKinshipPreview(selected, toHerd, toBreeding && beef.kinshipCheck);
+
   const mutation = useCreateAnimalEvent();
   const removeOne = (id: string) => setSelected((prev) => prev.filter((a) => a.id !== id));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (acknowledged = false) => {
     setError(null);
     if (!operator) {
       setError(missingMessage);
@@ -90,22 +111,37 @@ export default function Movement() {
       return;
     }
 
-    const remarks = reason === "Other" ? otherReason : reason;
+    for (const a of selection) {
+      const bad = selectionNoteError(notes[a.id] ?? "");
+      if (bad) {
+        setError(selection.length > 1 ? `${a.name}: ${bad}` : bad);
+        return;
+      }
+    }
+    if (kin.warnings.length && !acknowledged) {
+      setConfirmWarn(true);
+      return;
+    }
+
+    const remarksFor = (a: Animal) =>
+      selection.some((x) => x.id === a.id) ? (notes[a.id] ?? "").trim() : reason === "Other" ? otherReason : reason;
+    const serverWarnings: string[][] = [];
     // One Animal Event per moved animal — server script updates per-animal
     // current_herd. We sequence rather than parallelize so a partial failure
     // gives the user a clear "X of Y moved" message.
     let succeeded = 0;
     for (const a of selected) {
       try {
-        await mutation.mutateAsync({
+        const reply = await mutation.mutateAsync({
           eventType: "Movement",
           animal: a.id,
           currentHerd: a.herd,
           toHerd,
           operator,
           eventDate: isBackdating ? backdateDate : serverToday,
-          remarks,
+          remarks: remarksFor(a),
         });
+        if (Array.isArray(reply?.warnings)) serverWarnings.push(reply.warnings);
         succeeded += 1;
       } catch (err) {
         setError(
@@ -116,7 +152,11 @@ export default function Movement() {
     }
     const parts: string[] = [];
     if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
-    Alert.alert("Movement recorded", parts.join(" · "));
+    const warned = mergeWarnings(...serverWarnings);
+    Alert.alert(
+      warned.length ? "Movement recorded — check this" : "Movement recorded",
+      [parts.join(" · "), ...warned].join("\n\n"),
+    );
     finish("Movement");
   };
 
@@ -189,6 +229,34 @@ export default function Movement() {
         <Field label="Date"><Input value={serverToday} editable={false} /></Field>
       )}
 
+      {kin.warnings.length ? (
+        <Banner tone="warning" icon="alert">
+          {["Inbreeding warning — you can still move them:", ...kin.warnings].join("\n")}
+        </Banner>
+      ) : null}
+
+      {selection.length ? (
+        <>
+          <Banner tone="info" icon="clipboard-text-outline">
+            {selection.length > 1 ? "These bulls are" : "This bull is"} being selected for breeding. The note
+            stays on {selection.length > 1 ? "each animal's" : "his"} record.
+          </Banner>
+          {selection.map((a) => (
+            <Field
+              key={a.id}
+              label={selection.length > 1 ? `Why keep ${a.name}?` : "Breeding note"}
+              help={`${SELECTION_NOTE_PROMPT}. At least ${NOTE_MIN_LENGTH} characters.`}
+            >
+              <Textarea
+                value={notes[a.id] ?? ""}
+                onChangeText={(v) => setNotes((p) => ({ ...p, [a.id]: v }))}
+                placeholder="e.g. Strong frame, good temperament, dam calves every year"
+              />
+            </Field>
+          ))}
+        </>
+      ) : (
+      <>
       <Field label="Reason">
         <Chips>
           {REASONS.map((r) => (
@@ -201,6 +269,8 @@ export default function Movement() {
           <Textarea value={otherReason} onChangeText={setOtherReason} placeholder="e.g. Quarantine due to ringworm outbreak" />
         </Field>
       ) : null}
+      </>
+      )}
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
@@ -209,7 +279,19 @@ export default function Movement() {
         label={mutation.isPending ? "Submitting…" : "Submit move"}
         disabled={offline || mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
-        onPress={handleSubmit}
+        onPress={() => handleSubmit()}
+      />
+      <ConfirmModal
+        visible={confirmWarn}
+        title="Inbreeding warning"
+        message={`${kin.warnings.join("\n")}\n\nMove anyway? The warning is saved on the record.`}
+        confirmLabel="Move anyway"
+        cancelLabel="Go back"
+        onCancel={() => setConfirmWarn(false)}
+        onConfirm={() => {
+          setConfirmWarn(false);
+          void handleSubmit(true);
+        }}
       />
     </Screen>
   );

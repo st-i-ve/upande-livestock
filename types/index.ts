@@ -8,7 +8,6 @@ export type Animal = {
   dim: number | null;
   parity: number;
   lastWt: number;
-  milkSafe: string | null;
   inTreatment: 0 | 1;
   pregnant: 0 | 1;
   /** Set when the animal comes from the local store (animals_since). */
@@ -35,8 +34,15 @@ export type Herd = {
   cat: string;
   cnt: number;
   hasBom: boolean;
-  isMilking?: boolean;
-  isDry?: boolean;
+  /** Herds.herd_class: Breeding | Fattening | Calf | Cow | Other. */
+  herdClass?: string;
+  /** Breeding-class herd: a mating group, females and the bull(s) running with them. */
+  isBreeding?: boolean;
+  /** Live females / bulls (calves excluded). */
+  females?: number;
+  bulls?: number;
+  /** Head the herd ration is made for (calves under separation age excluded). */
+  fedHeads?: number | null;
   isCalfRearing?: boolean;
   isCalf?: boolean;
   isInCalf?: boolean;

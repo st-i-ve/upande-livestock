@@ -4,8 +4,6 @@ import { useAuthStore } from "@/src/auth/authStore";
  *  and a refused request say the same thing. */
 export const NOT_EMPLOYEE_MESSAGE =
   "You're not registered as an employee, so you can't record. Ask HR to link your user to an Employee.";
-export const NOT_EMPLOYEE_MILKING_MESSAGE =
-  "You're not registered as an employee, so you can't record milkings.";
 
 /**
  * Whether this user may record anything. A user with no Employee is view-only:

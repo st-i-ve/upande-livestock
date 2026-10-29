@@ -24,8 +24,6 @@ export type PillSpec = { label: string; tone: "default" | "danger" } | null;
 // The repro state is communicated by the label text, not by colour.
 export function pillFor(a: Animal): PillSpec {
   if (a.inTreatment) return { label: "In treatment", tone: "danger" };
-  if (a.repro === "Lactating" || a.repro === "Fresh / Lactating")
-    return { label: `${a.dim ?? 0} DIM`, tone: "default" };
   if (a.repro === "Pregnant 8mo") return { label: "Steaming", tone: "default" };
   if (a.repro === "Pregnant 5mo") return { label: "In-calf", tone: "default" };
   if (a.repro === "Calf") return { label: "Calf", tone: "default" };
@@ -46,7 +44,6 @@ export const STAGE_LABELS: Record<string, string> = {
   open: "Open",
   served: "Served",
   confirmed: "In calf",
-  dry: "Dry",
   retired: "Left the herd",
 };
 
