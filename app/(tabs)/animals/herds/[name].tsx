@@ -72,6 +72,13 @@ export default function HerdDetail() {
       <MetricGrid
         items={[
           { label: "Animals", value: h.cnt },
+          ...(h.isBreeding
+            ? [
+                { label: "Females", value: h.females ?? 0 },
+                { label: "Bulls", value: h.bulls ?? 0 },
+              ]
+            : []),
+          ...(h.fedHeads != null ? [{ label: "Fed head", value: h.fedHeads }] : []),
         ]}
       />
 
