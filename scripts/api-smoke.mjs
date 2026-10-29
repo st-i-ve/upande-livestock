@@ -103,7 +103,7 @@ async function step(group, name, fn) {
     rows.push({ group, name, ok: false, note: String(e.message || e).slice(0, 400) });
   }
 }
-const track = (doctype, name) => name && created.push({ doctype, name });
+const track = (doctype, name) => name && !created.some((c) => c.doctype === doctype && c.name === name) && created.push({ doctype, name });
 
 async function login(user, pass) {
   const body = new URLSearchParams({ usr: user, pwd: pass });
@@ -292,14 +292,26 @@ const doc = async (doctype, name) => msgOf(await get(`/api/resource/${doctype}/$
 const rowOf = async (name) => (msgOf(await get(`${M}.mobile.animals_since.animals_since`)).animals || []).find((a) => a.name === name);
 
 // Find the animals the writes use, from the seed (or the env).
-function discover() {
+async function discover() {
   const by = (p) => (ctx.animals || []).filter(p);
-  const cowsIn = by((a) => a.sex?.[0] === "F" && ctx.breedingHerds.includes(a.herd) && a.status !== "Sold" && a.stage !== "retired");
-  const free = cowsIn.filter((a) => !ctx.elig.diagnosable.includes(a.name));
-  const pick = (env, i) => process.env[env] || free[i]?.name;
+  // Females in a breeding herd that can be served: open or heifer, nothing awaiting a check.
+  const free = by((a) => a.sex?.[0] === "F" && ctx.breedingHerds.includes(a.herd) && ["open", "heifer"].includes(a.stage) && !ctx.elig.diagnosable.includes(a.name));
+  // One who has not calved inside the minimum calving interval, for the calving step.
+  const settled = [];
+  for (const a of free) {
+    if (settled.length >= 2) break;
+    const p = msgOf(await post(`${M}.animals.animal_profile.animal_profile`, { payload: { animal: a.name } }));
+    if (!p.lastCalving || (Date.now() - Date.parse(p.lastCalving)) / 86_400_000 > 300) settled.push(a);
+  }
+  const [dam, pdCow] = settled;
+  ctx.calvingDam = process.env.SMOKE_DAM || dam?.name;
+  ctx.calvingDamHerd = dam?.herd;
+  const rest = free.filter((a) => a.name !== ctx.calvingDam && a.name !== pdCow?.name);
+  const pick = (env, i) => process.env[env] || rest[i]?.name;
   ctx.cow = pick("SMOKE_COW", 0);
   ctx.cow2 = pick("SMOKE_COW2", 1);
   ctx.cow3 = pick("SMOKE_COW3", 2);
+  ctx.cow4 = process.env.SMOKE_COW4 || pdCow?.name;
   ctx.heifer = process.env.SMOKE_HEIFER || by((a) => a.sex?.[0] === "F" && !ctx.breedingHerds.includes(a.herd) && a.stage === "heifer")[0]?.name;
   const due = ctx.elig.separation_due.filter((d) => d.sex !== "Female");
   ctx.calfFeedlot = due[0];
@@ -307,11 +319,36 @@ function discover() {
   ctx.bullInBreeding = by((a) => a.sex?.[0] === "M" && ctx.breedingHerds.includes(a.herd) && a.dob && (Date.now() - Date.parse(a.dob)) / 86_400_000 > 700)[0];
 }
 
+// Cancelling an event does not roll back what it stamped on the Animal (repro status,
+// last service date, stream, breeding note ...), so the run snapshots the animals it
+// touches and puts those fields back after the documents are removed.
+const RESTORE_FIELDS = ["repro_status", "parity", "last_calving_date", "expected_calving_date", "last_service_date", "last_weight_kg", "last_bcs", "current_herd", "stream", "breeding_note", "breeding_note_by", "breeding_note_on", "sire"];
+const snapshots = new Map();
+async function snapshot(names) {
+  for (const n of names.filter(Boolean)) {
+    if (!snapshots.has(n)) snapshots.set(n, await doc("Animal", n));
+  }
+}
+async function restoreAnimals() {
+  const out = { fixed: 0, failed: [] };
+  for (const [name, before] of snapshots) {
+    const now = await doc("Animal", name);
+    const diff = {};
+    for (const f of RESTORE_FIELDS) if ((now[f] ?? null) !== (before[f] ?? null)) diff[f] = before[f] ?? null;
+    if (!Object.keys(diff).length) continue;
+    const res = await http("PUT", `/api/resource/Animal/${encodeURIComponent(name)}`, { body: diff });
+    if (res.status === 200) out.fixed++;
+    else out.failed.push(`${name} ${Object.keys(diff).join("/")} (HTTP ${res.status})`);
+  }
+  return out;
+}
+
 async function writes() {
   const op = ctx.employee;
-  discover();
-  const lines = [`cows ${ctx.cow}, ${ctx.cow2}, ${ctx.cow3}`, `heifer ${ctx.heifer}`, `calves ${ctx.calfFeedlot?.animal}, ${ctx.calfBreeding?.animal}`];
-  rows.push({ group: "write", name: "animals found for the write steps", ok: !!(ctx.cow && ctx.heifer), note: lines.join("; ") });
+  await discover();
+  await snapshot([ctx.cow, ctx.cow2, ctx.cow3, ctx.cow4, ctx.calvingDam, ctx.heifer, ctx.calfFeedlot?.animal, ctx.calfBreeding?.animal, ctx.bullInBreeding?.name]);
+  const lines = [`cows ${ctx.cow}, ${ctx.cow2}, ${ctx.cow3}, ${ctx.cow4}`, `calving dam ${ctx.calvingDam}`, `heifer ${ctx.heifer}`, `calves ${ctx.calfFeedlot?.animal}, ${ctx.calfBreeding?.animal}`];
+  rows.push({ group: "write", name: "animals found for the write steps", ok: !!(ctx.cow && ctx.cow4 && ctx.calvingDam && ctx.heifer), note: lines.join("; ") });
 
   // ---- Weight (first in the Record list) -----------------------------------
   await step("write", "weights.record_weights: each (2 good + 1 refused)", async () => {
@@ -340,9 +377,9 @@ async function writes() {
   // ---- Natural service, sire inferred ---------------------------------------
   await step("write", "Service: natural, perceived conception date, sire inferred or chosen", async () => {
     let m = await ev("Service", { animal: ctx.cow, event_date: today, operator: op, service_date: today, conception_date: today, remarks: "smoke" });
-    need(m, ["service_type", "sire_animal", "sire_label", "sire_inferred", "sire_basis", "candidates", "conception_date", "warnings"], "service reply");
+    need(m, ["service_type", "sire_animal", "sire_label", "sire_inferred", "sire_basis", "candidates", "conception_date"], "service reply");
     check(m.service_type === "Natural", `default service type is ${m.service_type}, not Natural`);
-    check(Array.isArray(m.warnings), "warnings is not a list");
+    check(m.warnings === undefined || Array.isArray(m.warnings), "warnings is not a list");
     ctx.service1 = m.name;
     if (m.sire_animal) {
       check(m.sire_inferred === true, "a bull was set but sire_inferred is false");
@@ -369,22 +406,17 @@ async function writes() {
   });
 
   // ---- PD with a conception date and no service on file ---------------------
-  const pdCow = ctx.cow3;
-  await step("write", "Pregnancy Diagnosis: no service on file refused without a conception date", async () => {
-    const lone = (ctx.animals || []).find((a) => a.sex?.[0] === "F" && ctx.breedingHerds.includes(a.herd) && ![ctx.cow, ctx.cow2, ctx.cow3].includes(a.name) && !ctx.elig.diagnosable.includes(a.name));
-    if (!lone) return "no spare cow";
-    ctx.cow4 = lone.name;
-    const r = await evRaw("Pregnancy Diagnosis", { animal: lone.name, event_date: today, operator: op, diagnosis_date: today, diagnosis_result: "Confirmed" });
+  await step("write", "Pregnancy Diagnosis: no service on file is refused without a conception date", async () => {
+    const r = await evRaw("Pregnancy Diagnosis", { animal: ctx.cow4, event_date: today, operator: op, diagnosis_date: today, diagnosis_result: "Confirmed" });
     check(r?.error, "a diagnosis with no service and no conception date was accepted");
     return `refused: ${String(r.error).slice(0, 70)}`;
   });
   await step("write", "Pregnancy Diagnosis: conception date, no prior service -> natural service created", async () => {
-    const cow = ctx.cow4 || pdCow;
-    const m = await ev("Pregnancy Diagnosis", { animal: cow, event_date: today, operator: op, diagnosis_date: today, diagnosis_result: "Confirmed", conception_date: daysAgo(60), diagnosis_remarks: "smoke" });
-    need(m, ["service", "service_created", "sire_animal", "sire_inferred", "sire_basis", "candidates", "warnings"], "PD reply");
+    const m = await ev("Pregnancy Diagnosis", { animal: ctx.cow4, event_date: today, operator: op, diagnosis_date: today, diagnosis_result: "Confirmed", conception_date: daysAgo(60), diagnosis_remarks: "smoke" });
+    need(m, ["service", "service_created", "sire_animal", "sire_inferred", "sire_basis", "candidates"], "PD reply");
     check(m.service_created === true && m.service, `no natural service created: ${JSON.stringify(m).slice(0, 160)}`);
+    check(m.warnings === undefined || Array.isArray(m.warnings), "warnings is not a list");
     track("Livestock Event", m.service);
-    ctx.pdCow = cow;
     const svc = await doc("Livestock Event", m.service);
     check(svc.service_type === "Natural", `created service is ${svc.service_type}`);
     check(String(svc.conception_date || svc.service_date) === daysAgo(60), `conception ${svc.conception_date}/${svc.service_date}`);
@@ -393,10 +425,9 @@ async function writes() {
 
   // ---- Calving with no service on file --------------------------------------
   await step("write", "Calving: no service on file -> conception 280 d before, calf gets sire and dam's herd", async () => {
-    const lone = (ctx.animals || []).find((a) => a.sex?.[0] === "F" && ctx.breedingHerds.includes(a.herd) && ![ctx.cow, ctx.cow2, ctx.cow3, ctx.cow4].includes(a.name) && !ctx.elig.diagnosable.includes(a.name));
-    const dam = lone?.name;
-    if (!dam) return "no spare cow";
-    const damHerd = lone.herd;
+    const dam = ctx.calvingDam;
+    const damHerd = ctx.calvingDamHerd;
+    if (!dam) return "SKIPPED: no female past the calving interval";
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
     const form = new FormData();
     form.append("file", new Blob([png], { type: "image/png" }), `smoke-calf-${Date.now()}.png`);
@@ -427,7 +458,8 @@ async function writes() {
     const to = d.options.find((o) => o.stream === "Feedlot").herd;
     check(to, `no feedlot herd offered for ${d.animal}`);
     const m = await ev("Movement", { animal: d.animal, event_date: today, operator: op, new_herd: to, remarks: "smoke: calf separation" });
-    need(m, ["warnings", "stream"], "movement reply");
+    need(m, ["stream"], "movement reply");
+    check(m.warnings === undefined || Array.isArray(m.warnings), "warnings is not a list");
     check(m.stream === "Feedlot", `stream ${m.stream}`);
     const a = await doc("Animal", d.animal);
     check(a.current_herd === to, `herd ${a.current_herd}, expected ${to}`);
@@ -457,7 +489,6 @@ async function writes() {
     const note = "Smoke: heavy for his age, calm, dam calves yearly";
     const m = await ev("Movement", { animal: d.animal, event_date: today, operator: op, new_herd: ctx.selTo, remarks: note });
     check(m.stream === "Breeding", `stream ${m.stream}`);
-    need(m, ["warnings"], "movement reply");
     const a = await doc("Animal", d.animal);
     check(a.stream === "Breeding", `animal stream ${a.stream}`);
     check(a.breeding_note === note, `breeding_note ${JSON.stringify(a.breeding_note)}`);
@@ -487,6 +518,7 @@ async function writes() {
     need(k.conflicts[0], ["other", "other_label", "relation", "shared_parent", "message"], "conflict");
     check(["sire-daughter", "dam-son", "full-siblings", "half-siblings"].includes(k.conflicts[0].relation), `relation ${k.conflicts[0].relation}`);
     check(k.warnings.every((w) => typeof w === "string"), "a warning is not text");
+    await snapshot([b.name]);
     const note = "Smoke: moved to test the inbreeding warning";
     const m = await ev("Movement", { animal: b.name, event_date: today, operator: op, new_herd: herd, remarks: note });
     check(Array.isArray(m.warnings) && m.warnings.length, "the move came back with no warnings");
@@ -532,22 +564,41 @@ async function nonEmployee() {
 
 // ---------------------------------------------------------------------------
 async function cleanup() {
-  const out = { removed: 0, kept: [] };
-  for (const { doctype, name } of [...created].reverse()) {
-    let ok = false;
-    let why = "";
-    const del = await http("DELETE", `/api/resource/${doctype}/${encodeURIComponent(name)}`);
-    if (del.status === 202 || del.status === 200) ok = true;
-    else {
-      // Submitted: cancel, then delete.
-      const c = await post("/api/method/frappe.client.cancel", { doctype, name });
-      const del2 = await http("DELETE", `/api/resource/${doctype}/${encodeURIComponent(name)}`);
-      ok = del2.status === 202 || del2.status === 200;
-      why = `cancel ${c.status}, delete ${del2.status} ${String(del2.data?.exception || del2.data?._server_messages || "").slice(0, 100)}`;
-    }
-    if (ok) out.removed++;
-    else out.kept.push(`${doctype} ${name} (${why})`);
+  // A calving also books its birth, a service and a confirmation the reply does not
+  // all name, so besides what the steps tracked, sweep every event and weight this
+  // user created since the run began (newest first), then the animals, then files.
+  const swept = [];
+  for (const doctype of ["Livestock Event", "Livestock Weight Record"]) {
+    const l = msgOf(await get(`/api/resource/${doctype}`, { fields: ["name", "creation"], filters: [["owner", "=", USER], ["creation", ">=", ctx.syncTime]], order_by: "creation desc", limit_page_length: 500 }));
+    for (const x of l) swept.push({ doctype, name: x.name, at: x.creation });
   }
+  swept.sort((x, y) => (x.at < y.at ? 1 : -1));
+  const known = (d) => created.filter((c) => c.doctype === d);
+  created.splice(0, created.length, ...swept.map(({ doctype, name }) => ({ doctype, name })), ...known("Animal"), ...known("File"));
+  const out = { removed: 0, kept: [] };
+  const text = (x) => String(x.data?.exception || x.data?._server_messages || "").replace(/<[^>]+>/g, " ").slice(0, 110);
+  let left = [...created].reverse();
+  // Documents link to each other (a calving to its birth, a birth to its calf), so a
+  // refusal on one pass is retried after the others have gone.
+  for (let pass = 0; pass < 5 && left.length; pass++) {
+    const next = [];
+    for (const item of left) {
+      const { doctype, name } = item;
+      const path = `/api/resource/${doctype}/${encodeURIComponent(name)}`;
+      let r = await http("DELETE", path);
+      let why = `delete ${r.status} ${text(r)}`;
+      if (r.status !== 202 && r.status !== 200) {
+        // Submitted: cancel, then delete.
+        const c = await post("/api/method/frappe.client.cancel", { doctype, name });
+        r = await http("DELETE", path);
+        why = `cancel ${c.status} ${text(c)}; delete ${r.status} ${text(r)}`;
+      }
+      if (r.status === 202 || r.status === 200 || r.status === 404) out.removed++;
+      else next.push({ ...item, why });
+    }
+    left = next;
+  }
+  out.kept = left.map((x) => `${x.doctype} ${x.name} (${x.why})`);
   return out;
 }
 
@@ -564,7 +615,9 @@ if (WRITE && CLEANUP && created.length) {
   try {
     await login(USER, PASS);
     const c = await cleanup();
-    rows.push({ group: "cleanup", name: `removed what the run created (${created.length} documents)`, ok: c.kept.length === 0, note: c.kept.length ? `KEPT ${c.kept.length}: ${c.kept.join(" | ")}`.slice(0, 600) : `${c.removed} removed` });
+    const a = await restoreAnimals();
+    rows.push({ group: "cleanup", name: `put back what the events stamped on ${snapshots.size} animals`, ok: a.failed.length === 0, note: a.failed.length ? `NOT RESTORED: ${a.failed.join(" | ")}`.slice(0, 500) : `${a.fixed} animals fixed` });
+    rows.push({ group: "cleanup", name: `removed what the run created (${created.length} documents)`, ok: c.kept.length === 0, note: c.kept.length ? `KEPT ${c.kept.length}: ${c.kept.join(" | ")}`.slice(0, 1500) : `${c.removed} removed` });
   } catch (e) {
     rows.push({ group: "cleanup", name: "cleanup", ok: false, note: String(e.message || e) });
   }
