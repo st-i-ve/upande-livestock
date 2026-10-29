@@ -10,7 +10,7 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/00000000-0000-0000-0000-000000000000"
+      "url": "https://u.expo.dev/f6f49a81-310e-4c2d-a446-6641bfc3e0c9"
     },
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
@@ -26,7 +26,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.upande.livestockmutara"
+      "package": "com.upande.livestockmutara",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -68,8 +71,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
+        "projectId": "f6f49a81-310e-4c2d-a446-6641bfc3e0c9"
       }
-    }
+    },
+    "owner": "stivewithani"
   }
 }
