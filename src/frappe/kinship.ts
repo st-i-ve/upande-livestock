@@ -13,7 +13,7 @@ export async function kinshipCheck(animal: string, herd: string): Promise<Kinshi
   if (!animal || !herd) return NO_KINSHIP;
   try {
     const client = await getClient();
-    const res = await client.post(KINSHIP, { payload: { animal, herd } });
+    const res = await client.post(KINSHIP, { animal, herd });
     const m = res.data?.message;
     return m && !m.error ? parseKinship(m) : NO_KINSHIP;
   } catch {

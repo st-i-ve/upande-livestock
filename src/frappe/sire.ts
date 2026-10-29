@@ -13,7 +13,7 @@ export async function sireCandidates(animal: string, conceptionDate: string): Pr
   if (!animal || !conceptionDate) return NO_SIRE;
   try {
     const client = await getClient();
-    const res = await client.post(SIRE_CANDIDATES, { payload: { animal, conception_date: conceptionDate } });
+    const res = await client.post(SIRE_CANDIDATES, { animal, conception_date: conceptionDate });
     const m = res.data?.message;
     return m && !m.error ? parseSire(m) : NO_SIRE;
   } catch {
