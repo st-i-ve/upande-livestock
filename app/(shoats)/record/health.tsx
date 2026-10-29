@@ -60,7 +60,7 @@ export default function ShoatHealth() {
         recordTreatment({
           herd: herd.name,
           treatmentType: type,
-          itemCode: pick.itemCode,
+          product: pick.itemCode,
           warehouse: pick.warehouse,
           dosePerHead,
           numberTreated: n,

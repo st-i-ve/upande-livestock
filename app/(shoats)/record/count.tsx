@@ -5,6 +5,7 @@ import { StyleSheet, Text } from "react-native";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Picker } from "@/components/Picker";
@@ -51,7 +52,6 @@ export default function CountAndMovements() {
   const [cause, setCause] = useState("");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  const [to, setTo] = useState<"herd" | "paddock">("herd");
   const [toHerd, setToHerd] = useState("");
   const [toPaddock, setToPaddock] = useState("");
 
@@ -67,7 +67,7 @@ export default function CountAndMovements() {
   const variance = herd && kind === "Head Count" ? countVariance(total, herd.head) : null;
   const short = REMOVES.includes(kind) ? overdrawn(counts, classes) : [];
   const needsDest = kind === "Transfer Out";
-  const destOk = !needsDest || (to === "herd" ? !!toHerd : !!toPaddock);
+  const destOk = !needsDest || !!toHerd;
   const needsCause = kind === "Death";
   const valid = !!herd && (kind === "Head Count" || total > 0) && short.length === 0 && destOk && (!needsCause || !!cause);
 
@@ -82,8 +82,8 @@ export default function CountAndMovements() {
           eventDate: day.eventDate,
           counts,
           cause: needsCause ? cause : undefined,
-          toHerd: needsDest && to === "herd" ? toHerd : undefined,
-          toPaddock: needsDest && to === "paddock" ? toPaddock : undefined,
+          otherHerd: needsDest ? toHerd : undefined,
+          paddock: needsDest ? toPaddock : undefined,
           reason,
           amount: Number(amount.replace(",", ".")) || undefined,
           operator,
@@ -136,19 +136,10 @@ export default function CountAndMovements() {
 
       {needsDest ? (
         <>
-          <Field label="Move to">
-            <Chips>
-              <Chip label="Another herd" active={to === "herd"} onPress={() => setTo("herd")} />
-              <Chip label="A paddock" active={to === "paddock"} onPress={() => setTo("paddock")} />
-            </Chips>
+          <DestinationHerdField value={toHerd} onChange={setToHerd} exclude={herd?.name} label="Transfer to herd" />
+          <Field label="Paddock they go to" help="Optional, kept as a note on the transfer.">
+            <FrappeSearchPicker doctype="Warehouse" value={toPaddock || null} onChange={(n) => setToPaddock(n)} placeholder="Pick a paddock or pen" />
           </Field>
-          {to === "herd" ? (
-            <DestinationHerdField value={toHerd} onChange={setToHerd} exclude={herd?.name} />
-          ) : (
-            <Field label="Paddock">
-              <Picker value={toPaddock} onChange={setToPaddock} options={options?.paddocks ?? []} placeholder="Pick a paddock" />
-            </Field>
-          )}
         </>
       ) : null}
 

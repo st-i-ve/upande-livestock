@@ -11,9 +11,9 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { Timeline } from "@/components/Timeline";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
-import { extractFrappeError, todayISO } from "@/src/services/api";
+import { extractFrappeError } from "@/src/services/api";
 import { useShoatHerd } from "@/src/shoats/hooks";
-import { kg } from "@/src/shoats/logic";
+import { kg, ledgerSummary } from "@/src/shoats/logic";
 
 export default function ShoatHerdPage() {
   const { canRecord } = useCanRecord();
@@ -37,23 +37,27 @@ export default function ShoatHerdPage() {
   }
 
   const go = (to: string) => router.push(`/(shoats)/record/${to}?herd=${encodeURIComponent(h.name)}` as any);
-  const today = todayISO();
 
   return (
     <Screen title={h.label} subtitle={`${h.species} · ${h.head} head`} back onRefresh={() => refetch()} refreshing={isRefetching}>
       <MetricGrid
         items={[
           { label: "Head", value: h.head },
-          { label: "Average weight", value: kg(h.avgKg), sub: h.lastSampleDate ? `sampled ${h.lastSampleDate}` : undefined },
+          { label: "Average weight", value: kg(h.avgKg), sub: h.weightDate ? `sampled ${h.weightDate}` : undefined },
           { label: "Live weight", value: kg(h.liveWeightKg) },
         ]}
       />
       {h.classes.length ? <MetricGrid items={h.classes.map((k) => ({ label: k.label, value: k.head }))} /> : null}
 
-      {h.withdrawalUntil && h.withdrawalUntil >= today ? (
+      {h.inWithdrawal && h.withdrawalUntil ? (
         <Banner tone="warning">In withdrawal until {h.withdrawalUntil}: no meat or sale before then.</Banner>
       ) : null}
-      {h.expectedBirth ? <Banner tone="info">Next births expected around {h.expectedBirth}.</Banner> : null}
+      {h.nextDue ? (
+        <Banner tone="info">
+          {`Births expected around ${h.nextDue.expectedBirthDate}${h.nextDue.daysToDue != null ? ` (${h.nextDue.daysToDue < 0 ? `${-h.nextDue.daysToDue} days late` : `in ${h.nextDue.daysToDue} days`})` : ""}, ${h.nextDue.femalesServed} ${h.labels.females.toLowerCase()} served.`}
+        </Banner>
+      ) : null}
+      {h.paddock ? <Banner tone="info">{`Grazing ${h.paddock}.`}</Banner> : null}
 
       {canRecord ? (
         <>
@@ -66,9 +70,46 @@ export default function ShoatHerdPage() {
         </>
       ) : null}
 
+      {h.weights.length ? (
+        <>
+          <SectionTitle>Weigh samples</SectionTitle>
+          <Timeline
+            events={h.weights.slice(0, 5).map((w) => ({
+              date: w.date,
+              title: `${kg(w.averageKg)} average`,
+              desc: `${w.animalsWeighed} weighed · ${w.sampleClass === "All" ? "whole herd" : h.labels[w.sampleClass as keyof typeof h.labels] ?? w.sampleClass}`,
+            }))}
+          />
+        </>
+      ) : null}
+      {h.matings.length ? (
+        <>
+          <SectionTitle>Matings</SectionTitle>
+          <Timeline
+            events={h.matings.slice(0, 5).map((m) => ({
+              date: m.matingStart ?? "",
+              title: `${m.femalesServed} ${h.labels.females.toLowerCase()} · ${m.status}`,
+              desc: `${m.malesIn} ${h.labels.males.toLowerCase()} in · due ${m.expectedBirthDate ?? "—"}${m.bornAlive || m.bornDead ? ` · ${m.bornAlive} born alive, ${m.bornDead} dead` : ""}`,
+            }))}
+          />
+        </>
+      ) : null}
+      {h.treatments.length ? (
+        <>
+          <SectionTitle>Treatments</SectionTitle>
+          <Timeline
+            events={h.treatments.slice(0, 5).map((x) => ({
+              date: x.date,
+              title: `${x.treatmentType} · ${x.productName}`,
+              desc: `${x.numberTreated} treated · ${x.quantity} ${x.doseUom}${x.withdrawalEnd ? ` · withdrawal to ${x.withdrawalEnd}` : ""}`,
+            }))}
+          />
+        </>
+      ) : null}
+
       <SectionTitle>History</SectionTitle>
       {h.ledger.length ? (
-        <Timeline events={h.ledger.map((e) => ({ date: e.date, title: e.eventType, desc: e.summary || undefined }))} />
+        <Timeline events={h.ledger.map((e) => ({ date: e.date, title: `${e.eventType} · ${e.headAfter} head`, desc: ledgerSummary(e, h.labels) }))} />
       ) : (
         <Empty text="Nothing on the ledger yet" />
       )}

@@ -6,19 +6,20 @@ import TestRenderer, { act } from "react-test-renderer";
 
 import { ClassCounts } from "@/components/shoats/ClassCounts";
 import { RECORD_SECTIONS } from "@/src/beef/records";
-import { mapLedger, mapShoatHerd } from "@/src/shoats/api";
+import { mapLedger, mapShoatHerd, type HeadClass } from "@/src/shoats/api";
 import { ANIMAL_TYPE_KEY, homeOf, isShoats, parseAnimalType, speciesOf, useAnimalType } from "@/src/shoats/animalType";
 import {
-  allCounts, classSummary, cleanCounts, countVariance, expectedBirthFrom, liveWeight, overdrawn, prefillFromLedger, totalOf, varianceText, withdrawalEnd,
+  allCounts, classSummary, ledgerSummary, cleanCounts, countVariance, expectedBirthFrom, liveWeight, overdrawn, prefillFromLedger, totalOf, varianceText, withdrawalEnd,
 } from "@/src/shoats/logic";
 import { SHOAT_RECORD_ITEMS } from "@/src/shoats/records";
 
 const root = path.resolve(__dirname, "..");
-const classes = [
-  { key: "ewes", label: "Ewes", head: 62 },
-  { key: "rams", label: "Rams", head: 3 },
-  { key: "lambs", label: "Lambs", head: 24 },
+const classes: HeadClass[] = [
+  { key: "females", label: "Ewes", head: 62 },
+  { key: "males", label: "Rams", head: 3 },
+  { key: "young", label: "Lambs", head: 24 },
 ];
+const labels = { females: "Ewes", males: "Rams", young: "Lambs", others: "Others" };
 
 describe("animal type", () => {
   it("opens the right place for each type, and asks when none is remembered", () => {
@@ -51,12 +52,12 @@ describe("animal type", () => {
 
 describe("head maths", () => {
   it("keeps whole positive figures only", () => {
-    expect(cleanCounts({ ewes: "12", rams: "0", lambs: "", x: "3.9" })).toEqual({ ewes: 12, x: 3 });
-    expect(totalOf({ ewes: 12, x: 3 })).toBe(15);
+    expect(cleanCounts({ females: "12", males: "0", young: "", others: "3.9" })).toEqual({ females: 12, others: 3 });
+    expect(totalOf({ females: 12, others: 3 })).toBe(15);
   });
   it("sends every class on a head count, zeros included", () => {
-    expect(allCounts({ ewes: "60", rams: "0" }, classes)).toEqual({ ewes: 60, rams: 0, lambs: 0 });
-    expect(prefillFromLedger(classes)).toEqual({ ewes: "62", rams: "3", lambs: "24" });
+    expect(allCounts({ females: "60", males: "0" }, classes)).toEqual({ females: 60, males: 0, young: 0 });
+    expect(prefillFromLedger(classes)).toEqual({ females: "62", males: "3", young: "24" });
   });
   it("reads variance against the books", () => {
     expect(countVariance(87, 89)).toBe(-2);
@@ -65,8 +66,8 @@ describe("head maths", () => {
     expect(varianceText(0)).toBe("matches the books");
   });
   it("flags a removal larger than a class holds", () => {
-    expect(overdrawn({ rams: 4, ewes: 10 }, classes).map((k) => k.key)).toEqual(["rams"]);
-    expect(overdrawn({ rams: 3 }, classes)).toEqual([]);
+    expect(overdrawn({ males: 4, females: 10 }, classes).map((k) => k.key)).toEqual(["males"]);
+    expect(overdrawn({ males: 3 }, classes)).toEqual([]);
   });
   it("works out expected birth, withdrawal end and live weight", () => {
     expect(expectedBirthFrom("2026-03-01", 150)).toBe("2026-07-29");
@@ -74,21 +75,39 @@ describe("head maths", () => {
     expect(liveWeight(31.4, 89)).toBe(2795);
   });
   it("summarises the classes that hold head", () => {
-    expect(classSummary([...classes, { key: "o", label: "Others", head: 0 }])).toBe("62 ewes · 3 rams · 24 lambs");
+    expect(classSummary([...classes, { key: "others", label: "Others", head: 0 }])).toBe("62 ewes · 3 rams · 24 lambs");
   });
 });
 
 describe("server shapes", () => {
-  it("maps a herd row with its classes and weight", () => {
+  it("maps a herd card with head by class, weight, withdrawal and the next birth", () => {
     const h = mapShoatHerd({
-      name: "SF1", label: "Sheep Flock 1", species: "Sheep", head: "89", classes: [{ key: "ewes", label: "Ewes", head: 62 }],
-      avg_kg: "31.4", live_weight_kg: 2795, withdrawal_until: "2026-11-12",
+      name: "Sheep Flock 1", label: "Dorper Flock", species: "Sheep", breed: "Dorper", paddock: "Paddock B1",
+      labels: { females: "Ewes", males: "Rams", young: "Lambs", others: "Others" },
+      head: { females: 62, males: 3, young: 24, others: 0, total: 89 },
+      live_weight_kg: 2795, avg_weight_kg: 31.4, weight_date: "2026-10-01", weight_basis: "class samples",
+      withdrawal_until: "2026-11-12", in_withdrawal: true, has_ration: true,
+      next_due: { mating: "HCE-1", expected_birth_date: "2027-01-20", days_to_due: 83, females_served: 40 },
     });
-    expect(h).toMatchObject({ name: "SF1", head: 89, avgKg: 31.4, liveWeightKg: 2795, withdrawalUntil: "2026-11-12", paddock: null });
-    expect(h.classes[0]).toEqual({ key: "ewes", label: "Ewes", head: 62 });
+    expect(h).toMatchObject({ name: "Sheep Flock 1", label: "Dorper Flock", head: 89, avgKg: 31.4, liveWeightKg: 2795, inWithdrawal: true, hasRation: true, paddock: "Paddock B1" });
+    expect(h.classes.map((k) => [k.key, k.label, k.head])).toEqual([["females", "Ewes", 62], ["males", "Rams", 3], ["young", "Lambs", 24], ["others", "Others", 0]]);
+    expect(h.nextDue).toEqual({ mating: "HCE-1", expectedBirthDate: "2027-01-20", daysToDue: 83, femalesServed: 40 });
   });
-  it("maps a ledger entry", () => {
-    expect(mapLedger({ name: "E1", date: "2026-10-01", event_type: "Death", summary: "2 ewes died", head: 87 })).toMatchObject({ eventType: "Death", head: 87, variance: null });
+  it("uses the goat words the server sends", () => {
+    const h = mapShoatHerd({ name: "G1", species: "Goat", labels: { females: "Does", males: "Bucks", young: "Kids", others: "Others" }, head: { females: 5, total: 5 } });
+    expect(h.classes.map((k) => k.label)).toEqual(["Does", "Bucks", "Kids", "Others"]);
+  });
+  it("reads a ledger line and writes its summary in the herd's words", () => {
+    const birth = mapLedger({ name: "E1", event_date: "2026-10-01", event_type: "Birth", young: 12, born_dead: 1, head_after: 100 });
+    expect(ledgerSummary(birth, labels)).toBe("12 lambs born alive, 1 born dead");
+    const death = mapLedger({ name: "E2", event_date: "2026-10-02", event_type: "Death", females: 2, cause: "Disease", head_after: 98 });
+    expect(ledgerSummary(death, labels)).toBe("2 ewes died of Disease");
+    const count = mapLedger({ name: "E3", event_date: "2026-10-03", event_type: "Head Count", females: 60, males: 3, young: 33, variance: { females: -1, males: 0, young: -1, others: 0 }, head_after: 96 });
+    expect(ledgerSummary(count, labels)).toBe("Counted 96 (2 fewer than the books)");
+    const out = mapLedger({ name: "E4", event_date: "2026-10-04", event_type: "Transfer Out", females: 5, other_herd: "Sheep Flock 2" });
+    expect(ledgerSummary(out, labels)).toBe("5 ewes out to Sheep Flock 2");
+    const mating = mapLedger({ name: "E5", event_date: "2026-03-01", event_type: "Mating", females: 40, males: 2, expected_birth_date: "2026-07-29" });
+    expect(ledgerSummary(mating, labels)).toBe("40 ewes put to 2 rams, due 2026-07-29");
   });
 });
 
@@ -120,7 +139,7 @@ describe("ClassCounts", () => {
     const json = JSON.stringify(r.toJSON());
     expect(json).toContain('"62"');
     expect(json).toContain(" on the books");
-    act(() => { r.root.findByProps({ testID: "count-ewes" }).props.onChangeText("12a"); });
-    expect(onChange).toHaveBeenCalledWith({ ewes: "12" });
+    act(() => { r.root.findByProps({ testID: "count-females" }).props.onChangeText("12a"); });
+    expect(onChange).toHaveBeenCalledWith({ females: "12" });
   });
 });

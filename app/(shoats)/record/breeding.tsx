@@ -8,8 +8,8 @@ import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
-import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
+import { ClassCounts } from "@/components/shoats/ClassCounts";
 import { useDayField } from "@/components/shoats/DayField";
 import { DestinationHerdField, useHerdField } from "@/components/shoats/HerdField";
 import { SaveBanners } from "@/components/shoats/SaveBanners";
@@ -19,25 +19,25 @@ import { todayISO } from "@/src/services/api";
 import { recordCountEvent } from "@/src/shoats/api";
 import { LABEL, useAnimalType } from "@/src/shoats/animalType";
 import { useShoatOptions } from "@/src/shoats/hooks";
-import { expectedBirthFrom } from "@/src/shoats/logic";
+import { cleanCounts, expectedBirthFrom, totalOf } from "@/src/shoats/logic";
 import { useSubmit } from "@/src/shoats/useSubmit";
 
 type Mode = "Mating" | "Birth" | "Weaning";
 
 const int = (v: string) => Math.max(0, Math.floor(Number(v)) || 0);
+const digits = (v: string) => v.replace(/[^0-9]/g, "");
 
 /**
- * Breeding by numbers: a mating (the rams or bucks put in, from when to when, the
- * birth date that follows), lambing or kidding (born alive, born dead) and weaning
- * (how many young move to another class or herd).
+ * Breeding by numbers: a mating (females put to the males, males in, from when to
+ * when, and the birth date that follows), lambing or kidding (born alive, born
+ * dead) and weaning (how many young become females, males or others, or go to
+ * another herd). Everything is a number for the herd, never an animal.
  */
 export default function Breeding() {
   const c = useColors();
   const offline = useOffline();
   const { operator, missingMessage } = useOperator();
   const type = useAnimalType((s) => s.type);
-  const young = type === "goats" ? "kids" : "lambs";
-  const males = type === "goats" ? "bucks" : "rams";
   const options = useShoatOptions().data;
   const { mode: preset } = useLocalSearchParams<{ mode?: string }>();
   const { herd, field } = useHerdField();
@@ -48,64 +48,65 @@ export default function Breeding() {
   const [mode, setMode] = useState<Mode>(preset === "Birth" || preset === "Weaning" ? preset : "Mating");
   const [start, setStart] = useState(today);
   const [end, setEnd] = useState("");
-  const [rams, setRams] = useState("");
+  const [served, setServed] = useState("");
+  const [males, setMales] = useState("");
   const [alive, setAlive] = useState("");
   const [dead, setDead] = useState("");
-  const [fromClass, setFromClass] = useState("");
-  const [weaned, setWeaned] = useState("");
-  const [dest, setDest] = useState<"class" | "herd">("class");
-  const [toClass, setToClass] = useState("");
+  const [weaned, setWeaned] = useState<Record<string, string>>({});
+  const [away, setAway] = useState(false);
   const [toHerd, setToHerd] = useState("");
 
+  const labels = herd?.labels ?? { females: "Ewes", males: "Rams", young: "Lambs", others: "Others" };
+  const youngWord = labels.young.toLowerCase();
+  const birthWord = type === "goats" ? "Kidding" : "Lambing";
   const classes = herd?.classes ?? [];
-  const from = classes.find((k) => k.label === fromClass);
-  const target = classes.find((k) => k.label === toClass);
+  const youngHead = classes.find((k) => k.key === "young")?.head ?? 0;
   const gestation = options?.gestationDays ?? 150;
-  const expected = mode === "Mating" ? expectedBirthFrom(start, gestation) : null;
+  const expected = expectedBirthFrom(end || start, gestation);
+  const weanedCounts = cleanCounts(weaned);
+  const weanedTotal = totalOf(weanedCounts);
 
   const valid =
     !!herd &&
     (mode === "Mating"
-      ? int(rams) > 0 && (!end || end >= start)
+      ? int(served) > 0 && int(males) > 0 && (!end || end >= start)
       : mode === "Birth"
         ? int(alive) + int(dead) > 0
-        : !!from && int(weaned) > 0 && int(weaned) <= from.head && (dest === "herd" ? !!toHerd : !!target && target.key !== from.key));
+        : weanedTotal > 0 && weanedTotal <= youngHead && (!away || !!toHerd));
 
   const save = async () => {
     if (!herd || !valid) return;
-    if (!operator) return sub_err(missingMessage);
+    if (!operator) return sub.setError(missingMessage);
     await sub.run(
       () =>
         recordCountEvent({
           herd: herd.name,
           eventType: mode,
-          eventDate: mode === "Mating" ? (start !== today ? start : undefined) : day.eventDate,
-          counts: mode === "Weaning" && from ? { [from.key]: int(weaned) } : {},
-          ramsIn: mode === "Mating" ? int(rams) : undefined,
-          endDate: mode === "Mating" ? end : undefined,
-          bornAlive: mode === "Birth" ? int(alive) : undefined,
+          eventDate: day.eventDate,
+          counts:
+            mode === "Mating" ? { females: int(served), males: int(males) } : mode === "Birth" ? { young: int(alive) } : weanedCounts,
           bornDead: mode === "Birth" ? int(dead) : undefined,
-          toHerd: mode === "Weaning" && dest === "herd" ? toHerd : undefined,
-          toClass: mode === "Weaning" && dest === "class" ? target?.key : undefined,
+          matingStart: mode === "Mating" ? start : undefined,
+          matingEnd: mode === "Mating" ? end || start : undefined,
+          otherHerd: mode === "Weaning" && away ? toHerd : undefined,
           operator,
         }),
-      () =>
+      (r) =>
         mode === "Mating"
-          ? `Mating saved: ${int(rams)} ${males} in. ${young[0].toUpperCase()}${young.slice(1)} expected around ${expected}.`
+          ? `Mating saved: ${int(served)} ${labels.females.toLowerCase()} put to ${int(males)} ${labels.males.toLowerCase()}. ${birthWord} expected around ${r.raw?.expected_birth_date ?? expected}.`
           : mode === "Birth"
-            ? `${type === "goats" ? "Kidding" : "Lambing"} saved: ${int(alive)} born alive, ${int(dead)} born dead.`
-            : `Weaning saved: ${int(weaned)} ${young} weaned.`,
+            ? `${birthWord} saved: ${int(alive)} born alive, ${int(dead)} born dead${r.raw?.mating_linked ? " (linked to its mating)" : ""}.`
+            : `Weaning saved: ${weanedTotal} ${youngWord} weaned.`,
     );
   };
-  const sub_err = (m: string) => sub.setError(m);
 
   return (
-    <Screen title="Breeding" subtitle={`${type ? LABEL[type] : "Shoats"} · mating, ${type === "goats" ? "kidding" : "lambing"}, weaning`} back>
+    <Screen title="Breeding" subtitle={`${type ? LABEL[type] : "Shoats"} · mating, ${birthWord.toLowerCase()}, weaning`} back>
       {field}
       <Field label="What happened">
         <Chips>
           <Chip label="Mating" active={mode === "Mating"} onPress={() => setMode("Mating")} />
-          <Chip label={type === "goats" ? "Kidding" : "Lambing"} active={mode === "Birth"} onPress={() => setMode("Birth")} />
+          <Chip label={birthWord} active={mode === "Birth"} onPress={() => setMode("Birth")} />
           <Chip label="Weaning" active={mode === "Weaning"} onPress={() => setMode("Weaning")} />
         </Chips>
       </Field>
@@ -113,16 +114,19 @@ export default function Breeding() {
       {mode === "Mating" ? (
         <>
           <Field label="Mating started">
-            <DateField value={start} onChange={setStart} maximumDate={fromISODate(today)} />
+            <DateField value={start} onChange={(d) => { setStart(d); if (end && end < d) setEnd(""); }} maximumDate={fromISODate(today)} />
           </Field>
-          <Field label="Rams out on" help="Optional: leave empty while they are still in.">
-            <DateField value={end} onChange={setEnd} minimumDate={fromISODate(start)} placeholder="Still in" />
+          <Field label={`${labels.males} out on`} help="Optional: leave empty if the mating ended the same day.">
+            <DateField value={end} onChange={setEnd} minimumDate={fromISODate(start)} maximumDate={fromISODate(today)} placeholder="Same day" />
           </Field>
-          <Field label={`${males[0].toUpperCase()}${males.slice(1)} in with the females`} help={herd ? `${classes.find((k) => /ram|buck/i.test(k.label))?.head ?? 0} ${males} on the books.` : undefined}>
-            <Input testID="rams-in" value={rams} onChangeText={(v) => setRams(v.replace(/[^0-9]/g, ""))} keyboardType="number-pad" placeholder="0" />
+          <Field label={`${labels.females} put to the ${labels.males.toLowerCase()}`} help={herd ? `${classes.find((k) => k.key === "females")?.head ?? 0} on the books.` : undefined}>
+            <Input testID="served" value={served} onChangeText={(v) => setServed(digits(v))} keyboardType="number-pad" placeholder="0" />
+          </Field>
+          <Field label={`${labels.males} in`} help={herd ? `${classes.find((k) => k.key === "males")?.head ?? 0} on the books.` : undefined}>
+            <Input testID="males-in" value={males} onChangeText={(v) => setMales(digits(v))} keyboardType="number-pad" placeholder="0" />
           </Field>
           <Text style={{ color: c.textMuted, fontSize: 12, marginBottom: 10 }}>
-            {`${type === "goats" ? "Kidding" : "Lambing"} expected around ${expected} (${gestation} days).`}
+            {`${birthWord} expected around ${expected} (${gestation} days after the mating ends).`}
           </Text>
         </>
       ) : null}
@@ -130,36 +134,30 @@ export default function Breeding() {
       {mode === "Birth" ? (
         <>
           {day.field}
-          <Field label={`${young[0].toUpperCase()}${young.slice(1)} born alive`}>
-            <Input testID="born-alive" value={alive} onChangeText={(v) => setAlive(v.replace(/[^0-9]/g, ""))} keyboardType="number-pad" placeholder="0" />
+          <Field label={`${labels.young} born alive`}>
+            <Input testID="born-alive" value={alive} onChangeText={(v) => setAlive(digits(v))} keyboardType="number-pad" placeholder="0" />
           </Field>
           <Field label="Born dead">
-            <Input testID="born-dead" value={dead} onChangeText={(v) => setDead(v.replace(/[^0-9]/g, ""))} keyboardType="number-pad" placeholder="0" />
+            <Input testID="born-dead" value={dead} onChangeText={(v) => setDead(digits(v))} keyboardType="number-pad" placeholder="0" />
           </Field>
-          <Banner tone="info">Those born alive join the herd as {young}; those born dead are on the ledger but not in the head.</Banner>
+          <Banner tone="info">Those born alive join the herd as {youngWord}; those born dead stay on the ledger but not in the head. The server links this to the mating it comes from.</Banner>
         </>
       ) : null}
 
       {mode === "Weaning" ? (
         <>
           {day.field}
-          <Field label="Weaning from">
-            <Picker value={fromClass} onChange={setFromClass} options={classes.map((k) => k.label)} placeholder={`Pick the class (${young})`} />
+          <Field label={`${labels.young} weaned into`} help={`${youngHead} ${youngWord} on the books. Enter how many become each.`}>
+            <ClassCounts classes={classes.filter((k) => k.key !== "young")} value={weaned} onChange={setWeaned} showLedger={false} />
           </Field>
-          <Field label="Number weaned" help={from ? `${from.head} ${from.label.toLowerCase()} on the books.` : undefined}>
-            <Input testID="weaned" value={weaned} onChangeText={(v) => setWeaned(v.replace(/[^0-9]/g, ""))} keyboardType="number-pad" placeholder="0" />
-          </Field>
-          <Field label="Move them to">
+          <Field label="Where they go">
             <Chips>
-              <Chip label="A class in this herd" active={dest === "class"} onPress={() => setDest("class")} />
-              <Chip label="Another herd" active={dest === "herd"} onPress={() => setDest("herd")} />
+              <Chip label="Stay in this herd" active={!away} onPress={() => setAway(false)} />
+              <Chip label="Another herd" active={away} onPress={() => setAway(true)} />
             </Chips>
           </Field>
-          {dest === "class" ? (
-            <Picker value={toClass} onChange={setToClass} options={classes.filter((k) => k.label !== fromClass).map((k) => k.label)} placeholder="Pick the class" />
-          ) : (
-            <DestinationHerdField value={toHerd} onChange={setToHerd} exclude={herd?.name} />
-          )}
+          {away ? <DestinationHerdField value={toHerd} onChange={setToHerd} exclude={herd?.name} /> : null}
+          {weanedTotal > youngHead ? <Text style={{ color: c.danger, fontSize: 12, marginBottom: 10 }}>Only {youngHead} {youngWord} in this herd.</Text> : null}
         </>
       ) : null}
 

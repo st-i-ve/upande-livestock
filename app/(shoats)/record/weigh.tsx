@@ -10,7 +10,8 @@ import { useDayField } from "@/components/shoats/DayField";
 import { useHerdField } from "@/components/shoats/HerdField";
 import { SaveBanners } from "@/components/shoats/SaveBanners";
 import { useColors } from "@/src/hooks/useColors";
-import { recordWeighSample } from "@/src/shoats/api";
+import { useOperator } from "@/src/hooks/useOperator";
+import { recordWeightSample } from "@/src/shoats/api";
 import { kg, liveWeight } from "@/src/shoats/logic";
 import { useSubmit } from "@/src/shoats/useSubmit";
 
@@ -26,6 +27,7 @@ export default function WeighSample() {
   const { herd, field } = useHerdField();
   const day = useDayField();
   const sub = useSubmit();
+  const { operator, missingMessage } = useOperator();
   const [klass, setKlass] = useState(WHOLE);
   const [weighed, setWeighed] = useState("");
   const [average, setAverage] = useState("");
@@ -39,8 +41,9 @@ export default function WeighSample() {
 
   const save = async () => {
     if (!herd || !valid) return;
+    if (!operator) return sub.setError(missingMessage);
     const ok = await sub.run(
-      () => recordWeighSample({ herd: herd.name, headClass: classRow?.key, animalsWeighed: n, averageKg: avg, eventDate: day.eventDate }),
+      () => recordWeightSample({ herd: herd.name, sampleClass: classRow?.key ?? "All", animalsWeighed: n, averageKg: avg, eventDate: day.eventDate, operator }),
       () => `Sample saved: ${n} weighed, average ${kg(avg)}.`,
     );
     if (ok) {

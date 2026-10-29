@@ -20,6 +20,14 @@
  *   herd (refused without the note, accepted with it, stream and note saved) ...
  *   kinship preview and a warned move (dam-son).
  *
+ * SHOATS (sheep and goats, by herd numbers; section "shoats"): the herds list with head
+ * by class, a herd's page, options, breeding and ledger reads; with WRITE=1 a weigh
+ * sample, a head count with variance, birth, death (cause required, refused when a class
+ * would go negative), purchase, sale in withdrawal (warning), a transfer (both sides,
+ * species guard), mating then weaning, and a dipping that issues from the Drug Store.
+ * Each is taken back with cancel_shoat_record and deleted, and the herd heads must end
+ * where they began.
+ *
  * Everything it creates is listed (the last line, CREATED [...]) and then removed
  * (cancel + delete through the API); a document the API will not remove is
  * reported, never ignored. SMOKE_CLEANUP=0 keeps them.
@@ -120,6 +128,14 @@ async function login(user, pass) {
 
 // ---------------------------------------------------------------------------
 await step("auth", "POST /api/method/login", () => login(USER, PASS));
+// SMOKE_SWEEP_SINCE="YYYY-MM-DD HH:MM:SS" (server time): remove what an interrupted run left behind
+// (events and weight records this user made since then), nothing else.
+if (process.env.SMOKE_SWEEP_SINCE) {
+  ctx.syncTime = process.env.SMOKE_SWEEP_SINCE;
+  const c = await cleanup();
+  console.log(JSON.stringify(c));
+  process.exit(c.kept.length ? 1 : 0);
+}
 await step("auth", "frappe.auth.get_logged_user", async () => {
   const m = msgOf(await get("/api/method/frappe.auth.get_logged_user"));
   check(m === USER, `logged in as ${m}`);
@@ -244,13 +260,16 @@ await step("read", "breeding.sire_candidates (preview)", async () => {
   need(m, ["sire_animal", "label", "inferred", "basis", "candidates"], "sire_candidates");
   return `${cow.name}: ${m.candidates.length} candidate(s), inferred=${m.inferred}`;
 });
-await step("read", "herds.herd_rations (head counts: females, bulls, calves, fed_heads)", async () => {
-  const herd = ctx.herds.find((h) => h.has_bom)?.name;
+await step("read", "mobile.record_feeding info + day (what the Feeding screen calls)", async () => {
+  // The desk's feeding.herd_rations needs BOM read, which the herdsman's roles do not have;
+  // the phone feeds through mobile.record_feeding, so that is what is checked.
+  const herd = ctx.herds.find((h) => h.has_bom);
   if (!herd) return "no herd has a ration";
-  const m = msgOf(await post(`${M}.herds.herd_rations.herd_rations`, {}));
-  const list = Array.isArray(m) ? m : m.herds || m.rows || m.rations || [];
-  if (list[0]) need(list[0], ["fed_heads", "calves", "bulls", "females"], "ration row");
-  return `${list.length} rows`;
+  const info = msgOf(await post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "info", herd: herd.name } }));
+  need(info, ["bom_no", "heads", "per_head_qty", "lines", "uom"], "feeding info");
+  const day = msgOf(await post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "day", herd: herd.name } }));
+  need(day, ["day_kg", "issued_kg", "remaining_kg", "suggested_portion", "complete"], "feeding day");
+  return `${herd.name}: ${info.heads} head, ${info.lines.length} ingredients, ${day.day_kg} kg a day`;
 });
 await step("read", "weights.weight_options", async () => {
   const m = msgOf(await get(`${M}.weights.weight_options.weight_options`, { settings_only: 1 }));
@@ -602,9 +621,213 @@ async function cleanup() {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// SHOATS: sheep and goats by herd numbers (upande_livestock.serverscripts.shoats.*)
+const SH = `${M}.shoats`;
+const shoatCreated = []; // {kind, name}
+const keep = (kind, name) => name && !shoatCreated.some((c) => c.name === name) && shoatCreated.push({ kind, name });
+const shoatCall = (file, body) => post(`${SH}.${file}.${file}`, body);
+const shoatRec = (file, payload) => shoatCall(file, { payload });
+const shoatRaw = async (file, payload) => (await shoatRec(file, payload)).data?.message;
+const KEYS = ["females", "males", "young", "others"];
+const sum = (h) => KEYS.reduce((a, k) => a + Number(h[k] || 0), 0);
+
+async function shoatReads() {
+  await step("shoats", "shoat_herds: head by class, weight, withdrawal, next birth", async () => {
+    const m = msgOf(await get(`${SH}.shoat_herds.shoat_herds`));
+    check(m.herds.length >= 4, `${m.herds.length} shoat herds, expected the seeded 2 flocks and 2 goat herds`);
+    need(m.herds[0], ["name", "label", "species", "labels", "head", "live_weight_kg", "avg_weight_kg", "withdrawal_until", "in_withdrawal", "has_ration", "next_due"], "shoat herd");
+    need(m.herds[0].head, [...KEYS, "total"], "head");
+    for (const h of m.herds) check(sum(h.head) === h.head.total, `${h.name}: classes add to ${sum(h.head)}, total ${h.head.total}`);
+    need(m, ["totals"], "shoat_herds");
+    ctx.shoatHerds = m.herds;
+    return `${m.herds.map((h) => `${h.label} ${h.head.total}`).join(", ")}`;
+  });
+  await step("shoats", "shoat_herds?species=Goat: only goat herds", async () => {
+    const m = msgOf(await get(`${SH}.shoat_herds.shoat_herds`, { species: "Goat" }));
+    check(m.herds.length >= 2 && m.herds.every((h) => h.species === "Goat"), `species ${m.herds.map((h) => h.species)}`);
+    check(m.herds[0].labels.females === "Does" && m.herds[0].labels.young === "Kids", "goat labels are not Does / Kids");
+    return `${m.herds.length} goat herds (${m.herds[0].labels.females}, ${m.herds[0].labels.males}, ${m.herds[0].labels.young})`;
+  });
+  await step("shoats", "shoat_herd: card, ledger history, weights, matings, treatments", async () => {
+    const h = ctx.shoatHerds.find((x) => x.species === "Sheep");
+    const m = msgOf(await get(`${SH}.shoat_herd.shoat_herd`, { herd: h.name }));
+    need(m, ["herd", "ledger", "weights", "matings", "treatments"], "shoat_herd");
+    check(m.ledger.length > 0, "no ledger history for a seeded herd");
+    need(m.ledger[0], ["name", "event_date", "event_type", "females", "males", "young", "others", "born_dead", "change", "head_after", "cause", "other_herd", "variance"], "ledger row");
+    check(m.herd.head.total === h.head.total, "card head differs from the list");
+    return `${h.name}: ${m.ledger.length} ledger lines, ${m.weights.length} samples, ${m.matings.length} matings, ${m.treatments.length} treatments`;
+  });
+  await step("shoats", "shoat_options: causes, types, Drug Store products, gestation", async () => {
+    const m = msgOf(await get(`${SH}.shoat_options.shoat_options`));
+    need(m, ["death_causes", "treatment_types", "drugs", "drug_store", "gestation_days", "event_types"], "shoat_options");
+    check(m.death_causes.length > 3 && m.treatment_types.includes("Dipping"), "causes or treatment types missing");
+    check(m.drugs.length > 0, "the Drug Store lists no product with stock");
+    need(m.drugs[0], ["item_code", "item_name", "uom", "qty"], "drug");
+    ctx.shoatOpts = m;
+    return `${m.drugs.length} products in ${m.drug_store}, gestation ${m.gestation_days} d`;
+  });
+  await step("shoats", "shoat_breeding + shoat_ledger", async () => {
+    const h = ctx.shoatHerds[0];
+    const b = msgOf(await get(`${SH}.shoat_breeding.shoat_breeding`, { herd: h.name }));
+    need(b, ["matings", "due", "gestation_days"], "shoat_breeding");
+    const l = msgOf(await get(`${SH}.shoat_ledger.shoat_ledger`, { herd: h.name, limit: 5 }));
+    need(l, ["rows", "head"], "shoat_ledger");
+    check(l.rows.length <= 5, "limit ignored");
+    return `${b.matings.length} matings, ${l.rows.length} ledger rows`;
+  });
+  await step("shoats", "mobile.record_feeding info + day: ration at the ledger's head", async () => {
+    const h = ctx.shoatHerds.find((x) => x.has_ration);
+    if (!h) return "no shoat herd has a ration";
+    const info = msgOf(await post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "info", herd: h.name } }));
+    check(info.heads === h.head.total, `ration feeds ${info.heads} head, the ledger says ${h.head.total}`);
+    need(info, ["bom_no", "per_head_qty", "lines", "uom"], "feeding info");
+    const day = msgOf(await post(`${M}.mobile.record_feeding.record_feeding`, { payload: { action: "day", herd: h.name } }));
+    need(day, ["day_kg", "issued_kg", "remaining_kg", "suggested_portion", "complete"], "feeding day");
+    return `${h.name}: ${info.heads} head x ${info.per_head_qty} ${info.uom} = ${day.day_kg} kg a day`;
+  });
+}
+
+async function shoatWrites() {
+  const op = ctx.employee;
+  const headOf = async (herd) => msgOf(await get(`${SH}.shoat_herd.shoat_herd`, { herd })).herd.head;
+  const sheep = ctx.shoatHerds.filter((h) => h.species === "Sheep");
+  const goat = ctx.shoatHerds.find((h) => h.species === "Goat");
+  const A = sheep[0].name;
+  const B = sheep[1].name;
+  ctx.shoatBefore = {};
+  for (const h of ctx.shoatHerds) ctx.shoatBefore[h.name] = (await headOf(h.name)).total;
+  const rec = async (type, payload, kind = "count_event") => {
+    const m = await shoatRaw("record_count_event", { herd: A, event_type: type, operator: op, ...payload });
+    if (m?.created?.count_event) { keep("count_event", m.created.count_event); keep("count_event", m.created.paired_event); }
+    return m;
+  };
+  let base;
+  await step("shoats", "record_weight_sample: 10 ewes average 33 kg", async () => {
+    const m = msgOf(await shoatRec("record_weight_sample", { herd: A, sample_class: "females", animals_weighed: 10, average_kg: 33, operator: op }));
+    keep("weight_sample", m.created.weight_sample);
+    check(m.sample.total_kg === 330, `total_kg ${m.sample.total_kg}`);
+    need(m, ["live_weight_kg", "avg_weight_kg", "head"], "weigh reply");
+    check(m.live_weight_kg > 0, "no live weight");
+    return `live weight ${m.live_weight_kg} kg, herd average ${m.avg_weight_kg} kg`;
+  });
+  await step("shoats", "record_weight_sample: 0 animals weighed is refused", async () => {
+    const m = await shoatRaw("record_weight_sample", { herd: A, animals_weighed: 0, average_kg: 30 });
+    check(m?.error, "accepted 0 weighed");
+    return String(m.error).replace(/<[^>]+>/g, "").slice(0, 80);
+  });
+  await step("shoats", "Head Count with variance: the count becomes the head", async () => {
+    base = await headOf(A);
+    const counted = { ...base, females: base.females - 2 };
+    const m = msgOf({ status: 200, data: { message: await rec("Head Count", { females: counted.females, males: counted.males, young: counted.young, others: counted.others }) } });
+    check(m.head.total === base.total - 2, `head after ${m.head.total}, expected ${base.total - 2}`);
+    check(m.variance.females === -2 && m.variance.males === 0, `variance ${JSON.stringify(m.variance)}`);
+    return `counted ${m.head.total} against ${base.total}: variance ${m.variance.females}`;
+  });
+  await step("shoats", "Birth: 3 alive, 1 dead (born dead never counts)", async () => {
+    const before = (await headOf(A)).total;
+    const m = msgOf({ status: 200, data: { message: await rec("Birth", { young: 3, born_dead: 1 }) } });
+    check(m.head.total === before + 3, `head ${m.head.total}, expected ${before + 3}`);
+    return `head ${before} -> ${m.head.total}; mating ${m.mating || "none"}`;
+  });
+  await step("shoats", "Death needs a cause; with one it takes the head down", async () => {
+    const no = await rec("Death", { young: 1 });
+    check(no?.error, "a death with no cause was accepted");
+    const before = (await headOf(A)).total;
+    const m = msgOf({ status: 200, data: { message: await rec("Death", { young: 1, cause: "Disease", remarks: "smoke" }) } });
+    check(m.head.total === before - 1, `head ${m.head.total}, expected ${before - 1}`);
+    return `refused without a cause; head ${before} -> ${m.head.total}`;
+  });
+  await step("shoats", "removal larger than a class holds is refused (never negative)", async () => {
+    const before = (await headOf(A)).total;
+    const m = await rec("Sale", { males: 100000 });
+    check(m?.error, "a sale of 100000 rams was accepted");
+    check((await headOf(A)).total === before, "head moved on a refused entry");
+    return String(m.error).replace(/<[^>]+>/g, "").slice(0, 100);
+  });
+  await step("shoats", "Purchase +2 ewes, Sale -1 ram in withdrawal gives a warning", async () => {
+    const before = await headOf(A);
+    const p = msgOf({ status: 200, data: { message: await rec("Purchase", { females: 2, amount: 24000, reason: "smoke supplier" }) } });
+    check(p.head.total === before.total + 2, `after purchase ${p.head.total}`);
+    const s = msgOf({ status: 200, data: { message: await rec("Sale", { males: 1, amount: 15000, reason: "smoke buyer" }) } });
+    check(s.head.total === before.total + 1, `after sale ${s.head.total}`);
+    const inWithdrawal = ctx.shoatHerds.find((h) => h.name === A).in_withdrawal;
+    if (inWithdrawal) check(Array.isArray(s.warnings) && s.warnings.length, "sale inside the withdrawal came back with no warning");
+    return `+2 -1 = ${s.head.total}${inWithdrawal ? `; warning: ${String(s.warnings[0]).replace(/<[^>]+>/g, "").slice(0, 60)}` : ""}`;
+  });
+  await step("shoats", "Transfer Out to another flock books both sides; sheep to goats refused", async () => {
+    const a0 = (await headOf(A)).total;
+    const b0 = (await headOf(B)).total;
+    const m = msgOf({ status: 200, data: { message: await rec("Transfer Out", { females: 2, other_herd: B, paddock: "", reason: "smoke" }) } });
+    check(m.created.paired_event, "no paired Transfer In");
+    check((await headOf(A)).total === a0 - 2, "sender did not lose 2");
+    check((await headOf(B)).total === b0 + 2, "receiver did not gain 2");
+    const bad = await rec("Transfer Out", { females: 1, other_herd: goat.name });
+    check(bad?.error, "sheep were moved into a goat herd");
+    return `${A} ${a0} -> ${a0 - 2}, ${B} ${b0} -> ${b0 + 2}; to goats: ${String(bad.error).replace(/<[^>]+>/g, "").slice(0, 50)}`;
+  });
+  await step("shoats", "Mating (rams in, dates) then Weaning (lambs to ewes) keeps the head", async () => {
+    const start = daysAgo(3);
+    const m = msgOf({ status: 200, data: { message: await rec("Mating", { females: 5, males: 1, mating_start: start, mating_end: today }) } });
+    check(m.expected_birth_date, "no expected birth date");
+    const gest = ctx.shoatOpts.gestation_days;
+    const want = new Date(Date.parse(today) + gest * 86_400_000).toISOString().slice(0, 10);
+    check(m.expected_birth_date === want, `expected ${m.expected_birth_date}, mating end + ${gest} d is ${want}`);
+    const before = await headOf(A);
+    const w = msgOf({ status: 200, data: { message: await rec("Weaning", { females: 2 }) } });
+    check(w.head.total === before.total, `weaning changed the head ${before.total} -> ${w.head.total}`);
+    const after = await headOf(A);
+    check(after.young === before.young - 2 && after.females === before.females + 2, `classes ${JSON.stringify(after)} from ${JSON.stringify(before)}`);
+    return `due ${m.expected_birth_date}; 2 lambs became ewes, head ${w.head.total}`;
+  });
+  await step("shoats", "record_treatment: dipping issues from the Drug Store, withdrawal set", async () => {
+    const drug = ctx.shoatOpts.drugs[0];
+    const m = msgOf(await shoatRec("record_treatment", { herd: A, treatment_type: "Dipping", product: drug.item_code, dose_per_head: 0.01, number_treated: 20, withdrawal_days: 5, operator: op }));
+    keep("treatment", m.created.treatment);
+    check(m.treatment.quantity === 0.2, `quantity ${m.treatment.quantity}, expected dose x head = 0.2`);
+    check(m.treatment.withdrawal_end, "no withdrawal end");
+    check(m.withdrawal_until, "herd shows no withdrawal_until");
+    return `${drug.item_name}: ${m.treatment.quantity} ${m.treatment.uom}, stock entry ${m.created.stock_entry || "draft/none"}, withdrawal to ${m.treatment.withdrawal_end}`;
+  });
+  await step("shoats", "shoat_herd shows what was recorded in its history", async () => {
+    const m = msgOf(await get(`${SH}.shoat_herd.shoat_herd`, { herd: A }));
+    const types = new Set(m.ledger.map((e) => e.event_type));
+    for (const x of ["Head Count", "Birth", "Death", "Purchase", "Sale", "Transfer Out", "Mating", "Weaning"]) check(types.has(x), `${x} is not in the ledger the herd page reads`);
+    check(m.treatments.some((x) => x.treatment_type === "Dipping"), "the dipping is not in treatments");
+    check(m.weights.some((x) => x.animals_weighed === 10), "the weigh sample is not in weights");
+    return `ledger shows ${[...types].length} event types`;
+  });
+}
+
+async function shoatCleanup() {
+  const KIND = { count_event: "Herd Count Event", treatment: "Herd Treatment", weight_sample: "Herd Weight Sample" };
+  let removed = 0;
+  const kept = [];
+  const pairedOnly = []; // cancelled, but the API cannot delete a transfer pair (each names the other)
+  const text = (x) => String(x.data?.exception || "").replace(/<[^>]+>/g, " ").slice(0, 90);
+  for (const { kind, name } of [...shoatCreated].reverse()) {
+    const c = msgOf2(await post(`${SH}.cancel_shoat_record.cancel_shoat_record`, { payload: { kind, name } }));
+    const cancelled = c.ok || /already cancelled/.test(String(c.error));
+    const d = await http("DELETE", `/api/resource/${encodeURIComponent(KIND[kind])}/${encodeURIComponent(name)}`);
+    if ([200, 202, 404].includes(d.status)) removed++;
+    else if (cancelled && kind === "count_event" && /LinkExistsError/.test(String(d.data?.exception || d.data?.exc_type || ""))) pairedOnly.push(name);
+    else kept.push(`${KIND[kind]} ${name} (cancelled: ${cancelled ? "yes" : c.error}; delete ${d.status} ${text(d)})`);
+  }
+  const headsBack = [];
+  for (const [herd, was] of Object.entries(ctx.shoatBefore || {})) {
+    const now = msgOf(await get(`${SH}.shoat_herd.shoat_herd`, { herd })).herd.head.total;
+    if (now !== was) headsBack.push(`${herd} ${now} (was ${was})`);
+  }
+  return { removed, kept, headsBack, pairedOnly };
+}
+// A cancel that the server declines is data, not a crash: keep going and report it.
+const msgOf2 = (r) => r.data?.message ?? { error: `HTTP ${r.status}` };
+
+await shoatReads();
 if (WRITE) {
   if (rows.every((r) => r.ok)) await writes();
   else rows.push({ group: "write", name: "writes skipped: the reads above failed", ok: false, note: "" });
+  if (ctx.shoatHerds && ctx.shoatOpts) await shoatWrites();
 }
 if (NONEMP_USER && NONEMP_PASS) {
   ctx.animal ||= "x";
@@ -623,9 +846,21 @@ if (WRITE && CLEANUP && created.length) {
   }
 }
 
+if (WRITE && CLEANUP && shoatCreated.length) {
+  try {
+    await login(USER, PASS);
+    const s = await shoatCleanup();
+    rows.push({ group: "cleanup", name: `shoats: cancelled and removed what the run created (${shoatCreated.length} documents)`, ok: s.kept.length === 0, note: (s.kept.length ? `KEPT ${s.kept.join(" | ")}`.slice(0, 800) : `${s.removed} removed`) + (s.pairedOnly.length ? `; ${s.pairedOnly.length} transfer pair events left CANCELLED (each links the other, the API cannot delete them; no effect on head): ${s.pairedOnly.join(", ")}` : "") });
+    rows.push({ group: "cleanup", name: "shoats: every herd's head is back where it began", ok: s.headsBack.length === 0, note: s.headsBack.join(" | ") || "all heads restored" });
+  } catch (e) {
+    rows.push({ group: "cleanup", name: "shoats cleanup", ok: false, note: String(e.message || e) });
+  }
+}
+
 const w = Math.max(...rows.map((r) => r.name.length));
 for (const r of rows) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name.padEnd(w)}  ${r.note}`);
 const bad = rows.filter((r) => !r.ok).length;
 console.log(`\n${rows.length - bad}/${rows.length} passed`);
 if (created.length) console.log("CREATED " + JSON.stringify(created));
+if (shoatCreated.length) console.log("SHOAT RECORDS " + JSON.stringify(shoatCreated));
 process.exit(bad ? 1 : 0);
