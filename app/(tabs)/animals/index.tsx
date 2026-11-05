@@ -18,6 +18,7 @@ import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimalGroups } from "@/src/stores/animalGroups";
+import { sexMatches, useAnimalSexFilter, type SexFilter } from "@/src/stores/animalSexFilter";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { breedingCards } from "@/src/beef/breeding";
 import { useBeefSettings, useHerdFacts, useHerds, type HerdFacts } from "@/src/hooks/useHerds";
@@ -29,6 +30,12 @@ const FILTERS = [
   { id: "heifer", label: "Heifers" },
   { id: "calf", label: "Calves" },
   { id: "incalf", label: "In-calf" },
+  { id: "bulls", label: "Bulls" },
+];
+
+const SEX_FILTERS: { id: SexFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "cows", label: "Cows" },
   { id: "bulls", label: "Bulls" },
 ];
 
@@ -69,6 +76,8 @@ export default function Animals() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [filter, setFilter] = useState("all");
+  const sexFilter = useAnimalSexFilter((st) => st.value);
+  const setSexFilter = useAnimalSexFilter((st) => st.set);
   const [query, setQuery] = useState("");
   const [showTop, setShowTop] = useState(false);
   const listRef = useRef<SectionList<Animal>>(null);
@@ -97,7 +106,14 @@ export default function Animals() {
     return out;
   }, [animals, matchers]);
 
-  const list = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
+  // Search and the herd filter first; the All / Cows / Bulls counts follow them.
+  const scoped = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
+  const sexCounts = useMemo(() => {
+    const out: Record<SexFilter, number> = { all: scoped.length, cows: 0, bulls: 0 };
+    for (const a of scoped) out[a.sex === "M" ? "bulls" : "cows"] += 1;
+    return out;
+  }, [scoped]);
+  const list = useMemo(() => scoped.filter((a) => sexMatches(sexFilter, a.sex)), [scoped, sexFilter]);
 
   // Group the filtered list by herd.
   const groups = useMemo(() => {
@@ -167,6 +183,11 @@ export default function Animals() {
           style={s.input}
         />
       </View>
+      <Chips>
+        {SEX_FILTERS.map((f) => (
+          <Chip key={f.id} label={`${f.label} ${sexCounts[f.id]}`} active={sexFilter === f.id} onPress={() => setSexFilter(f.id)} />
+        ))}
+      </Chips>
       <Chips>
         {FILTERS.map((f) => (
           <Chip key={f.id} label={`${f.label} ${counts[f.id] ?? 0}`} active={filter === f.id} onPress={() => setFilter(f.id)} />
