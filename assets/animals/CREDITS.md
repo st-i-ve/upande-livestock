@@ -10,3 +10,9 @@ Shown when an animal has no photo of her own. Cropped square and resized to 512p
 | photo-bull.jpg | https://commons.wikimedia.org/wiki/File:Holstein_Friesian_bull_in_Belarus.jpg | Homoatrox | CC BY-SA 3.0 |
 
 The photos are cropped and resized; the BY-SA photos (heifer, bull) stay under their original licence.
+
+Young male / steer (added for the beef app):
+
+| File | Source | Author | Licence |
+|---|---|---|---|
+| photo-steer.jpg | https://commons.wikimedia.org/wiki/File:Bos_taurus_indicus_(cropped).jpg | Scott Bauer, USDA ARS | Public domain |
