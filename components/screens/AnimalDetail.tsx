@@ -12,6 +12,7 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { StandingSection } from "@/components/StandingSection";
 import { Timeline } from "@/components/Timeline";
+import { MaleCycle } from "@/components/MaleCycle";
 import { AnimalImage } from "@/components/AnimalImage";
 import { AnimalPhotos, Viewer } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
@@ -113,6 +114,8 @@ export function AnimalDetail({ id }: { id: string }) {
   }
 
   const kind = kindOf({ ...a, stage });
+  const male = a.sex === "M";
+  const heroLabel = (stage === "bull" && profile?.cycle?.class) || (stage ? (STAGE_LABELS[stage] ?? stage) : "");
   const isFemaleAdult = kind === "cow" || kind === "heifer";
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
   // Weight is the first thing a herdsman does with an animal, so it comes first.
@@ -159,7 +162,7 @@ export function AnimalDetail({ id }: { id: string }) {
           <View style={s.heroRow}>
             {stage ? (
               <View style={s.heroBadge}>
-                <Text style={s.heroBadgeText}>{STAGE_LABELS[stage] ?? stage}</Text>
+                <Text style={s.heroBadgeText}>{heroLabel}</Text>
               </View>
             ) : null}
             <Text style={s.heroMeta} numberOfLines={1}>
@@ -179,12 +182,16 @@ export function AnimalDetail({ id }: { id: string }) {
         onWeigh={() => router.push(`/(tabs)/animals/act/weight?animal=${encodeURIComponent(id)}` as never)}
       />
 
+      {male && profile?.cycle && stage !== "retired" && stage !== "unknown" ? (
+        <MaleCycle cycle={profile.cycle} stage={stage ?? profile.stage} cached={profile.cached} />
+      ) : null}
+
       <View style={s.facts}>
         <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
         <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
         <Fact label="Dam" value={a.dam || "—"} />
         <Fact label="Sire" value={a.sire || "—"} />
-        <Fact label="Parity" value={String(a.parity ?? 0)} />
+        {male ? null : <Fact label="Parity" value={String(a.parity ?? 0)} />}
         {a.stream ? <Fact label="Stream" value={a.stream} /> : null}
       </View>
 
