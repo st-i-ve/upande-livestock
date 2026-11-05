@@ -18,6 +18,7 @@ export const useAnimalProfile = (id: string | undefined) =>
     enabled: !!id,
     staleTime: 60_000,
     retry: 1,
+    networkMode: "always",
   });
 
 /** How she stands against her herd and group. Falls back to the last saved answer offline. */

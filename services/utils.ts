@@ -44,8 +44,33 @@ export const STAGE_LABELS: Record<string, string> = {
   open: "Open",
   served: "Served",
   confirmed: "In calf",
+  dry: "Dry",
+  calf: "Calf",
+  weaner: "Weaner",
+  grower: "Grower",
+  finisher: "Finisher",
+  market: "Market-ready",
+  steer: "Young male",
+  bull: "Breeding bull",
+  unknown: "Unknown",
   retired: "Left the herd",
 };
+
+/** The desk's one-line note under each stage. */
+export const STAGE_NOTES: Record<string, string> = {
+  calf: "on the dam",
+  weaner: "weaned, building frame",
+  grower: "growing out",
+  finisher: "on finishing feed",
+  market: "at sale weight",
+  steer: "not yet weighed",
+  bull: "kept for breeding",
+  unknown: "sex not recorded",
+  retired: "no longer on the farm",
+};
+
+/** A male's liveweight ladder, lowest first. */
+export const GROWTH_ORDER = ["calf", "weaner", "grower", "finisher", "market"] as const;
 
 /** Age the way the desk's portrait writes it: "12d", "6w", "14m", "2y 3m". */
 export function ageFrom(bornOn: string | null | undefined, now = new Date()): string {

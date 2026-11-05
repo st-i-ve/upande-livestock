@@ -1,5 +1,7 @@
 import type { Animal } from "@/types";
+import { useAuthStore } from "@/src/auth/authStore";
 import { getClient } from "@/src/services/api";
+import { storage } from "@/src/services/storage";
 
 type AnimalRow = Record<string, any>;
 
@@ -56,6 +58,41 @@ const mapAnimalDetail = (row: AnimalRow): AnimalDetail => ({
 const ANIMAL_PROFILE =
   "/api/method/upande_livestock.serverscripts.animals.animal_profile.animal_profile";
 
+export type GrowthState = {
+  kg: number;
+  stage: string;
+  fromKg: number;
+  nextStage: string | null;
+  nextKg: number | null;
+  /** How far through the current band, 0-100. */
+  pct: number;
+  /** kg/day; null until two weighings exist. */
+  adg: number | null;
+  daysToNext: number | null;
+  /** Null when the move into the Fattening herd was never recorded. */
+  daysOnFeed: number | null;
+  weighedOn: string | null;
+};
+
+export type BullState = {
+  state: "At rest" | "In breeding cycle";
+  lastService: string | null;
+  reason: string;
+};
+
+/** The server picks the cycle by sex: repro (females), growth ladder, bull, unknown, retired. */
+export type CycleState = {
+  kind?: "repro" | "growth" | "bull" | "unknown" | "retired";
+  stage: string;
+  /** "Breeding bull" or "Young bull". */
+  class?: string;
+  growth?: GrowthState | null;
+  bull?: BullState;
+  dayInStage?: number;
+  nextUp?: string;
+  nextOn?: string | null;
+};
+
 export type AnimalProfile = {
   id: string;
   name: string;
@@ -63,29 +100,50 @@ export type AnimalProfile = {
   herd: string;
   breed: string | null;
   bornOn: string | null;
-  stage: "heifer" | "fresh" | "open" | "served" | "confirmed" | "retired";
+  stage: string;
   photo: string | null;
+  /** ~240 px version of `photo`. */
+  thumb?: string | null;
   dam: string | null;
   sire: string | null;
-  cycle?: Record<string, unknown>;
+  cycle?: CycleState;
   /** Weight and daily-gain trend; ADG is null until two weighings exist. */
   gain?: {
     trend: { date: string; weight_kg: number; adg_kg: number | null }[];
     lifetime_adg: number | null;
     herd_adg: number | null;
     target_adg_kg: number | null;
-  };};
+  };
+  /** True when this is the last saved answer, shown because the phone is offline. */
+  cached?: boolean;
+};
+
+const profileKey = (id: string) => `animal-profile:${useAuthStore.getState().instanceUrl}:${id}`;
 
 /**
- * What the desk's Animals page shows about her — the same `animal_profile` call,
- * so the stage and the facts read the same on both. Online only; the phone's
- * local copy answers when there is no signal.
+ * What the desk's Animals page shows about the animal (the same `animal_profile`
+ * call, so stage and cycle read the same on both). The last answer is kept per
+ * site and animal, so one looked at once still opens without signal.
  */
 export const getAnimalProfile = async (id: string): Promise<AnimalProfile | null> => {
-  const client = await getClient();
-  const res = await client.post(ANIMAL_PROFILE, { payload: { animal: id } });
-  const m = res.data?.message;
-  return m && !m.error ? (m as AnimalProfile) : null;
+  try {
+    const client = await getClient();
+    const res = await client.post(ANIMAL_PROFILE, { payload: { animal: id } });
+    const m = res.data?.message;
+    if (!m || m.error) return null;
+    await storage.setItem(profileKey(id), JSON.stringify(m)).catch(() => {});
+    return m as AnimalProfile;
+  } catch (err) {
+    const raw = await storage.getItem(profileKey(id)).catch(() => null);
+    if (raw) {
+      try {
+        return { ...(JSON.parse(raw) as AnimalProfile), cached: true };
+      } catch {
+        /* fall through */
+      }
+    }
+    throw err;
+  }
 };
 
 /**
