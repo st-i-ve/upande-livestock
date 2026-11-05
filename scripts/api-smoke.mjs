@@ -168,7 +168,7 @@ await step("read", "mobile.get_bootstrap_bundle: settings block", async () => {
   ctx.beef = m.settings;
   return `separation ${m.settings.calf_separation_age_days} d, service default ${m.settings.default_service_type}`;
 });
-const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage", "repro_status", "image", "dam", "sire", "parity", "last_weight_kg", "modified"];
+const SYNC_FIELDS = ["name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage", "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "modified"];
 await step("read", "mobile.animals_since full (offline store at login)", async () => {
   const m = msgOf(await get(`${M}.mobile.animals_since.animals_since`));
   need(m, ["server_time", "animals", "removed"], "animals_since");
@@ -199,6 +199,24 @@ await step("read", "animals.animal_profile (weight / gain block)", async () => {
   const m = msgOf(await post(`${M}.animals.animal_profile.animal_profile`, { payload: { animal: ctx.animal } }));
   need(m, ["id", "stage", "gain"], "profile");
   need(m.gain, ["trend", "lifetime_adg", "herd_adg", "target_adg_kg"], "gain");
+});
+await step("read", "animals.animal_profile by sex: bull status, steer growth ladder, cow without male cycle", async () => {
+  const live = (ctx.animals || []).filter((a) => a.stage !== "retired");
+  const males = live.filter((a) => a.sex?.[0] === "M");
+  const bull = males.find((a) => a.stage === "bull");
+  const steer = males.find((a) => ["weaner", "grower", "finisher", "market", "steer"].includes(a.stage));
+  const cow = live.find((a) => a.sex?.[0] === "F" && !["calf", "heifer"].includes(a.stage));
+  const seen = [];
+  for (const [label, a] of [["bull", bull], ["steer", steer], ["cow", cow]]) {
+    if (!a) { seen.push(`${label}: none in the seed`); continue; }
+    const m = msgOf(await post(`${M}.animals.animal_profile.animal_profile`, { payload: { animal: a.name } }));
+    need(m, ["stage", "cycle", "thumb"], `${label} profile`);
+    if (label === "bull") check(m.cycle.kind === "bull" && ["At rest", "In breeding cycle"].includes(m.cycle.bull?.state), `bull cycle ${JSON.stringify(m.cycle).slice(0, 120)}`);
+    if (label === "steer") check(m.cycle.kind === "growth", `steer cycle kind ${m.cycle.kind}`);
+    if (label === "cow") check(!m.cycle.growth && !m.cycle.bull, "a cow must not carry the male cycle");
+    seen.push(`${label} ${a.name} ${m.stage}`);
+  }
+  return seen.join("; ");
 });
 await step("read", "animals.animal_standing", async () => {
   const m = msgOf(await post(`${M}.animals.animal_standing.animal_standing`, { payload: { animal: ctx.animal } }));
