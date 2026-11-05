@@ -45,5 +45,5 @@ export function kindOf(a: KindFacts | null | undefined): AnimalKind {
   if (a.stage === "calf" || a.repro === "Calf" || (!a.stage && young)) return "calf";
   if (male) return a.stage === "bull" ? "bull" : "steer";
   if (a.stage === "heifer") return "heifer";
-  return female || a.stage ? "cow" : "steer";
+  return female ? "cow" : "steer";
 }
