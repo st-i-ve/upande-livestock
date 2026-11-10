@@ -5,7 +5,7 @@ import { dueLine, optionOf, separationRemarks } from "@/src/beef/separation";
 describe("Mutara app identity", () => {
   const e = app.expo as any;
   it("has its own name, slug, scheme and packages (installs beside Kaitet's)", () => {
-    expect(e.name).toBe("Upande Livestock Mutara");
+    expect(e.name).toBe("Upande Livestock");
     expect(e.slug).toBe("upande-livestock-mutara");
     expect(e.scheme).toBe("upandelivestockmutara");
     expect(e.android.package).toBe("com.upande.livestockmutara");

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Upande Livestock Mutara",
+    "name": "Upande Livestock",
     "slug": "upande-livestock-mutara",
     "version": "1.1.0",
     "orientation": "portrait",
@@ -52,8 +52,8 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Upande Livestock Mutara uses the camera to photograph a newborn calf so the picture lands on the animal's record.",
-          "photosPermission": "Upande Livestock Mutara needs access to your photos only if you choose an existing picture instead of taking one."
+          "cameraPermission": "Upande Livestock uses the camera to photograph a newborn calf so the picture lands on the animal's record.",
+          "photosPermission": "Upande Livestock needs access to your photos only if you choose an existing picture instead of taking one."
         }
       ],
       "@react-native-community/datetimepicker",
