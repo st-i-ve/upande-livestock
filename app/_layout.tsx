@@ -1,3 +1,5 @@
+import '../src/mobile-kit';
+import { MobileKitProvider } from '@upande/mobile-kit';
 import "@/src/theme/patchText";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -162,6 +164,7 @@ export default function RootLayout() {
   }
 
   return (
+    <MobileKitProvider>
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: palette.bg }}>
         <SafeAreaProvider>
@@ -184,5 +187,6 @@ export default function RootLayout() {
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
+    </MobileKitProvider>
   );
 }

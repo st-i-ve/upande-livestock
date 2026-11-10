@@ -10,7 +10,7 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/0640a515-d7f3-4710-a550-8cf6b8934b7e"
+      "url": "https://kaitet.132.145.18.63.nip.io/api/method/upande_mobile.api.ota.manifest?app=Upande%20Livestock"
     },
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
@@ -57,7 +57,9 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      "@upande/mobile-kit",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -68,6 +70,20 @@
       "router": {},
       "eas": {
         "projectId": "0640a515-d7f3-4710-a550-8cf6b8934b7e"
+      },
+      "otaBaseUrl": "https://upandeltd.github.io/upande-livestock-kaitet-releases/ota",
+      "mobileKit": {
+        "_help": "All of the kit's settings for this app live here. Edit the lists under \"release\"; the kit manages nativeBaseline and apkTag itself.",
+        "sites": {
+          "production": "https://kaitet.132.145.18.63.nip.io"
+        },
+        "versionCodeBase": 0,
+        "runtimeMajorBase": 0,
+        "release": {
+          "_help": "Decides APK or OTA for you. \"apk\": folders/files (globs) that need a new APK when they change, e.g. \"modules/**\". \"ota\": folders/files that are safe over the air, e.g. \"assets/fonts/**\". Built in: app/**, src/**, tests, docs, *.md are OTA; android/**, ios/**, patches/**, plugins/** are APK. A changed file in neither list builds an APK to be safe, and the release says which file to list.",
+          "apk": [],
+          "ota": []
+        }
       }
     }
   }

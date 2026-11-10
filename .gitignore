@@ -41,3 +41,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# @upande/mobile-kit: local answers and backups (not for git)
+upande-mobile-kit.json
+.upande-mobile-kit/
