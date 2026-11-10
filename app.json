@@ -10,7 +10,7 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/f6f49a81-310e-4c2d-a446-6641bfc3e0c9"
+      "url": "https://mutara.fsn.frappe.cloud/api/method/upande_mobile.api.ota.manifest?app=Upande%20Livestock"
     },
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
@@ -61,7 +61,9 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      "@upande/mobile-kit",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -72,7 +74,63 @@
       "router": {},
       "eas": {
         "projectId": "f6f49a81-310e-4c2d-a446-6641bfc3e0c9"
-      }
+      },
+      "otaBaseUrl": "https://st-i-ve.github.io/upande-livestock/ota",
+      "mobileKit": {
+        "_help": "All of the kit's settings for this app live here. Edit the lists under \"release\"; the kit manages nativeBaseline and apkTag itself.",
+        "sites": {
+          "production": "https://mutara.fsn.frappe.cloud"
+        },
+        "versionCodeBase": 0,
+        "runtimeMajorBase": 0,
+        "release": {
+          "_help": "Decides APK or OTA for you. \"apk\": folders/files (globs) that need a new APK when they change, e.g. \"modules/**\". \"ota\": folders/files that are safe over the air, e.g. \"assets/fonts/**\". Built in: app/**, src/**, tests, docs, *.md are OTA; android/**, ios/**, patches/**, plugins/** are APK. A changed file in neither list builds an APK to be safe, and the release says which file to list.",
+          "apk": [],
+          "ota": []
+        },
+        "nativeBaseline": {
+          "hash": "408e3db40951",
+          "parts": {
+            "@react-native-async-storage/async-storage": "2.2.0",
+            "@react-native-community/datetimepicker": "9.1.0",
+            "@react-native-community/netinfo": "12.0.1",
+            "@upande/mobile-kit (native modules and plugins)": "2caf04d881ff",
+            "expo": "57.0.28",
+            "expo-battery": "57.0.3",
+            "expo-constants": "57.0.21",
+            "expo-device": "57.0.2",
+            "expo-file-system": "57.0.7",
+            "expo-font": "57.0.4",
+            "expo-haptics": "57.0.3",
+            "expo-image": "57.0.5",
+            "expo-image-picker": "57.0.20",
+            "expo-intent-launcher": "57.0.1",
+            "expo-linking": "57.0.12",
+            "expo-local-authentication": "57.0.3",
+            "expo-localization": "57.0.2",
+            "expo-network": "57.0.3",
+            "expo-router": "57.0.26",
+            "expo-splash-screen": "57.0.10",
+            "expo-sqlite": "57.0.4",
+            "expo-status-bar": "57.0.1",
+            "expo-symbols": "57.0.3",
+            "expo-system-ui": "57.0.4",
+            "expo-updates": "57.0.26",
+            "expo-web-browser": "57.0.3",
+            "jest-expo": "57.0.6",
+            "react-native": "0.86.3",
+            "react-native-gesture-handler": "2.32.0",
+            "react-native-reanimated": "4.5.1",
+            "react-native-safe-area-context": "5.7.0",
+            "react-native-screens": "4.26.2",
+            "react-native-svg": "15.15.4",
+            "react-native-worklets": "0.10.1",
+            "app.json (native fields)": "0d045898228e"
+          }
+        },
+        "apkTag": "v1.1.1"
+      },
+      "runtimeSdk": 57
     },
     "owner": "stivewithani"
   }
