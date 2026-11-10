@@ -37,7 +37,7 @@ permissions:
 
 jobs:
   release:
-    uses: mark-judah/upande-mobile-kit/.github/workflows/release.yml@v0.18.1
+    uses: mark-judah/upande-mobile-kit/.github/workflows/release.yml@49294e873342fbe253f56246e91c0b254c708da2
     with:
       app-name: "Upande Livestock"
       apk-name: upande_livestock
