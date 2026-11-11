@@ -63,7 +63,9 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     meta: { fontSize: 11, color: c.textMuted, marginTop: 1 },
     cell: {
       width: 84,
-      height: 40,
+      // A floor, not a fixed height: at the larger text sizes the figure must not clip.
+      minHeight: 40,
+      paddingVertical: 4,
       borderWidth: 1,
       borderColor: c.border,
       borderRadius: RADIUS.md,

@@ -15,8 +15,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import React from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Appearance, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -106,6 +107,7 @@ export default function RootLayout() {
   const hydrateType = useAnimalType((s) => s.hydrate);
   const typeHydrated = useAnimalType((s) => s.hydrated);
   const hydrated = useThemeStore((s) => s.hydrated);
+  const themeOverride = useThemeStore((s) => s.override);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const authLoading = useAuthStore((s) => s.isLoading);
   const signedIn = useAuthStore((s) => s.isAuthenticated);
@@ -116,6 +118,20 @@ export default function RootLayout() {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+
+  // The theme chosen in Profile > Accessibility reaches native UI too (date
+  // pickers, alerts, the window behind a modal), not only our own palette.
+  React.useEffect(() => {
+    if (!hydrated) return;
+    try {
+      Appearance.setColorScheme(themeOverride ?? "unspecified");
+    } catch {
+      // older native module: our own palette still follows the choice
+    }
+  }, [hydrated, themeOverride]);
+  React.useEffect(() => {
+    SystemUI.setBackgroundColorAsync(palette.bg).catch(() => {});
+  }, [palette.bg]);
 
   React.useEffect(() => {
     hydrate();
@@ -197,6 +213,7 @@ export default function RootLayout() {
                 <Stack.Screen name="nutritionist" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="(shoats)" />
+                <Stack.Screen name="accessibility" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
               </Stack>
               <StatusBar style={dark ? "light" : "dark"} />
             </ThemeProvider>

@@ -15,12 +15,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { OnlineDot } from "@/components/OnlineDot";
 import { SyncBar } from "@/components/SyncBar";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
 import { LABEL, useAnimalType } from "@/src/shoats/animalType";
+import { textStepOf } from "@/src/theme/textScale";
+import { useTextScale, useThemePref } from "@/src/theme/themeStore";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -91,6 +92,8 @@ export default function Profile() {
   const isEmployee = useAuthStore((s) => s.isEmployee);
   const ota = useOtaUpdate();
   const animalType = useAnimalType((x) => x.type);
+  const themePref = useThemePref();
+  const textStep = textStepOf(useTextScale());
 
   const displayName = fullname || email || "Signed in";
   const subtitle = email ?? "";
@@ -134,7 +137,6 @@ export default function Profile() {
             label={`Animal type · ${animalType ? LABEL[animalType] : "not chosen"}`}
             onPress={() => router.push("/choose")}
           />
-          <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
           <Row
             icon="cloud-download-outline"
             label={OTA_LABEL[ota.stage]}
@@ -145,6 +147,21 @@ export default function Profile() {
               ) : (
                 <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
               )
+            }
+          />
+
+          <Subheader>Accessibility</Subheader>
+          <Row
+            icon="format-size"
+            label="Text size & theme"
+            onPress={() => router.push("/accessibility")}
+            right={
+              <View style={s.rowValue}>
+                <Text style={s.rowValueText} numberOfLines={1}>
+                  {textStep.label} · {themePref === "system" ? "System" : themePref === "dark" ? "Dark" : "Light"}
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
+              </View>
             }
           />
 
@@ -296,6 +313,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       fontSize: 14,
       fontFamily: FONT_FAMILY.regular,
     },
+    rowValue: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 1, maxWidth: "50%" },
+    rowValueText: { fontSize: 13, color: c.textMuted, flexShrink: 1 },
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.borderSubtle,

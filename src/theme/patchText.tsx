@@ -1,6 +1,8 @@
 import React from "react";
 
 import { fontFamilyFor } from "@/constants/theme";
+import { maxOsMultiplier, scaleSize } from "@/src/theme/textScale";
+import { useThemeStore } from "@/src/theme/themeStore";
 
 // RN 0.81's Text is a plain function component (no `.render`), so the old
 // Text.render monkey-patch was a silent no-op. Instead we redefine the
@@ -34,6 +36,29 @@ function snapFontSize(size: number | undefined): number | undefined {
   return 26;
 }
 
+// RN's own default when a Text sets no size.
+const RN_DEFAULT_SIZE = 14;
+
+/**
+ * The text size step from Profile > Accessibility, applied here so every Text
+ * and TextInput follows it without each screen knowing. A size (and a numeric
+ * line height, which would otherwise clip the larger glyphs) is multiplied by
+ * the app's scale; the phone's own font scale still applies on top, limited by
+ * `maxFontSizeMultiplier` so the two together stay under the cap. A nested Text
+ * with no size inherits its parent's, already scaled, so it is left alone.
+ * Text that opts out of font scaling (`allowFontScaling={false}`: every
+ * @expo/vector-icons glyph, so icons in a tab bar or a round button keep their
+ * box) is left at its size here too.
+ */
+function scaled(flat: any, fontSize: number | undefined, nested: boolean, scale: number) {
+  if (scale === 1) return fontSize != null ? { fontSize } : null;
+  const base = fontSize ?? (nested ? undefined : RN_DEFAULT_SIZE);
+  const out: { fontSize?: number; lineHeight?: number } = {};
+  if (base != null) out.fontSize = scaleSize(base, scale);
+  if (typeof flat?.lineHeight === "number") out.lineHeight = scaleSize(flat.lineHeight, scale);
+  return out;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const RN: any = require("react-native");
 
@@ -43,6 +68,8 @@ if (!RN.__poppinsTextPatched) {
 
   const PoppinsText = React.forwardRef(function PoppinsText(props: any, ref: any) {
     const nested = React.useContext(InText);
+    const appScale = useThemeStore((st) => st.textScale);
+    const scale = props.allowFontScaling === false ? 1 : appScale;
     const flat = StyleSheet.flatten(props.style);
     const own = flat?.fontFamily && !MONO.has(flat.fontFamily);
     const fontFamily = resolveFamily(flat);
@@ -51,7 +78,8 @@ if (!RN.__poppinsTextPatched) {
     const el = React.createElement(OriginalText, {
       ...props,
       ref,
-      style: [inherit ? null : { fontFamily }, props.style, inherit ? null : fontFamily === flat?.fontFamily ? null : { fontWeight: "normal" }, fontSize != null ? { fontSize } : null],
+      maxFontSizeMultiplier: props.maxFontSizeMultiplier ?? maxOsMultiplier(scale),
+      style: [inherit ? null : { fontFamily }, props.style, inherit ? null : fontFamily === flat?.fontFamily ? null : { fontWeight: "normal" }, scaled(flat, fontSize, nested, scale)],
     });
     return nested ? el : React.createElement(InText.Provider, { value: true }, el);
   });
@@ -60,13 +88,16 @@ if (!RN.__poppinsTextPatched) {
   // TextInput (and its placeholder) take their face from the style too.
   const OriginalInput = RN.TextInput;
   const PoppinsInput = React.forwardRef(function PoppinsInput(props: any, ref: any) {
+    const appScale = useThemeStore((st) => st.textScale);
+    const scale = props.allowFontScaling === false ? 1 : appScale;
     const flat = StyleSheet.flatten(props.style);
     const fontFamily = resolveFamily(flat);
     const fontSize = snapFontSize(flat?.fontSize);
     return React.createElement(OriginalInput, {
       ...props,
       ref,
-      style: [{ fontFamily }, props.style, { fontWeight: "normal" }, fontSize != null ? { fontSize } : null],
+      maxFontSizeMultiplier: props.maxFontSizeMultiplier ?? maxOsMultiplier(scale),
+      style: [{ fontFamily }, props.style, { fontWeight: "normal" }, scaled(flat, fontSize, false, scale)],
     });
   });
   (PoppinsInput as any).displayName = "PoppinsTextInput";
