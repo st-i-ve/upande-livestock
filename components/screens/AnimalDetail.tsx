@@ -29,10 +29,14 @@ import { useAnimalGallery } from "@/src/hooks/useAnimalGallery";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { visibleActions } from "@/src/beef/events";
 import type { TimelineEvent } from "@/components/Timeline";
 
 export function AnimalDetail({ id }: { id: string }) {
   const { canRecord } = useCanRecord();
+  // Quick actions for events the farm switched off are not offered.
+  const disabledEvents = useDisabledEvents();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   // The local copy answers first (and offline); the server adds what only it
@@ -134,7 +138,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const isFemaleAdult = kind === "cow" || kind === "heifer";
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
   // Weight is the first thing a herdsman does with an animal, so it comes first.
-  const actions: Action[] = [
+  const actions: Action[] = visibleActions<Action>([
     { label: "Weigh", route: "weight", icon: "scale" },
     { label: "Check up", route: "diagnosis", icon: "magnify" },
     ...(isFemaleAdult ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
@@ -143,7 +147,7 @@ export function AnimalDetail({ id }: { id: string }) {
     { label: "Vaccinate", route: "vaccination", icon: "needle" },
     { label: "Deworm", route: "deworming", icon: "bug-outline" },
     { label: "Move", route: "movement", icon: "arrow-left-right" },
-  ];
+  ], disabledEvents);
 
   return (
     <Screen

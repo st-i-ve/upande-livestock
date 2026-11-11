@@ -1,4 +1,6 @@
+import { isEventEnabled } from "@/src/beef/events";
 import { getClient } from "@/src/services/api";
+import { disabledEventsNow, loadDisabledEvents } from "@/src/services/disabledEvents";
 import { OpsError } from "./opsError";
 
 const BIRTH_CHECK = "upande_livestock.serverscripts.breeding.birth_check.birth_check";
@@ -32,7 +34,10 @@ export const birthCheck = async (dam: string, birthDate: string, serviceDate?: s
   const msg = res.data?.message;
   if (!msg) throw new OpsError("The birth check returned nothing.");
   if (msg.error) throw new OpsError(msg.error, msg.code, msg);
-  return msg as BirthCheck;
+  // A farm with Pregnancy Diagnosis switched off is not offered the optional
+  // diagnosis step on the retro path.
+  const pdOn = isEventEnabled("Pregnancy Diagnosis", await loadDisabledEvents());
+  return { ...(msg as BirthCheck), allow_diagnosis: !!msg.allow_diagnosis && pdOn };
 };
 
 /** The facts a `birth_needs_service` refusal carries, in the same shape as a check. */
@@ -51,6 +56,6 @@ export const checkFromRefusal = (details: Record<string, any> | undefined): Birt
     retro_refusal: details.retro_refusal ?? "",
     is_manager: !!details.is_manager,
     backdating_open: !!details.backdating_open,
-    allow_diagnosis: details.allow_diagnosis !== false,
+    allow_diagnosis: details.allow_diagnosis !== false && isEventEnabled("Pregnancy Diagnosis", disabledEventsNow()),
   };
 };

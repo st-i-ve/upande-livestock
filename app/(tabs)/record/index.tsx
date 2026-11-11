@@ -8,14 +8,19 @@ import { Pill } from "@/components/Pill";
 import { font } from "@/constants/theme";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
+import { visibleSections } from "@/src/beef/events";
 import { RECORD_SECTIONS } from "@/src/beef/records";
 import { useColors } from "@/src/hooks/useColors";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 import { useOffline } from "@/components/OnlineOnlyNotice";
 
 export default function Record() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const offline = useOffline();
+  // Events the farm switched off (Settings -> Events) are not offered.
+  const disabled = useDisabledEvents();
+  const sections = useMemo(() => visibleSections(RECORD_SECTIONS, disabled), [disabled]);
   return (
     <Screen title="Livestock events" subtitle="Pick what you observed or did">
       {offline ? (
@@ -23,7 +28,7 @@ export default function Record() {
           You are offline. Recording needs a connection: every entry is checked by the server live.
         </Banner>
       ) : null}
-      {RECORD_SECTIONS.map((sec) => (
+      {sections.map((sec) => (
         <View key={sec.title}>
           <SectionTitle style={s.section}>{sec.title}</SectionTitle>
           {sec.items.map((it) => (

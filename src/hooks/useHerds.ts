@@ -6,7 +6,7 @@ import { storage } from "@/src/services/storage";
 import type { Herd } from "@/types";
 
 /** One bootstrap call feeds the herd list and the beef settings. */
-const useBootstrap = () =>
+export const useBootstrap = () =>
   useQuery({
     queryKey: ["herds"],
     queryFn: getBootstrap,

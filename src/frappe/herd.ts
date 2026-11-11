@@ -1,4 +1,5 @@
 import type { Herd } from "@/types";
+import { mapDisabledEvents } from "@/src/beef/events";
 import { getClient } from "@/src/services/api";
 
 /**
@@ -57,7 +58,12 @@ export const mapBeefSettings = (m: Record<string, any> | undefined): BeefSetting
   };
 };
 
-export type Bootstrap = { herds: Herd[]; settings: BeefSettings };
+export type Bootstrap = {
+  herds: Herd[];
+  settings: BeefSettings;
+  /** Livestock Event Types the farm switched off; [] from a server that does not send it. */
+  disabledEvents: string[];
+};
 
 export const getBootstrap = async (): Promise<Bootstrap> => {
   const client = await getClient();
@@ -67,6 +73,7 @@ export const getBootstrap = async (): Promise<Bootstrap> => {
   return {
     herds: ((msg.herds ?? []) as any[]).map(mapHerd),
     settings: mapBeefSettings(msg.settings),
+    disabledEvents: mapDisabledEvents(msg.disabled_events),
   };
 };
 
