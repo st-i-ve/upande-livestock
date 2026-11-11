@@ -13,13 +13,15 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { StandingSection } from "@/components/StandingSection";
 import { Timeline } from "@/components/Timeline";
 import { MaleCycle } from "@/components/MaleCycle";
+import { FamilyTree, SireRecord } from "@/components/FamilyTree";
+import { sectionsFor } from "@/src/family";
 import { AnimalImage } from "@/components/AnimalImage";
 import { AnimalPhotos, Viewer } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { kindOf } from "@/src/animalKind";
 import { extractFrappeError } from "@/src/services/api";
 import type { AnimalProfile } from "@/src/frappe/animal";
-import { useAnimal, useAnimalProfile } from "@/src/hooks/useAnimal";
+import { useAnimal, useAnimalFamily, useAnimalProfile } from "@/src/hooks/useAnimal";
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
 import { useAnimalGallery } from "@/src/hooks/useAnimalGallery";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
@@ -37,6 +39,8 @@ export function AnimalDetail({ id }: { id: string }) {
   const online = useAnimal(id);
   const profileQ = useAnimalProfile(id);
   const profile = profileQ.data ?? null;
+  const familyQ = useAnimalFamily(id);
+  const family = familyQ.data ?? null;
   const gallery = useAnimalGallery(id).data?.photos ?? [];
   const [viewing, setViewing] = useState<number | null>(null);
   const a = local.data
@@ -57,6 +61,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const refetch = () => {
     online.refetch();
     profileQ.refetch();
+    familyQ.refetch();
   };
   const {
     data: events,
@@ -115,6 +120,13 @@ export function AnimalDetail({ id }: { id: string }) {
 
   const kind = kindOf({ ...a, stage });
   const male = a.sex === "M";
+  // By sex: a male never shows her figures; a breeding male shows his record as a sire.
+  const sections = sectionsFor({
+    sex: a.sex,
+    stage,
+    stream: a.stream ?? null,
+    breedingBull: family?.breedingBull ?? null,
+  });
   const heroLabel = (stage === "bull" && profile?.cycle?.class) || (stage ? (STAGE_LABELS[stage] ?? stage) : "");
   const isFemaleAdult = kind === "cow" || kind === "heifer";
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
@@ -186,12 +198,13 @@ export function AnimalDetail({ id }: { id: string }) {
         <MaleCycle cycle={profile.cycle} stage={stage ?? profile.stage} cached={profile.cached} />
       ) : null}
 
+      {sections.bull && family?.bred ? <SireRecord bred={family.bred} offspring={family.offspring.length} /> : null}
+
       <View style={s.facts}>
         <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
         <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
-        <Fact label="Dam" value={a.dam || "—"} />
-        <Fact label="Sire" value={a.sire || "—"} />
-        {male ? null : <Fact label="Parity" value={String(a.parity ?? 0)} />}
+        {sections.female ? <Fact label="Parity" value={String(a.parity ?? 0)} /> : null}
+        {male ? <Fact label="Kept for" value={sections.bull ? "Breeding" : "Beef (steer)"} /> : null}
         {a.stream ? <Fact label="Stream" value={a.stream} /> : null}
       </View>
 
@@ -228,7 +241,13 @@ export function AnimalDetail({ id }: { id: string }) {
 
       <AnimalPhotos id={id} isCalf={kind === "calf"} hasCalved={isFemaleAdult && (a.parity ?? 0) > 0} />
 
-      <StandingSection id={id} />
+      <FamilyTree
+        family={family}
+        loading={familyQ.isLoading}
+        me={{ id: a.id, name: a.name, sex: a.sex, dob: a.dob, stage, image: a.image ?? profile?.photo, thumb: a.thumb ?? profile?.thumb }}
+      />
+
+      <StandingSection id={id} male={male} />
 
       <SectionTitle>History</SectionTitle>
       {eventsLoading ? (

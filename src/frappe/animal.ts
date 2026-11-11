@@ -1,4 +1,5 @@
 import type { Animal } from "@/types";
+import type { Family } from "@/src/family";
 import { useAuthStore } from "@/src/auth/authStore";
 import { getClient } from "@/src/services/api";
 import { storage } from "@/src/services/storage";
@@ -182,4 +183,36 @@ export const getAnimal = async (id: string): Promise<AnimalDetail | null> => {
     detail.inTreatment = 1;
   }
   return detail;
+};
+
+const ANIMAL_FAMILY =
+  "/api/method/upande_livestock.serverscripts.animals.animal_family.animal_family";
+
+const familyKey = (id: string) => `animal-family:${useAuthStore.getState().instanceUrl}:${id}`;
+
+/**
+ * Her dam and sire, every calf she or he left (sold and dead ones too, with
+ * their status), and a male's record as a sire. The last answer is kept, like
+ * the profile; with neither signal nor a saved answer, null (the caller works
+ * it out from the phone's own animals).
+ */
+export const getAnimalFamily = async (id: string): Promise<Family | null> => {
+  try {
+    const client = await getClient();
+    const res = await client.post(ANIMAL_FAMILY, { payload: { animal: id } });
+    const m = res.data?.message;
+    if (!m || m.error) return null;
+    await storage.setItem(familyKey(id), JSON.stringify(m)).catch(() => {});
+    return m as Family;
+  } catch {
+    const raw = await storage.getItem(familyKey(id)).catch(() => null);
+    if (raw) {
+      try {
+        return JSON.parse(raw) as Family;
+      } catch {
+        /* fall through */
+      }
+    }
+    return null;
+  }
 };

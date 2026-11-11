@@ -8,6 +8,7 @@ import { SectionTitle } from "@/components/SectionTitle";
 import type { Peers, StandingMetric } from "@/src/frappe/standing";
 import { useAnimalStanding } from "@/src/hooks/useAnimal";
 import { useColors } from "@/src/hooks/useColors";
+import { measuresFor } from "@/src/family";
 
 const fmt = (n: number | null, unit: string) =>
   n == null ? "—" : `${Number.isInteger(n) ? n : n.toFixed(1)}${unit ? ` ${unit}` : ""}`;
@@ -30,7 +31,8 @@ const verdict = (m: StandingMetric, p: Peers) =>
  * a better end, full is the good end), the tick is the middle. Online; the last
  * answer is kept and shown with its date when there is no signal.
  */
-export function StandingSection({ id }: { id: string }) {
+/** A male gets only the measures that mean something for him (no parity, no calving figures). */
+export function StandingSection({ id, male = false }: { id: string; male?: boolean }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const q = useAnimalStanding(id);
@@ -55,7 +57,7 @@ export function StandingSection({ id }: { id: string }) {
           <Text style={s.scope}>
             vs {d.herd.name} ({d.herd.n}) and {d.group.label} ({d.group.n})
           </Text>
-          {d.metrics.map((m) => (
+          {measuresFor(d.metrics, male).map((m) => (
             <MetricBar key={m.key} m={m} />
           ))}
         </View>
