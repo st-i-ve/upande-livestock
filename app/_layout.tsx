@@ -25,6 +25,7 @@ import "react-native-reanimated";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
+import { nutritionistOnly } from "@/src/auth/roles";
 import { startAnimalSync } from "@/src/db/sync";
 import { startRealtime } from "@/src/realtime/realtime";
 import { queryClient } from "@/src/services/queryClient";
@@ -63,6 +64,9 @@ function AuthGate() {
   const isLoading = useAuthStore((s) => s.isLoading);
   const animalType = useAnimalType((s) => s.type);
   const typeHydrated = useAnimalType((s) => s.hydrated);
+  // A user whose only livestock role is Livestock Nutritionist would be refused
+  // every screen here; they get one screen pointing at the web's Ration Editor.
+  const nutritionist = useAuthStore((s) => nutritionistOnly(s.roles));
 
   React.useEffect(() => {
     if (isLoading || !typeHydrated) return;
@@ -70,6 +74,10 @@ function AuthGate() {
     const inAuthGroup = top === "(auth)";
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
+    } else if (isAuthenticated && nutritionist) {
+      if (top !== "nutritionist" && top !== "mobile-kit") router.replace("/nutritionist");
+    } else if (isAuthenticated && top === "nutritionist") {
+      router.replace(homeOf(animalType));
     } else if (isAuthenticated && inAuthGroup) {
       // After login: straight to the animal type the phone remembers, else ask.
       router.replace(homeOf(animalType));
@@ -80,7 +88,7 @@ function AuthGate() {
       if (top === "(tabs)" && isShoats(animalType)) router.replace(homeOf(animalType));
       else if (top === "(shoats)" && animalType === "cattle") router.replace(homeOf(animalType));
     }
-  }, [isAuthenticated, isLoading, typeHydrated, animalType, segments, router]);
+  }, [isAuthenticated, isLoading, typeHydrated, animalType, segments, router, nutritionist]);
 
   return null;
 }
@@ -117,10 +125,12 @@ export default function RootLayout() {
 
   // Keep the local animals current while signed in: a sync now (the full set
   // on a first run) and a delta each time the app returns to the foreground.
+  // Not for a nutritionist-only user: the server lets that role read no animals.
+  const nutritionist = useAuthStore((s) => nutritionistOnly(s.roles));
   React.useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn || nutritionist) return;
     return startAnimalSync();
-  }, [signedIn]);
+  }, [signedIn, nutritionist]);
 
   // Live updates: a socket to the farm's server while signed in and in the
   // foreground, so what others record reaches this phone within seconds.
@@ -184,6 +194,7 @@ export default function RootLayout() {
               >
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="choose" />
+                <Stack.Screen name="nutritionist" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="(shoats)" />
               </Stack>
