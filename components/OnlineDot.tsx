@@ -101,7 +101,7 @@ export function OnlineDot() {
   );
 }
 
-function StatusSheet({ state, onClose }: { state: DotState; onClose: () => void }) {
+export function StatusSheet({ state, onClose }: { state: DotState; onClose: () => void }) {
   const c = useColors();
   const st = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();

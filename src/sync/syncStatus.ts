@@ -132,3 +132,52 @@ export const lastSyncedText = (ms: number | null, now = Date.now()): string => {
   const d = new Date(ms);
   return `Animals synced ${d.getDate()}/${d.getMonth() + 1}`;
 };
+
+// ---- the quiet summary in the bar's place when nothing is syncing ----
+
+/** "just now", "1 min ago", "12 min ago", "3 h ago", or the day: "9/11". */
+export const agoText = (ms: number, now = Date.now()): string => {
+  const diff = Math.max(0, now - ms);
+  if (diff < 60_000) return "just now";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
+  const d = new Date(ms);
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+};
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
+export type SummaryInput = {
+  /** What the phone holds: cattle as animals, shoats as herds and head. */
+  what: { animals: number | null } | { herds: number; head: number } | null;
+  /** When it was last brought up to date (epoch ms), null never. */
+  syncedAt: number | null;
+  now: number;
+  /** The last try failed (and none has succeeded since). */
+  failed?: boolean;
+  offline?: boolean;
+  /** Records kept for Continue recording. */
+  waiting?: number;
+};
+
+/**
+ * The line the sync bar's strip shows while nothing syncs:
+ * "All synced · 475 animals · 2 min ago · 1 record waiting",
+ * "All synced · 5 herds · 420 head · just now", "Offline · 475 animals · 3 h ago".
+ */
+export const summaryText = ({ what, syncedAt, now, failed, offline, waiting = 0 }: SummaryInput): string => {
+  const head = offline
+    ? "Offline"
+    : syncedAt === null
+      ? failed ? "Not synced" : "Not synced yet"
+      : failed ? "Last sync failed" : "All synced";
+  const parts = [head];
+  if (what && "animals" in what) {
+    if (what.animals !== null) parts.push(plural(what.animals, "animal", "animals"));
+  } else if (what) {
+    parts.push(plural(what.herds, "herd", "herds"), `${what.head.toLocaleString("en-US")} head`);
+  }
+  if (syncedAt !== null) parts.push(agoText(syncedAt, now));
+  if (waiting > 0) parts.push(plural(waiting, "record waiting", "records waiting"));
+  return parts.join(" · ");
+};

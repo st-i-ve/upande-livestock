@@ -112,7 +112,7 @@ export default function Profile() {
         <Text style={[s.appbarTitle, { flex: 1 }]}>Profile</Text>
         <OnlineDot />
       </View>
-      <SyncBar />
+      <SyncBar summary />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.userSection}>

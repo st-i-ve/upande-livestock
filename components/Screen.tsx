@@ -56,7 +56,7 @@ export function Screen({
         {/* A tab's first screen (no back) carries the connection dot, top right. */}
         {back ? null : <OnlineDot />}
       </View>
-      <SyncBar />
+      <SyncBar summary={!back} />
       {scroll ? (
         <ScrollView
           contentContainerStyle={[s.body, { paddingBottom: 24 + insets.bottom }]}
