@@ -9,6 +9,8 @@ export type ServerAnimal = {
   animal_name: string | null;
   sex: string | null;
   breed: string | null;
+  /** Feedlot | Breeding, for a male whose stream is decided. */
+  stream?: string | null;
   dob: string | null;
   herd: string | null;
   status: string | null;
@@ -29,7 +31,7 @@ export type ServerAnimal = {
 type Row = Omit<ServerAnimal, "dob"> & { dob: string | null };
 
 const COLS = [
-  "name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage",
+  "name", "tag", "animal_name", "sex", "breed", "stream", "dob", "herd", "status", "stage",
   "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "last_weight_date", "modified",
 ] as const;
 
@@ -85,6 +87,7 @@ const toAnimal = (r: Row): Animal => ({
   pregnant: String(r.repro_status ?? "").toLowerCase().includes("pregnant") ? 1 : 0,
   tag: r.tag,
   breed: r.breed,
+  stream: r.stream ?? null,
   image: r.image,
   thumb: r.thumb,
   dam: r.dam,

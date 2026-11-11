@@ -61,6 +61,13 @@ const MIGRATIONS: string[][] = [
     `ALTER TABLE animals ADD COLUMN last_weight_date TEXT`,
     `DELETE FROM meta WHERE key = 'animals_server_time'`,
   ],
+  // 5 -> 6: the stream (Feedlot / Breeding) a male was put in, shown on the
+  // animal page's picture even offline. Rows on the phone have none: drop the
+  // cursor, full sync.
+  [
+    `ALTER TABLE animals ADD COLUMN stream TEXT`,
+    `DELETE FROM meta WHERE key = 'animals_server_time'`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

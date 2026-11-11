@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { font } from "@/constants/theme";
 import { Banner } from "@/components/Banner";
@@ -19,6 +20,7 @@ import { AnimalImage } from "@/components/AnimalImage";
 import { AnimalPhotos, Viewer } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { kindOf } from "@/src/animalKind";
+import { heroInfo } from "@/src/heroInfo";
 import { extractFrappeError } from "@/src/services/api";
 import type { AnimalProfile } from "@/src/frappe/animal";
 import { useAnimal, useAnimalFamily, useAnimalProfile } from "@/src/hooks/useAnimal";
@@ -47,7 +49,7 @@ export function AnimalDetail({ id }: { id: string }) {
     ? {
         ...local.data,
         inTreatment: online.data?.inTreatment ?? 0,
-        stream: online.data?.stream ?? null,
+        stream: online.data?.stream ?? local.data.stream ?? null,
         breedingNote: online.data?.breedingNote ?? null,
         breedingNoteBy: online.data?.breedingNoteBy ?? null,
         breedingNoteOn: online.data?.breedingNoteOn ?? null,
@@ -128,6 +130,7 @@ export function AnimalDetail({ id }: { id: string }) {
     breedingBull: family?.breedingBull ?? null,
   });
   const heroLabel = (stage === "bull" && profile?.cycle?.class) || (stage ? (STAGE_LABELS[stage] ?? stage) : "");
+  const info = heroInfo({ sex: a.sex, breed: a.breed || profile?.breed, stream: a.stream });
   const isFemaleAdult = kind === "cow" || kind === "heifer";
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
   // Weight is the first thing a herdsman does with an animal, so it comes first.
@@ -168,6 +171,40 @@ export function AnimalDetail({ id }: { id: string }) {
         style={s.hero}
       >
         <AnimalImage image={a.image ?? profile?.photo} animal={{ ...a, stage }} style={s.heroPhoto} />
+        {/* Soft dark scrims top and bottom, so white labels read on any photo
+            and on the silhouette card in either theme. */}
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <Defs>
+            <LinearGradient id="heroTop" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#000" stopOpacity={0.5} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0} />
+            </LinearGradient>
+            <LinearGradient id="heroBottom" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#000" stopOpacity={0} />
+              <Stop offset="0.45" stopColor="#000" stopOpacity={0.35} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0.72} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100" height="26" fill="url(#heroTop)" />
+          <Rect x="0" y="48" width="100" height="52" fill="url(#heroBottom)" />
+        </Svg>
+        <View style={s.heroTop} pointerEvents="none" testID="hero-labels">
+          {info.sex ? (
+            <View style={s.heroChip} testID="hero-sex">
+              <MaterialCommunityIcons name={info.sex.icon} size={14} color="#fff" />
+              <Text style={s.heroChipText}>{info.sex.label}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          <View style={s.heroChips}>
+            {info.chips.map((chip) => (
+              <View key={chip.key} style={s.heroChip} testID={`hero-${chip.key}`}>
+                <Text style={s.heroChipText} numberOfLines={1}>{chip.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
         <View style={s.heroShade}>
           <Text style={s.heroName} numberOfLines={1}>{a.name}</Text>
           <Text style={s.heroId} numberOfLines={1}>{a.id}</Text>
@@ -320,8 +357,18 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     heroPhoto: { width: "100%", height: "100%" },
     heroShade: {
       position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, paddingTop: 36,
-      backgroundColor: "rgba(0,0,0,0.45)",
     },
+    heroTop: {
+      position: "absolute", left: 0, right: 0, top: 0, padding: 12,
+      flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8,
+    },
+    heroChips: { flexShrink: 1, flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 6 },
+    heroChip: {
+      flexDirection: "row", alignItems: "center", gap: 4, maxWidth: 180,
+      paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999,
+      backgroundColor: "rgba(0,0,0,0.42)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.35)",
+    },
+    heroChipText: { fontSize: 12, ...font("600"), color: "#fff" },
     heroName: { fontSize: 24, ...font("700"), color: "#fff" },
     heroId: { fontSize: 12, color: "rgba(255,255,255,0.8)", ...font("400") },
     heroRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },

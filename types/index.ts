@@ -22,6 +22,8 @@ export type Animal = {
   dam?: string | null;
   sire?: string | null;
   status?: string | null;
+  /** Males: "Feedlot" or "Breeding" (Animal.stream), from the local store. */
+  stream?: string | null;
   /** The animal's stage from the local store; see STAGE_LABELS. */
   stage?: string | null;
 };
