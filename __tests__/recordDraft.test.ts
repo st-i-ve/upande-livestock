@@ -1,4 +1,4 @@
-import { draftHref, hasInput, isTabRoot, useRecordDrafts } from "@/src/record/draft";
+import { draftHref, draftTab, hasInput, isTabRoot, useRecordDrafts } from "@/src/record/draft";
 import { lockedAnimalId } from "@/src/record/locked";
 
 const store = () => useRecordDrafts.getState();
@@ -62,6 +62,15 @@ describe("record draft store", () => {
     expect(store().draft).toBeNull();
   });
 
+  it("only the blur of the form's own tab makes it pending", () => {
+    store().save({ ...weight, state: { kg: "312" } });
+    // Continue recording from Profile: Profile blurs as the form comes back.
+    store().markPending("profile");
+    expect(store().draft?.pending).toBe(false);
+    store().markPending("record");
+    expect(store().draft?.pending).toBe(true);
+  });
+
   it("markPending with nothing open does nothing", () => {
     store().markPending();
     expect(store().draft).toBeNull();
@@ -81,6 +90,14 @@ describe("draftHref", () => {
     const a = draftHref(["(tabs)", "animals", "act", "weight"], { animal: "A1" });
     const b = draftHref(["(tabs)", "animals", "act", "weight"], { animal: "A2" });
     expect(a).not.toBe(b);
+  });
+});
+
+describe("draftTab", () => {
+  it("is the first segment after the group", () => {
+    expect(draftTab("/(tabs)/record/events/weight")).toBe("record");
+    expect(draftTab("/(tabs)/animals/act/weight?animal=A1")).toBe("animals");
+    expect(draftTab("/(shoats)/record/weigh")).toBe("record");
   });
 });
 

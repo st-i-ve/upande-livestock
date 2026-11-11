@@ -37,7 +37,7 @@ export default function ShoatsTabLayout() {
           </TabSwipe>
         )}
         // A record form left with input in it is kept for "Continue recording".
-        screenListeners={{ blur: () => useRecordDrafts.getState().markPending() }}
+        screenListeners={({ route }) => ({ blur: () => useRecordDrafts.getState().markPending(route.name) })}
         screenOptions={{
           headerShown: false,
           // Coming back to a tab shows its top screen, not the one left deep in its stack.

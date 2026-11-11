@@ -31,9 +31,16 @@ export function useRecordDraft<S extends Record<string, unknown>>({
   filled?: boolean;
   preset?: string | null;
 }): { clear: () => void } {
-  const segments = useSegments() as string[];
+  // useSegments() is the app's CURRENT route, not this screen's: once the user
+  // switches tab the still-mounted form re-renders with the new tab's segments
+  // (e.g. `(tabs)/profile`), and the draft was re-saved under that href, so
+  // Continue recording pushed to Profile and nothing happened. The form's own
+  // route is the one current when it mounted: keep that. Params are local.
+  const liveSegments = useSegments() as string[];
+  const ownSegments = useRef<string[] | null>(null);
+  if (ownSegments.current === null) ownSegments.current = liveSegments;
   const params = useLocalSearchParams() as Record<string, string | string[] | undefined>;
-  const key = draftHref(segments, params);
+  const key = draftHref(ownSegments.current, params);
 
   const restoreRef = useRef(restore);
   restoreRef.current = restore;

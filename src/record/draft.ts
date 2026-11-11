@@ -27,8 +27,9 @@ type DraftStore = {
   /** Mirror a form's state as the draft (replacing any other). Its own pending flag is kept:
    *  a form re-rendering after its tab lost focus must not turn it live again. */
   save: (d: Omit<RecordDraft, "pending">) => void;
-  /** Its tab lost focus: a live draft becomes pending. */
-  markPending: () => void;
+  /** A tab lost focus: a live draft in THAT tab becomes pending (no tab named: any).
+   *  Leaving Profile for the form via Continue recording must not mark it pending. */
+  markPending: (tab?: string) => void;
   /** The form is back on screen: a pending draft for it is live again. */
   resume: (key: string) => void;
   /** Drop the draft — any, or only the one for `key`. */
@@ -43,9 +44,9 @@ export const useRecordDrafts = create<DraftStore>((set, get) => ({
     const prev = get().draft;
     set({ draft: { ...d, pending: prev?.key === d.key ? prev.pending : false } });
   },
-  markPending: () => {
+  markPending: (tab) => {
     const d = get().draft;
-    if (d && !d.pending) set({ draft: { ...d, pending: true } });
+    if (d && !d.pending && (tab === undefined || draftTab(d.key) === tab)) set({ draft: { ...d, pending: true } });
   },
   resume: (key) => {
     const d = get().draft;
@@ -120,6 +121,10 @@ export function hasInput(value: unknown, presetId?: string | null): boolean {
 
 const isAnimal = (v: unknown, id: string) =>
   !!v && typeof v === "object" && (v as { id?: unknown }).id === id;
+
+/** The tab a draft's route lives in: `/(tabs)/animals/act/weight?animal=A1` → `animals`. */
+export const draftTab = (href: string): string | undefined =>
+  href.split("?")[0].split("/").filter((s) => s && !/^\(.*\)$/.test(s))[0];
 
 /** A tab's top screen: `(tabs)/animals`, `(shoats)/profile` — group plus one segment. */
 export const isTabRoot = (segments: readonly string[]): boolean =>

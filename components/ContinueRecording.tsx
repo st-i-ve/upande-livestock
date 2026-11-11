@@ -33,7 +33,10 @@ export function ContinueRecording({ bottom }: { bottom: number }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Continue recording: ${draft.title}`}
-          onPress={() => router.push(draft.href as never)}
+          onPress={() => {
+            console.log(`[continue] → ${draft.href}`);
+            router.push(draft.href as never);
+          }}
           onLongPress={discard}
           style={({ pressed }) => [s.main, pressed && { opacity: 0.7 }]}
           testID="continue-recording"
