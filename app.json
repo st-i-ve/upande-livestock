@@ -2,7 +2,7 @@
   "expo": {
     "name": "Upande Livestock",
     "slug": "upande-livestock-mutara",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/livestock-icon.png",
     "scheme": "upandelivestockmutara",
@@ -28,7 +28,8 @@
       "package": "com.upande.livestockmutara",
       "permissions": [
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "versionCode": 5200
     },
     "web": {
       "output": "static",
@@ -62,13 +63,22 @@
       "expo-web-browser",
       "expo-sqlite",
       "@upande/mobile-kit",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "runtimeVersion": "1.1.0-mutarabeeffrappe16",
+    "runtimeVersion": "1.2",
     "extra": {
       "router": {},
       "eas": {
@@ -88,48 +98,49 @@
           "ota": []
         },
         "nativeBaseline": {
-          "hash": "408e3db40951",
+          "hash": "e38703706cc7",
           "parts": {
             "@react-native-async-storage/async-storage": "2.2.0",
-            "@react-native-community/datetimepicker": "9.1.0",
+            "@react-native-community/datetimepicker": "9.2.1",
             "@react-native-community/netinfo": "12.0.1",
             "@upande/mobile-kit (native modules and plugins)": "2caf04d881ff",
-            "expo": "57.0.28",
-            "expo-battery": "57.0.3",
-            "expo-constants": "57.0.21",
-            "expo-device": "57.0.2",
-            "expo-file-system": "57.0.7",
-            "expo-font": "57.0.4",
-            "expo-haptics": "57.0.3",
-            "expo-image": "57.0.5",
-            "expo-image-picker": "57.0.20",
-            "expo-intent-launcher": "57.0.1",
-            "expo-linking": "57.0.12",
-            "expo-local-authentication": "57.0.3",
-            "expo-localization": "57.0.2",
-            "expo-network": "57.0.3",
-            "expo-router": "57.0.26",
-            "expo-splash-screen": "57.0.10",
-            "expo-sqlite": "57.0.4",
-            "expo-status-bar": "57.0.1",
-            "expo-symbols": "57.0.3",
-            "expo-system-ui": "57.0.4",
-            "expo-updates": "57.0.26",
-            "expo-web-browser": "57.0.3",
-            "jest-expo": "57.0.6",
-            "react-native": "0.86.3",
-            "react-native-gesture-handler": "2.32.0",
-            "react-native-reanimated": "4.5.1",
-            "react-native-safe-area-context": "5.7.0",
-            "react-native-screens": "4.26.2",
-            "react-native-svg": "15.15.4",
-            "react-native-worklets": "0.10.1",
-            "app.json (native fields)": "0d045898228e"
+            "expo": "58.0.23",
+            "expo-battery": "58.0.4",
+            "expo-build-properties": "58.0.12",
+            "expo-constants": "58.0.15",
+            "expo-device": "58.0.5",
+            "expo-file-system": "58.0.13",
+            "expo-font": "58.0.12",
+            "expo-haptics": "58.0.8",
+            "expo-image": "58.0.18",
+            "expo-image-picker": "58.0.10",
+            "expo-intent-launcher": "58.0.3",
+            "expo-linking": "58.0.16",
+            "expo-local-authentication": "58.0.3",
+            "expo-localization": "58.0.5",
+            "expo-network": "58.0.5",
+            "expo-router": "58.0.30",
+            "expo-splash-screen": "58.0.14",
+            "expo-sqlite": "58.0.15",
+            "expo-status-bar": "58.0.5",
+            "expo-symbols": "58.0.5",
+            "expo-system-ui": "58.0.7",
+            "expo-updates": "58.0.21",
+            "expo-web-browser": "58.0.8",
+            "jest-expo": "58.0.14",
+            "react-native": "0.88.1",
+            "react-native-gesture-handler": "3.3.0",
+            "react-native-reanimated": "4.7.1",
+            "react-native-safe-area-context": "5.11.1",
+            "react-native-screens": "4.30.1",
+            "react-native-svg": "15.16.0",
+            "react-native-worklets": "0.13.0",
+            "app.json (native fields)": "27e97cc0991e"
           }
         },
-        "apkTag": "v1.1.1"
+        "apkTag": "v1.2.0"
       },
-      "runtimeSdk": 57
+      "runtimeSdk": 58
     },
     "owner": "stivewithani"
   }

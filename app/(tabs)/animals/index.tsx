@@ -207,7 +207,7 @@ export default function Animals() {
           ListHeaderComponent={
             cards.length ? (
               <BreedingCards cards={cards} onOpen={(h) => router.push(`/(tabs)/animals/herds/${encodeURIComponent(h)}`)} />
-            ) : null
+            ) : undefined
           }
           ref={listRef}
           sections={sections}
@@ -220,7 +220,7 @@ export default function Animals() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => refetch()}
+              onRefresh={() => { void refetch(); }}
               tintColor={c.text}
             />
           }

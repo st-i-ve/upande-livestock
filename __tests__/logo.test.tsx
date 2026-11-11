@@ -7,6 +7,12 @@ import { LivestockLogo, TAIL_SWING } from "@/components/LivestockLogo";
 import { LOGO_COW } from "@/src/art/paths";
 
 jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"));
+// Reanimated 4.7 (SDK 58) registers its CSS event handler on load, which the
+// JS (non-native) module that Jest gets refuses; on a phone the native module takes it.
+jest.mock("react-native-reanimated/src/css/native/proxy", () => ({
+  ...jest.requireActual("react-native-reanimated/src/css/native/proxy"),
+  setCSSEventHandler: () => {},
+}));
 jest.mock("react-native-reanimated", () => ({ ...require("react-native-reanimated/mock"), useReducedMotion: () => false }));
 
 const root = path.resolve(__dirname, "..");

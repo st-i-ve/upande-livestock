@@ -22,7 +22,7 @@ export function RecordTabButton(props: Props) {
       accessibilityRole="button"
       accessibilityLabel="Log a livestock event"
       accessibilityState={{ selected }}
-      android_ripple={null}
+      android_ripple={undefined}
       style={s.recordCell}
     >
       <View style={s.recordCircle}>

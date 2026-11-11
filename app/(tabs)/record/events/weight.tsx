@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
@@ -71,7 +71,7 @@ export default function WeightSession() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<WeightOutcome | null>(null);
-  const inputs = useRef<Record<string, TextInput | null>>({});
+  const inputs = useRef<Record<string, TextInputInstance | null>>({});
 
   const methods = settings.data?.methods ?? [];
   // Settings supply the default once; after that the operator's choice stands,

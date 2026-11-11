@@ -46,7 +46,7 @@ export default function TabLayout() {
         options={{
           title: "Animals",
           tabBarIcon: ({ color }) => (
-            <CowIcon size={ICON_SIZE + 3} color={color} />
+            <CowIcon size={ICON_SIZE + 3} color={color as string} />
           ),
         }}
       />
@@ -81,7 +81,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color} />
+            <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color as string} />
           ),
         }}
       />

@@ -45,7 +45,7 @@ export default function ShoatsTabLayout() {
           name="herds"
           options={{
             title: "Herds",
-            tabBarIcon: ({ color }) => <MaterialCommunityIcons name="sheep" size={ICON_SIZE + 3} color={color} />,
+            tabBarIcon: ({ color }) => <MaterialCommunityIcons name="sheep" size={ICON_SIZE + 3} color={color as string} />,
           }}
         />
         <Tabs.Screen
@@ -76,7 +76,7 @@ export default function ShoatsTabLayout() {
           options={{
             title: "Profile",
             tabBarIcon: ({ color, focused }) => (
-              <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color} />
+              <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color as string} />
             ),
           }}
         />

@@ -12,8 +12,11 @@ describe("Mutara app identity", () => {
     expect(e.ios.bundleIdentifier).toBe("com.upande.livestockmutara");
     expect(e.android.package).not.toBe("com.stivewithani.upandelivestock");
   });
-  it("runs its own runtime version", () => {
-    expect(e.runtimeVersion).toBe("1.1.0-mutarabeeffrappe16");
+  it("runs a new runtime on each Expo SDK, so an older SDK's update never loads", () => {
+    // The kit's plain major.minor runtime; 1.1.0-mutarabeeffrappe16 was SDK 57's.
+    expect(e.runtimeVersion).toMatch(/^\d+\.\d+$/);
+    expect(e.runtimeVersion).not.toBe("1.1.0-mutarabeeffrappe16");
+    expect(e.extra.runtimeSdk).toBe(Number(require("../package.json").dependencies.expo.replace(/^\D*/, "").split(".")[0]));
   });
   it("keeps Kaitet's EAS project out; it has its own project id", () => {
     expect(JSON.stringify(e)).not.toContain("0640a515");

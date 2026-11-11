@@ -12,7 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput as RNTextInput,
+  type TextInputInstance,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
@@ -74,7 +74,7 @@ export default function LoginScreen() {
   const reveal = useSharedValue(0);
   // Halo pulse around the logo while no instance URL is set.
   const pulse = useSharedValue(0);
-  const urlInputRef = useRef<RNTextInput | null>(null);
+  const urlInputRef = useRef<TextInputInstance | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedRef = useRef(false);
 
