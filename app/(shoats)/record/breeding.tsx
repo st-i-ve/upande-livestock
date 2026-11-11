@@ -20,6 +20,8 @@ import { recordCountEvent } from "@/src/shoats/api";
 import { LABEL, useAnimalType } from "@/src/shoats/animalType";
 import { useShoatOptions } from "@/src/shoats/hooks";
 import { cleanCounts, expectedBirthFrom, totalOf } from "@/src/shoats/logic";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { shoatBreedingModes } from "@/src/shoats/records";
 import { useSubmit } from "@/src/shoats/useSubmit";
 import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
@@ -47,7 +49,10 @@ export default function Breeding() {
   const sub = useSubmit();
   const today = todayISO();
 
-  const [mode, setMode] = useState<Mode>(preset === "Birth" || preset === "Weaning" ? preset : "Mating");
+  // Mating or a birth the farm switched off (Settings -> Events) is not offered.
+  const modes = shoatBreedingModes(useDisabledEvents());
+  const [picked, setMode] = useState<Mode>(preset === "Birth" || preset === "Weaning" ? preset : "Mating");
+  const mode: Mode = modes.includes(picked) ? picked : modes[0];
   const [start, setStart] = useState(today);
   const [end, setEnd] = useState("");
   const [served, setServed] = useState("");
@@ -131,8 +136,8 @@ export default function Breeding() {
       {field}
       <Field label="What happened">
         <Chips>
-          <Chip label="Mating" active={mode === "Mating"} onPress={() => setMode("Mating")} />
-          <Chip label={birthWord} active={mode === "Birth"} onPress={() => setMode("Birth")} />
+          {modes.includes("Mating") ? <Chip label="Mating" active={mode === "Mating"} onPress={() => setMode("Mating")} /> : null}
+          {modes.includes("Birth") ? <Chip label={birthWord} active={mode === "Birth"} onPress={() => setMode("Birth")} /> : null}
           <Chip label="Weaning" active={mode === "Weaning"} onPress={() => setMode("Weaning")} />
         </Chips>
       </Field>

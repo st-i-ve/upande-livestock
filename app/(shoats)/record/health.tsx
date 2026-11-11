@@ -17,6 +17,8 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { recordTreatment } from "@/src/shoats/api";
 import { useShoatOptions } from "@/src/shoats/hooks";
 import { withdrawalEnd } from "@/src/shoats/logic";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { shoatHealthTypes } from "@/src/shoats/records";
 import { useSubmit } from "@/src/shoats/useSubmit";
 import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
@@ -37,9 +39,12 @@ export default function ShoatHealth() {
   const { herd, field } = herdField;
   const day = useDayField();
   const sub = useSubmit();
-  const types = options?.treatmentTypes?.length ? options.treatmentTypes : DEFAULT_TYPES;
+  // A type the farm switched off (Settings -> Events) is not offered.
+  const disabled = useDisabledEvents();
+  const types = shoatHealthTypes(options?.treatmentTypes?.length ? options.treatmentTypes : DEFAULT_TYPES, disabled);
 
-  const [type, setType] = useState("Treatment");
+  const [chosen, setType] = useState("Treatment");
+  const type = types.includes(chosen) ? chosen : types[0] ?? chosen;
   const [pick, setPick] = useState<StockPick>({ itemCode: "", uom: "", warehouse: "", batch: "" });
   const [dose, setDose] = useState("");
   const [treated, setTreated] = useState("");

@@ -10,13 +10,17 @@ import { Screen } from "@/components/Screen";
 import { font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { LABEL, useAnimalType } from "@/src/shoats/animalType";
-import { SHOAT_RECORD_ITEMS } from "@/src/shoats/records";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { SHOAT_RECORD_ITEMS, visibleShoatItems } from "@/src/shoats/records";
 
 export default function ShoatRecord() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const offline = useOffline();
   const type = useAnimalType((st) => st.type);
+  // Events the farm switched off (Settings -> Events) are not offered.
+  const disabled = useDisabledEvents();
+  const items = useMemo(() => visibleShoatItems(SHOAT_RECORD_ITEMS, disabled), [disabled]);
   return (
     <Screen title="Shoat events" subtitle={`${type ? LABEL[type] : "Shoats"} · by number, never per animal`}>
       {offline ? (
@@ -24,7 +28,7 @@ export default function ShoatRecord() {
           You are offline. Recording needs a connection: every entry is checked by the server live.
         </Banner>
       ) : null}
-      {SHOAT_RECORD_ITEMS.map((it) => (
+      {items.map((it) => (
         <Pressable
           key={it.href}
           onPress={() => router.push(it.href as any)}

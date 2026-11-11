@@ -11,12 +11,17 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { Timeline } from "@/components/Timeline";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 import { extractFrappeError } from "@/src/services/api";
 import { useShoatHerd } from "@/src/shoats/hooks";
 import { kg, ledgerSummary } from "@/src/shoats/logic";
+import { shoatEntryOn } from "@/src/shoats/records";
 
 export default function ShoatHerdPage() {
   const { canRecord } = useCanRecord();
+  // Events the farm switched off (Settings -> Events) get no button.
+  const disabled = useDisabledEvents();
+  const on = (leaf: string) => shoatEntryOn(leaf, disabled);
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
   const { data: h, isLoading, isRefetching, error, refetch } = useShoatHerd(herdName);
@@ -62,11 +67,11 @@ export default function ShoatHerdPage() {
       {canRecord ? (
         <>
           <SectionTitle>Record for this herd</SectionTitle>
-          <Button label="Weigh sample" icon="scale" onPress={() => go("weigh")} />
+          {on("weigh") ? <Button label="Weigh sample" icon="scale" onPress={() => go("weigh")} /> : null}
           <Button label="Count & movements" icon="counter" variant="outline" onPress={() => go("count")} />
-          <Button label="Breeding" icon="heart" variant="outline" onPress={() => go("breeding")} />
-          <Button label="Health" icon="medical-bag" variant="outline" onPress={() => go("health")} />
-          <Button label="Feeding" icon="grain" variant="outline" onPress={() => go("feeding")} />
+          {on("breeding") ? <Button label="Breeding" icon="heart" variant="outline" onPress={() => go("breeding")} /> : null}
+          {on("health") ? <Button label="Health" icon="medical-bag" variant="outline" onPress={() => go("health")} /> : null}
+          {on("feeding") ? <Button label="Feeding" icon="grain" variant="outline" onPress={() => go("feeding")} /> : null}
         </>
       ) : null}
 

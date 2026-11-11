@@ -19,6 +19,8 @@ import { useColors } from "@/src/hooks/useColors";
 import { recordCountEvent, type CountEventType } from "@/src/shoats/api";
 import { useShoatOptions } from "@/src/shoats/hooks";
 import { allCounts, cleanCounts, countVariance, overdrawn, prefillFromLedger, totalOf, varianceText } from "@/src/shoats/logic";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { shoatBreedingModes } from "@/src/shoats/records";
 import { useSubmit } from "@/src/shoats/useSubmit";
 import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
@@ -48,6 +50,8 @@ export default function CountAndMovements() {
   const { herd, field } = herdField;
   const day = useDayField();
   const sub = useSubmit();
+  // A lambing/kidding is a Calving: switched off (Settings -> Events), no shortcut to it.
+  const birthOn = shoatBreedingModes(useDisabledEvents()).includes("Birth");
 
   const [kind, setKind] = useState<Kind>("Head Count");
   const [entered, setEntered] = useState<{ key: string; values: Record<string, string> } | null>(null);
@@ -124,7 +128,9 @@ export default function CountAndMovements() {
           {KINDS.map((k) => (
             <Chip key={k.id} label={k.label} active={kind === k.id} onPress={() => setKind(k.id)} />
           ))}
-          <Chip label="Birth" onPress={() => router.replace(`/(shoats)/record/breeding?mode=Birth${herd ? `&herd=${encodeURIComponent(herd.name)}` : ""}` as any)} />
+          {birthOn ? (
+            <Chip label="Birth" onPress={() => router.replace(`/(shoats)/record/breeding?mode=Birth${herd ? `&herd=${encodeURIComponent(herd.name)}` : ""}` as any)} />
+          ) : null}
         </Chips>
       </Field>
 
