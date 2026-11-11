@@ -54,3 +54,8 @@ export const visibleActions = <A extends { route: string }>(
   actions: readonly A[],
   disabled: readonly string[] | null | undefined,
 ): A[] => actions.filter((a) => isRouteEnabled(a.route, disabled));
+
+/** The calving screen's outcomes: an abortion is its own event type, so it goes when the farm switched Abortion off. */
+export type CalvingOutcome = "Live Birth" | "Still Birth" | "Abortion";
+export const calvingOutcomes = (disabled: readonly string[] | null | undefined): CalvingOutcome[] =>
+  isEventEnabled("Abortion", disabled) ? ["Live Birth", "Still Birth", "Abortion"] : ["Live Birth", "Still Birth"];

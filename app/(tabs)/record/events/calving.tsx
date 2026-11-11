@@ -40,6 +40,8 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBeefSettings, useHerds } from "@/src/hooks/useHerds";
+import { calvingOutcomes, type CalvingOutcome } from "@/src/beef/events";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { calvingFilled, retroOnReset, type CalvingDraft, type HeldRetro } from "@/src/record/calvingDraft";
@@ -83,7 +85,10 @@ export default function Calving() {
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [dam, setDam] = useState<Animal | null>(null);
-  const [outcome, setOutcome] = useState<"Live Birth" | "Still Birth" | "Abortion">("Live Birth");
+  // Abortion is its own event type: switched off (Settings -> Events), it is no outcome here.
+  const outcomes = calvingOutcomes(useDisabledEvents());
+  const [picked, setOutcome] = useState<CalvingOutcome>("Live Birth");
+  const outcome: CalvingOutcome = outcomes.includes(picked) ? picked : "Live Birth";
   const [abortionCause, setAbortionCause] = useState<
     "Infectious" | "Nutritional" | "Traumatic" | "Congenital" | "Unknown" | "Other"
   >("Unknown");
@@ -339,7 +344,7 @@ export default function Calving() {
           <Picker
             value={outcome}
             onChange={(v) => setOutcome(v as typeof outcome)}
-            options={["Live Birth", "Still Birth", "Abortion"]}
+            options={outcomes}
           />
         </Field>
       </FieldRow>
