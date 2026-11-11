@@ -49,8 +49,15 @@ export default function Choose() {
       {/* Always offered on the second step: someone already working with sheep or
           goats lands here first and must be able to get back to Cattle. */}
       {step === "shoats" ? (
-        <Pressable onPress={() => setStep("top")} hitSlop={8} accessibilityRole="button">
-          <Text style={s.link}>Back to animal type</Text>
+        <Pressable
+          onPress={() => setStep("top")}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Back to animal type"
+          style={({ pressed }) => [s.backBtn, pressed && { backgroundColor: c.bgMuted }]}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={18} color={c.text} />
+          <Text style={s.backLabel}>Back to animal type</Text>
         </Pressable>
       ) : null}
       {options.map((o) => (
@@ -90,5 +97,18 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     cardOn: { borderWidth: 1.5, borderColor: c.text },
     label: { fontSize: 18, ...font("600"), color: c.text },
     blurb: { fontSize: 13, color: c.textMuted, marginTop: 2 },
-    link: { fontSize: 13, color: c.text, textDecorationLine: "underline", marginBottom: 12 },
+    backBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      gap: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      marginBottom: 16,
+      borderRadius: RADIUS.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.bg,
+    },
+    backLabel: { fontSize: 14, ...font("600"), color: c.text },
   });
