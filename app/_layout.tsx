@@ -1,3 +1,4 @@
+import "@/src/ui/installAlert";
 import '../src/mobile-kit';
 import { MobileKitProvider } from '@upande/mobile-kit';
 import "@/src/theme/patchText";
@@ -23,6 +24,7 @@ import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
+import { AppAlertHost } from "@/components/AppAlertHost";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
@@ -216,6 +218,8 @@ export default function RootLayout() {
                 <Stack.Screen name="accessibility" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
               </Stack>
               <StatusBar style={dark ? "light" : "dark"} />
+              {/* Every Alert.alert, drawn over everything (src/ui/alert.ts). */}
+              <AppAlertHost />
             </ThemeProvider>
           </PaperProvider>
         </SafeAreaProvider>
