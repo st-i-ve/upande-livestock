@@ -4,7 +4,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
-import { useSyncParts } from "@/components/SyncBar";
+import { useSyncParts } from "@/src/sync/useSyncParts";
 import { FONT_FAMILY } from "@/constants/theme";
 import { syncAnimalsSoon } from "@/src/db/sync";
 import { useColors } from "@/src/hooks/useColors";

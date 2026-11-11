@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -14,7 +14,7 @@ import { StatusSheet, useDotState } from "@/components/OnlineDot";
 import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { syncFraction, syncText } from "@/src/sync/syncStatus";
-import { partsOf, useSyncStore } from "@/src/sync/syncStore";
+import { useSyncParts } from "@/src/sync/useSyncParts";
 import { useSyncSummary } from "@/src/sync/useSyncSummary";
 
 /** A sync that finishes within this never shows the bar (the quick delta syncs). */
@@ -25,11 +25,7 @@ export const MIN_SHOWN_MS = 600;
 const MOVE_MS = 280;
 const EASE = Easing.inOut(Easing.cubic);
 
-/** What is syncing now, in the store's parts, as one stable list. */
-export function useSyncParts() {
-  const parts = useSyncStore((s) => s.parts);
-  return useMemo(() => partsOf(parts), [parts]);
-}
+export { useSyncParts };
 
 /**
  * Whether the bar should be up: true only once a sync has lasted SHOW_AFTER_MS,
