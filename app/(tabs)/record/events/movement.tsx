@@ -22,7 +22,8 @@ import { useColors } from "@/src/hooks/useColors";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
-import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { titleFor, useFinishRecording, useLockedAnimalId, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import type { Animal } from "@/types";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useBeefSettings, useHerds } from "@/src/hooks/useHerds";
@@ -64,6 +65,8 @@ export default function Movement() {
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
   const finish = useFinishRecording();
   const [error, setError] = useState<string | null>(null);
+  // Opened from her page: she is the only animal here, and cannot be taken off.
+  const locked = !!useLockedAnimalId();
 
   // Where the herd structure says these animals should go next. The ladder is
   // ordered on the backend and this reads that order rather than guessing from
@@ -85,6 +88,27 @@ export default function Movement() {
   // an alphabetically-first herd that was almost never the right one.
   const [toHerdTouched, setToHerdTouched] = useState(false);
   const toHerd = toHerdTouched ? toHerdPick : suggested || herds[0]?.n || "";
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Movement",
+    state: { selected, toHerdPick, toHerdTouched, reason, otherReason, notes, day: isBackdating ? backdateDate : "" },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      toHerdTouched ||
+      reason !== "Routine age-out" ||
+      !!otherReason.trim() ||
+      Object.values(notes).some((n) => !!n.trim()),
+    restore: (d) => {
+      setSelected(d.selected);
+      setToHerd(d.toHerdPick);
+      setToHerdTouched(d.toHerdTouched);
+      setReason(d.reason);
+      setOtherReason(d.otherReason);
+      setNotes(d.notes);
+      if (isBackdating && d.day) setBackdateDate(d.day);
+    },
+  });
 
   // A bull going into a Breeding herd from outside one is a *selection*: it decides
   // his stream, and the herdsman must write why he is kept. The server enforces
@@ -174,7 +198,10 @@ export default function Movement() {
     >
       {isBackdating ? <BackdateBanner /> : null}
 
-      <Field label="Animals to move" help="Search by tag, or open the By herd tab to grab a whole herd.">
+      <Field
+        label={locked ? "Animal to move" : "Animals to move"}
+        help={locked ? undefined : "Search by tag, or open the By herd tab to grab a whole herd."}
+      >
         <AnimalPickerButton
           mode="multi"
           placeholder={selected.length ? `${selected.length} selected — tap to change` : "Select one or many..."}
@@ -193,9 +220,11 @@ export default function Movement() {
                   <Text style={s.selName} numberOfLines={1}>{a.name} <Text style={s.selId}>{a.id}</Text></Text>
                   <Text style={s.selMeta} numberOfLines={1}>{a.herd}</Text>
                 </View>
-                <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
-                  <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
-                </Pressable>
+                {locked ? null : (
+                  <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
+                    <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
+                  </Pressable>
+                )}
               </View>
             ))}
           </View>

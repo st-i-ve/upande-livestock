@@ -30,6 +30,7 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -74,6 +75,33 @@ export default function Service() {
   const { vets, vet, setVet } = useVetChoice();
   const { refreshing, onRefresh } = usePullToRefresh();
   useRefreshOnFocus();
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  // (The sire picked from several bulls is asked again: it belongs to her and the date.)
+  useRecordDraft({
+    title: "Service",
+    state: {
+      selected, typePick, conceptionPick, straw, strawUom, semenWarehouse, outsideSire, remarks, vet,
+      day: isBackdating ? backdateDate : "",
+    },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      typePick !== null ||
+      conceptionPick !== null ||
+      !!(straw || outsideSire.trim() || remarks.trim()),
+    restore: (d) => {
+      setSelected(d.selected);
+      setType(d.typePick);
+      setConception(d.conceptionPick);
+      setStraw(d.straw);
+      setStrawUom(d.strawUom);
+      setSemenWarehouse(d.semenWarehouse);
+      setSire(d.outsideSire);
+      setRemarks(d.remarks);
+      setVet(d.vet);
+      if (isBackdating && d.day) setBackdateDate(d.day);
+    },
+  });
 
   const handleSubmit = async (acknowledged = false) => {
     setError(null);

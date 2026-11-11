@@ -21,6 +21,7 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useBeefSettings, useHerds } from "@/src/hooks/useHerds";
 import { useKinshipPreview } from "@/src/hooks/useKinshipPreview";
 import { useOperator } from "@/src/hooks/useOperator";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -39,6 +40,21 @@ export default function Separation() {
   const beef = useBeefSettings();
   const due = data?.separation_due ?? [];
 
+  // What was chosen on each calf's card, by calf. Kept here (not in the card)
+  // so a tab switch can keep it for "Continue recording".
+  const [rows, setRows] = useState<Record<string, RowInput>>({});
+  const patchRow = (id: string, patch: Partial<RowInput> | null) =>
+    setRows((r) => {
+      const { [id]: was, ...rest } = r;
+      return patch ? { ...rest, [id]: { ...(was ?? BLANK_ROW), ...patch } } : rest;
+    });
+  useRecordDraft({
+    title: "Calf separation",
+    state: { rows },
+    filled: Object.values(rows).some((r) => !!(r.mode || r.herdPick || r.note.trim())),
+    restore: (d) => setRows(d.rows),
+  });
+
   return (
     <Screen
       title="Calf separation"
@@ -51,14 +67,31 @@ export default function Separation() {
       {error ? <ErrorState text={extractFrappeError(error)} onRetry={() => refetch()} /> : null}
       {!isLoading && !error && due.length === 0 ? <Empty icon="check" text="No calf is due to leave its mother" /> : null}
       {due.map((d) => (
-        <DueRow key={d.animal} d={d} />
+        <DueRow
+          key={d.animal}
+          d={d}
+          input={rows[d.animal] ?? BLANK_ROW}
+          patch={(p) => patchRow(d.animal, p)}
+        />
       ))}
       <Text style={s.foot}>{due.length ? `${due.length} calf${due.length === 1 ? "" : "ves"} due` : ""}</Text>
     </Screen>
   );
 }
 
-function DueRow({ d }: { d: SeparationDue }) {
+type RowInput = { mode: "feedlot" | "breeding" | "heifer" | null; herdPick: string; note: string };
+const BLANK_ROW: RowInput = { mode: null, herdPick: "", note: "" };
+
+function DueRow({
+  d,
+  input,
+  patch,
+}: {
+  d: SeparationDue;
+  input: RowInput;
+  /** Change this calf's choices; null forgets them (moved). */
+  patch: (p: Partial<RowInput> | null) => void;
+}) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const offline = useOffline();
@@ -71,9 +104,10 @@ function DueRow({ d }: { d: SeparationDue }) {
   const feedlot = optionOf(d, "Feedlot");
   const breeding = optionOf(d, "Breeding");
   const heifer = optionOf(d, "Heifer");
-  const [mode, setMode] = useState<"feedlot" | "breeding" | "heifer" | null>(null);
-  const [herdPick, setHerdPick] = useState("");
-  const [note, setNote] = useState("");
+  const { mode, herdPick, note } = input;
+  const setMode = (m: RowInput["mode"]) => patch({ mode: m });
+  const setHerdPick = (h: string) => patch({ herdPick: h });
+  const setNote = (n: string) => patch({ note: n });
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
@@ -107,6 +141,7 @@ function DueRow({ d }: { d: SeparationDue }) {
       });
       const warned = mergeWarnings(Array.isArray(reply?.warnings) ? reply.warnings : []);
       setDone(`Moved to ${target}`);
+      patch(null);
       if (warned.length) Alert.alert("Moved — check this", warned.join("\n\n"));
     } catch (e) {
       setError(extractFrappeError(e));

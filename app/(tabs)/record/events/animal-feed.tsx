@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -54,6 +54,7 @@ import { useManualFeed } from "@/src/hooks/useManualFeed";
 import { useManufactureHerdFeed } from "@/src/hooks/mutations";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useFinishRecording } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import type { HerdRecipe } from "@/src/frappe/herdRecipes";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
@@ -70,6 +71,21 @@ const MANUAL_WARNING =
   "stock out of the store — you are accountable for what you enter.";
 
 type Mode = "system" | "manual";
+
+/** A tab's own input, reported up so "Continue recording" can keep it. */
+type SystemDraft = { portionPick: Portion | null; date: string; typedTotal: string | null; filled: boolean };
+type ManualDraft = {
+  rawRows: ManualLine[] | null;
+  total: string;
+  notice: string | null;
+  headsEdit: string | null;
+  typedTotal: string | null;
+  date: string;
+  seededBom: string | null;
+  seedSnapshot: string;
+  filled: boolean;
+};
+type TabDraft = { system?: SystemDraft | null; manual?: ManualDraft | null };
 
 /**
  * Mixing and feeding a herd, in one action.
@@ -114,6 +130,35 @@ export default function AnimalFeed() {
     setSelectedForHerd(herdName);
   }
 
+  // Left by a tab switch with input in it: kept for "Continue recording". The
+  // open tab reports its own input here; a restore remounts it (key) from `resume`.
+  const [tabDraft, setTabDraft] = useState<TabDraft>({});
+  const [resume, setResume] = useState<TabDraft | null>(null);
+  const [gen, setGen] = useState(0);
+  const report = <K extends keyof TabDraft>(k: K, v: TabDraft[K]) => {
+    setTabDraft((t) => ({ ...t, [k]: v }));
+    setResume(null);
+  };
+  useRecordDraft({
+    title: "Animal feeding",
+    state: { herdPick, mode, selectedBom, selectedForHerd, tab: tabDraft },
+    filled:
+      !!herdPick ||
+      mode !== "system" ||
+      (!!recipes.data && !!selectedBom && selectedBom !== recipes.data.standingBom) ||
+      !!tabDraft.system?.filled ||
+      !!tabDraft.manual?.filled,
+    restore: (d) => {
+      setHerdName(d.herdPick);
+      setMode(d.mode);
+      setSelectedBom(d.selectedBom);
+      setSelectedForHerd(d.selectedForHerd);
+      setTabDraft(d.tab);
+      setResume(d.tab);
+      setGen((g) => g + 1);
+    },
+  });
+
   if (isLoading) {
     return (
       <Screen title="Animal feeding" back>
@@ -146,6 +191,9 @@ export default function AnimalFeed() {
 
       {mode === "manual" ? (
         <ManualTab
+          key={`m${gen}`}
+          resume={resume?.manual ?? null}
+          onDraft={(v) => report("manual", v)}
           herd={herdName}
           recipes={recipes.data?.recipes ?? []}
           selectedBom={selectedBom}
@@ -153,6 +201,9 @@ export default function AnimalFeed() {
         />
       ) : (
         <SystemTab
+          key={`s${gen}`}
+          resume={resume?.system ?? null}
+          onDraft={(v) => report("system", v)}
           herd={herdName}
           recipes={recipes.data?.recipes ?? []}
           selectedBom={selectedBom}
@@ -273,11 +324,15 @@ const makePortionSwitchStyles = (c: ReturnType<typeof useColors>) =>
  *  through `useManufactureHerdFeed` to `manufactureHerdFeed`'s third
  *  argument, which was previously dead from this hook. */
 function SystemTab({
+  resume,
+  onDraft,
   herd,
   recipes,
   selectedBom,
   onSelectBom,
 }: {
+  resume: SystemDraft | null;
+  onDraft: (d: SystemDraft | null) => void;
   herd: string;
   recipes: HerdRecipe[];
   selectedBom: string;
@@ -290,15 +345,28 @@ function SystemTab({
   const day = useFeedDayStatus(herd);
   const manufacture = useManufactureHerdFeed();
 
-  const [portionPick, setPortion] = useState<Portion | null>(null);
+  const [portionPick, setPortion] = useState<Portion | null>(resume?.portionPick ?? null);
   const portion: Portion | null =
     portionPick ?? (day.data ? (day.data.suggestedPortion === 0.5 ? 0.5 : 1) : null);
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(resume?.date ?? todayISO());
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [submitError, setSubmitError] = useState<string | null>(null);
   // Typed group total (Feed by Head Count off); null follows the suggestion.
-  const [typedTotal, setTypedTotal] = useState<string | null>(null);
+  const [typedTotal, setTypedTotal] = useState<string | null>(resume?.typedTotal ?? null);
+
+  // This tab's input, for "Continue recording" (the screen keeps it).
+  useEffect(() => {
+    onDraft({
+      portionPick,
+      date,
+      typedTotal,
+      filled: portionPick !== null || typedTotal !== null || date !== todayISO(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portionPick, date, typedTotal]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDraft(null), []);
 
   // What the picker's choice actually mixes: the selected recipe's own
   // per-head figures where one is resolved, falling back to `info` (always
@@ -513,11 +581,15 @@ function SystemTab({
  *  outside the 100% and never lock. Locks and shares are screen state only.
  */
 function ManualTab({
+  resume,
+  onDraft,
   herd,
   recipes,
   selectedBom,
   onSelectBom,
 }: {
+  resume: ManualDraft | null;
+  onDraft: (d: ManualDraft | null) => void;
   herd: string;
   recipes: HerdRecipe[];
   selectedBom: string;
@@ -532,14 +604,14 @@ function ManualTab({
   const { operator, missingMessage } = useOperator();
   const feed = useManualFeed();
 
-  const [rawRows, setRows] = useState<ManualLine[] | null>(null);
+  const [rawRows, setRows] = useState<ManualLine[] | null>(resume?.rawRows ?? null);
   // The ration's Kg per head, typed; "" is no definite total (the lines' sum shows in grey).
-  const [total, setTotal] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
-  const [headsEdit, setHeads] = useState<string | null>(null);
+  const [total, setTotal] = useState(resume?.total ?? "");
+  const [notice, setNotice] = useState<string | null>(resume?.notice ?? null);
+  const [headsEdit, setHeads] = useState<string | null>(resume?.headsEdit ?? null);
   const heads = headsEdit ?? (info?.heads ? String(info.heads) : "");
-  const [typedTotal, setTypedTotal] = useState<string | null>(null);
-  const [date, setDate] = useState(todayISO());
+  const [typedTotal, setTypedTotal] = useState<string | null>(resume?.typedTotal ?? null);
+  const [date, setDate] = useState(resume?.date ?? todayISO());
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [error, setError] = useState<string | null>(null);
@@ -555,9 +627,32 @@ function ManualTab({
 
   // Which recipe `rows` reflects, and a snapshot of what it was seeded with —
   // what `isDirty` compares against before a picker change overwrites edits.
-  const [seededBom, setSeededBom] = useState<string | null>(null);
-  const [seedSnapshot, setSeedSnapshot] = useState<string>("");
+  const [seededBom, setSeededBom] = useState<string | null>(resume?.seededBom ?? null);
+  const [seedSnapshot, setSeedSnapshot] = useState<string>(resume?.seedSnapshot ?? "");
   const snapshot = (rs: ManualLine[]) => JSON.stringify(rs.map((r) => [r.itemCode, r.qty, r.uom]));
+
+  // This tab's input, for "Continue recording" (the screen keeps it).
+  useEffect(() => {
+    onDraft({
+      rawRows,
+      total,
+      notice,
+      headsEdit,
+      typedTotal,
+      date,
+      seededBom,
+      seedSnapshot,
+      filled:
+        (rawRows !== null && seedSnapshot !== "" && snapshot(rawRows) !== seedSnapshot) ||
+        !!total.trim() ||
+        headsEdit !== null ||
+        typedTotal !== null ||
+        date !== todayISO(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawRows, total, notice, headsEdit, typedTotal, date, seededBom, seedSnapshot]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDraft(null), []);
 
   // Seeds once per distinct `selectedBom`: switching recipes reseeds; typing does not.
   const seedRecipe =
