@@ -20,6 +20,7 @@ import { recordCountEvent, type CountEventType } from "@/src/shoats/api";
 import { useShoatOptions } from "@/src/shoats/hooks";
 import { allCounts, cleanCounts, countVariance, overdrawn, prefillFromLedger, totalOf, varianceText } from "@/src/shoats/logic";
 import { useSubmit } from "@/src/shoats/useSubmit";
+import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
 type Kind = "Head Count" | "Death" | "Purchase" | "Sale" | "Slaughter" | "Transfer Out";
 const KINDS: { id: Kind; label: string }[] = [
@@ -43,7 +44,8 @@ export default function CountAndMovements() {
   const offline = useOffline();
   const { operator, missingMessage } = useOperator();
   const options = useShoatOptions().data;
-  const { herd, field } = useHerdField();
+  const herdField = useHerdField();
+  const { herd, field } = herdField;
   const day = useDayField();
   const sub = useSubmit();
 
@@ -54,6 +56,23 @@ export default function CountAndMovements() {
   const [reason, setReason] = useState("");
   const [toHerd, setToHerd] = useState("");
   const [toPaddock, setToPaddock] = useState("");
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const draft = useShoatDraft({
+    title: "Count & movements",
+    herd: herdField,
+    day,
+    entry: { kind, entered, cause, amount, reason, toHerd, toPaddock },
+    filled: kind !== "Head Count" || !!(entered || cause || amount.trim() || reason.trim() || toHerd || toPaddock),
+    restore: (e) => {
+      setKind(e.kind);
+      setEntered(e.entered);
+      setCause(e.cause);
+      setAmount(e.amount);
+      setReason(e.reason);
+      setToHerd(e.toHerd);
+      setToPaddock(e.toPaddock);
+    },
+  });
 
   // A head count starts from the books; every other entry starts blank. Figures
   // typed belong to one herd and one kind, so changing either starts afresh.
@@ -74,7 +93,7 @@ export default function CountAndMovements() {
   const save = async () => {
     if (!herd || !valid) return;
     if (!operator) return sub.setError(missingMessage);
-    await sub.run(
+    const ok = await sub.run(
       () =>
         recordCountEvent({
           herd: herd.name,
@@ -93,6 +112,7 @@ export default function CountAndMovements() {
           ? `Count saved: ${total} head${r.variance != null ? ` (${varianceText(r.variance)})` : ""}.`
           : `${kind === "Transfer Out" ? "Transfer" : kind} saved: ${total} head.`,
     );
+    if (ok) draft.saved();
   };
 
   return (

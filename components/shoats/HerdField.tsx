@@ -11,7 +11,17 @@ import type { ShoatHerd } from "@/src/shoats/api";
  * else a pick among the herds of the species this phone works with. Returns the
  * picked herd and the field to render.
  */
-export function useHerdField(label = "Herd", exclude?: string): { herd: ShoatHerd | null; field: React.ReactNode; loading: boolean } {
+export function useHerdField(
+  label = "Herd",
+  exclude?: string,
+): {
+  herd: ShoatHerd | null;
+  field: React.ReactNode;
+  loading: boolean;
+  /** The picked herd's name, and its setter (Continue recording puts it back). */
+  name: string;
+  setName: (name: string) => void;
+} {
   const { herd: preset } = useLocalSearchParams<{ herd?: string }>();
   const choices = useHerdChoices();
   const [name, setName] = useState(() => (preset ? decodeURIComponent(String(preset)) : ""));
@@ -27,7 +37,7 @@ export function useHerdField(label = "Herd", exclude?: string): { herd: ShoatHer
       />
     </Field>
   );
-  return { herd, field, loading: choices.isLoading };
+  return { herd, field, loading: choices.isLoading, name, setName };
 }
 
 /** A herd picker for a destination (transfer to), with its own state. */

@@ -21,6 +21,7 @@ import { LABEL, useAnimalType } from "@/src/shoats/animalType";
 import { useShoatOptions } from "@/src/shoats/hooks";
 import { cleanCounts, expectedBirthFrom, totalOf } from "@/src/shoats/logic";
 import { useSubmit } from "@/src/shoats/useSubmit";
+import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
 type Mode = "Mating" | "Birth" | "Weaning";
 
@@ -40,7 +41,8 @@ export default function Breeding() {
   const type = useAnimalType((s) => s.type);
   const options = useShoatOptions().data;
   const { mode: preset } = useLocalSearchParams<{ mode?: string }>();
-  const { herd, field } = useHerdField();
+  const herdField = useHerdField();
+  const { herd, field } = herdField;
   const day = useDayField();
   const sub = useSubmit();
   const today = todayISO();
@@ -55,6 +57,29 @@ export default function Breeding() {
   const [weaned, setWeaned] = useState<Record<string, string>>({});
   const [away, setAway] = useState(false);
   const [toHerd, setToHerd] = useState("");
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const draft = useShoatDraft({
+    title: "Breeding",
+    herd: herdField,
+    day,
+    entry: { mode, start, end, served, males, alive, dead, weaned, away, toHerd },
+    filled:
+      start !== today ||
+      !!(end || served || males || alive || dead || away || toHerd) ||
+      Object.values(weaned).some((v) => !!v),
+    restore: (e) => {
+      setMode(e.mode);
+      setStart(e.start);
+      setEnd(e.end);
+      setServed(e.served);
+      setMales(e.males);
+      setAlive(e.alive);
+      setDead(e.dead);
+      setWeaned(e.weaned);
+      setAway(e.away);
+      setToHerd(e.toHerd);
+    },
+  });
 
   const labels = herd?.labels ?? { females: "Ewes", males: "Rams", young: "Lambs", others: "Others" };
   const youngWord = labels.young.toLowerCase();
@@ -77,7 +102,7 @@ export default function Breeding() {
   const save = async () => {
     if (!herd || !valid) return;
     if (!operator) return sub.setError(missingMessage);
-    await sub.run(
+    const ok = await sub.run(
       () =>
         recordCountEvent({
           herd: herd.name,
@@ -98,6 +123,7 @@ export default function Breeding() {
             ? `${birthWord} saved: ${int(alive)} born alive, ${int(dead)} born dead${r.raw?.mating_linked ? " (linked to its mating)" : ""}.`
             : `Weaning saved: ${weanedTotal} ${youngWord} weaned.`,
     );
+    if (ok) draft.saved();
   };
 
   return (

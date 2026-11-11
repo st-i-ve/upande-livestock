@@ -18,6 +18,7 @@ import { recordTreatment } from "@/src/shoats/api";
 import { useShoatOptions } from "@/src/shoats/hooks";
 import { withdrawalEnd } from "@/src/shoats/logic";
 import { useSubmit } from "@/src/shoats/useSubmit";
+import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
 const DEFAULT_TYPES = ["Treatment", "Dipping", "Deworming", "Vaccination"];
 
@@ -32,7 +33,8 @@ export default function ShoatHealth() {
   const offline = useOffline();
   const { operator, missingMessage } = useOperator();
   const options = useShoatOptions().data;
-  const { herd, field } = useHerdField();
+  const herdField = useHerdField();
+  const { herd, field } = herdField;
   const day = useDayField();
   const sub = useSubmit();
   const types = options?.treatmentTypes?.length ? options.treatmentTypes : DEFAULT_TYPES;
@@ -43,6 +45,21 @@ export default function ShoatHealth() {
   const [treated, setTreated] = useState("");
   const [withdrawal, setWithdrawal] = useState("");
   const [warning, setWarning] = useState<string | null>(null);
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const draft = useShoatDraft({
+    title: "Health",
+    herd: herdField,
+    day,
+    entry: { type, pick, dose, treated, withdrawal },
+    filled: type !== "Treatment" || !!(pick.itemCode || dose.trim() || treated || withdrawal),
+    restore: (e) => {
+      setType(e.type);
+      setPick(e.pick);
+      setDose(e.dose);
+      setTreated(e.treated);
+      setWithdrawal(e.withdrawal);
+    },
+  });
 
   const dosePerHead = Number(dose.replace(",", "."));
   const n = Math.floor(Number(treated));
@@ -72,6 +89,7 @@ export default function ShoatHealth() {
     );
     if (ok) {
       setTreated("");
+      draft.saved();
     }
   };
 

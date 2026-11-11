@@ -22,6 +22,7 @@ import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
 import { extractFrappeError } from "@/src/services/api";
 import { kg } from "@/src/shoats/logic";
 import { refreshShoats } from "@/src/shoats/invalidate";
+import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
 /**
  * Feeding a shoat herd its ration: the herd's own recipe at the head on the
@@ -32,7 +33,8 @@ export default function ShoatFeeding() {
   const c = useColors();
   const offline = useOffline();
   const qc = useQueryClient();
-  const { herd, field } = useHerdField();
+  const herdField = useHerdField();
+  const { herd, field } = herdField;
   const day = useDayField("Date of this feed");
   const info = useHerdFeedInfo(herd?.name);
   const status = useFeedDayStatus(herd?.name);
@@ -42,6 +44,18 @@ export default function ShoatFeeding() {
   const [note, setNote] = useState<string | null>(null);
   // Typed group total (Feed by Head Count off); null follows the suggestion.
   const [typedTotal, setTypedTotal] = useState<string | null>(null);
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const draft = useShoatDraft({
+    title: "Feeding",
+    herd: herdField,
+    day,
+    entry: { portionPick, typedTotal },
+    filled: portionPick !== null || typedTotal !== null,
+    restore: (e) => {
+      setPortion(e.portionPick);
+      setTypedTotal(e.typedTotal);
+    },
+  });
 
   const st = status.data;
   const portion = portionPick ?? (st ? (st.suggestedPortion === 0.5 ? 0.5 : 1) : 1);
@@ -58,6 +72,7 @@ export default function ShoatFeeding() {
     try {
       const r = await manufactureHerdFeed(herd.name, portion, day.eventDate, undefined, group.send);
       setNote(`${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} mixed and issued to ${herd.label} (${r.heads} head).`);
+      draft.saved();
       refreshShoats(qc);
       await Promise.all([info.refetch(), status.refetch()]);
     } catch (e) {

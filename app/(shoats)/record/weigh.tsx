@@ -14,6 +14,7 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { recordWeightSample } from "@/src/shoats/api";
 import { kg, liveWeight } from "@/src/shoats/logic";
 import { useSubmit } from "@/src/shoats/useSubmit";
+import { useShoatDraft } from "@/src/shoats/useShoatDraft";
 
 const WHOLE = "Whole herd";
 
@@ -24,13 +25,27 @@ const WHOLE = "Whole herd";
 export default function WeighSample() {
   const c = useColors();
   const offline = useOffline();
-  const { herd, field } = useHerdField();
+  const herdField = useHerdField();
+  const { herd, field } = herdField;
   const day = useDayField();
   const sub = useSubmit();
   const { operator, missingMessage } = useOperator();
   const [klass, setKlass] = useState(WHOLE);
   const [weighed, setWeighed] = useState("");
   const [average, setAverage] = useState("");
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const draft = useShoatDraft({
+    title: "Weigh sample",
+    herd: herdField,
+    day,
+    entry: { klass, weighed, average },
+    filled: !!(weighed || average.trim()),
+    restore: (e) => {
+      setKlass(e.klass);
+      setWeighed(e.weighed);
+      setAverage(e.average);
+    },
+  });
 
   const n = Math.floor(Number(weighed));
   const avg = Number(average.replace(",", "."));
@@ -49,6 +64,7 @@ export default function WeighSample() {
     if (ok) {
       setWeighed("");
       setAverage("");
+      draft.saved();
     }
   };
 

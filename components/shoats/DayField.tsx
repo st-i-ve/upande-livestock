@@ -8,7 +8,14 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
  * The date an entry is for. Today unless the farm has backdating open, in which
  * case the operator may pick an earlier day; `eventDate` is only sent then.
  */
-export function useDayField(label = "Date it happened"): { eventDate: string | undefined; field: React.ReactNode; today: string } {
+export function useDayField(label = "Date it happened"): {
+  eventDate: string | undefined;
+  field: React.ReactNode;
+  today: string;
+  /** The day picked ("" = today), and its setter (Continue recording puts it back). */
+  picked: string;
+  setPicked: (iso: string) => void;
+} {
   const { open, today } = useBackdatingWindow();
   const [picked, setPicked] = useState("");
   const date = open && picked && picked !== today ? picked : undefined;
@@ -17,5 +24,5 @@ export function useDayField(label = "Date it happened"): { eventDate: string | u
       <DateField value={picked || today} onChange={setPicked} maximumDate={fromISODate(today)} />
     </Field>
   ) : null;
-  return { eventDate: date, field, today };
+  return { eventDate: date, field, today, picked, setPicked };
 }
