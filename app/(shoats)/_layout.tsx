@@ -80,8 +80,8 @@ export default function ShoatsTabLayout() {
           name="profile"
           options={{
             title: "Profile",
-            tabBarIcon: ({ color, focused }) => (
-              <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color as string} />
+            tabBarIcon: ({ color }) => (
+              <MaterialCommunityIcons name="account" size={28} color={color as string} />
             ),
           }}
         />
