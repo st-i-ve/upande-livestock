@@ -12,6 +12,11 @@ export type ManualFeedLine = {
    *  The server derives the conversion factor from the herd's own BOM, so
    *  send exactly the number the screen shows; do not convert it here. */
   qty: number;
+  /** The line's unit, sent back with it: the recipe's own unit for a line
+   *  seeded from a BOM (so it matches that row), Gram or Millilitre for a
+   *  per-head dose (so 7 stays 7 g, not 7 kg), or a store unit the operator
+   *  picked (Litre, BALE), which the server converts with the item's own
+   *  table (`_tuned_bom.row_units`). */
   uom?: string;
 };
 
@@ -31,6 +36,10 @@ export type ManualFeedInput = {
    *  `manual_feed.py` already reads this key (`tuned_bom(herd, lines,
    *  base_bom=d.get("base_bom"))`) — it was simply never sent from here. */
   baseBom?: string;
+  /** The group's kilos as weighed, on a farm not feeding by head count
+   *  (`feed_day_status.feed_by_head_count` off): the server scales the tuned
+   *  lines to it. Leave it out on a head-count farm; the server ignores it there. */
+  totalQty?: number;
 };
 
 /** Mix and issue a ration the operator tuned by hand.
@@ -56,7 +65,8 @@ export const manualFeed = async (
       posting_date: input.postingDate,
       employee: input.employee,
       base_bom: input.baseBom,
-      lines: input.lines.map((l) => ({ item_code: l.itemCode, qty: l.qty })),
+      total_qty: input.totalQty,
+      lines: input.lines.map((l) => (l.uom ? { item_code: l.itemCode, qty: l.qty, uom: l.uom } : { item_code: l.itemCode, qty: l.qty })),
     },
   });
   const message = res.data?.message ?? res.data;

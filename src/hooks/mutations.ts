@@ -78,8 +78,8 @@ export const useTreatAnimal = () => {
 export const useManufactureHerdFeed = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { herd: string; portion?: number; postingDate?: string; bomNo?: string }) =>
-      sendNow(() => manufactureHerdFeed(v.herd, v.portion ?? 1, v.postingDate, v.bomNo)),
+    mutationFn: (v: { herd: string; portion?: number; postingDate?: string; bomNo?: string; totalQty?: number }) =>
+      sendNow(() => manufactureHerdFeed(v.herd, v.portion ?? 1, v.postingDate, v.bomNo, v.totalQty)),
     onSuccess: () => invalidateAll(qc),
   });
 };

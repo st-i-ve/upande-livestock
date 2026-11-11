@@ -20,6 +20,11 @@ export type HerdRecipeLine = {
    *  the phone — see the identical warning on `ManualFeedLine.qty`. */
   qty: number;
   uom: string;
+  /** A per-head dose in Gram or Millilitre (`_doses.is_dose`), outside the
+   *  ration's kilos: shown as g/head or ml/head and sent back in that unit. */
+  isDose: boolean;
+  /** The line is the concentrate the farm mixes itself. */
+  isConcentrate: boolean;
 };
 
 export type HerdRecipe = {
@@ -67,6 +72,9 @@ export const getHerdRecipes = async (herd: string): Promise<HerdRecipes> => {
         itemName: l.item_name,
         qty: Number(l.qty ?? 0),
         uom: l.uom ?? "",
+        // Older servers do not send it; the unit says the same thing.
+        isDose: l.is_dose != null ? !!l.is_dose : l.uom === "Gram" || l.uom === "Millilitre",
+        isConcentrate: !!l.is_concentrate,
       })),
     })),
   };

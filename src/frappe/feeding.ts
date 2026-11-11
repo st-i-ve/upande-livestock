@@ -145,6 +145,12 @@ export type FeedDayStatus = {
   runsDone: number;
   suggestedPortion: number;
   complete: boolean;
+  /** The ration's kilos a head (`BOM.quantity`). */
+  perHeadKg: number;
+  /** Livestock Settings > Feed by Head Count. Off, every figure above is a
+   *  suggestion and the operator types what the group was given (`total_qty`).
+   *  A server that does not send it feeds by head count, as before. */
+  feedByHeadCount: boolean;
 };
 
 export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => {
@@ -159,6 +165,8 @@ export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => 
     runsDone: Number(m.runs_done ?? 0),
     suggestedPortion: Number(m.suggested_portion ?? 1),
     complete: !!m.complete,
+    perHeadKg: Number(m.per_head_kg ?? 0),
+    feedByHeadCount: m.feed_by_head_count !== false,
   };
 };
 
@@ -182,5 +190,8 @@ export const manufactureHerdFeed = (
   portion = 1,
   postingDate?: string,
   bomNo?: string,
+  /** The group's kilos as typed, on a farm not feeding by head count; the
+   *  server ignores it while Feed by Head Count is on. */
+  totalQty?: number,
 ): Promise<ManufactureResult> =>
-  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo });
+  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo, total_qty: totalQty });
