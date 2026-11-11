@@ -3,6 +3,8 @@ import { font } from "@/constants/theme";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/src/hooks/useColors";
+import type { Silhouette } from "@/src/silhouettes";
+import { SilhouetteArt } from "@/components/AnimalSilhouette";
 
 export type AvatarTone = "calf" | "bull" | "warning" | "danger" | "default";
 
@@ -11,9 +13,12 @@ export function Avatar({
   icon,
   tone = "default",
   size = 34,
+  art,
 }: {
   text?: string;
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  /** A traced silhouette instead of a glyph (fitted inside the circle, never clipped). */
+  art?: Silhouette;
   tone?: AvatarTone;
   size?: number;
 }) {
@@ -41,7 +46,9 @@ export function Avatar({
         },
       ]}
     >
-      {icon ? (
+      {art ? (
+        <SilhouetteArt pose={art} color={t.fg} width={Math.round(size * 0.66)} height={Math.round(size * 0.6)} />
+      ) : icon ? (
         <MaterialCommunityIcons name={icon} size={Math.round(size * 0.5)} color={t.fg} />
       ) : (
         <Text style={[styles.txt, { color: t.fg, fontSize: Math.round(size * 0.32) }]}>{text}</Text>

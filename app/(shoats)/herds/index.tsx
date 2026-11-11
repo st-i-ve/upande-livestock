@@ -11,7 +11,7 @@ import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
-import { LABEL, useAnimalType } from "@/src/shoats/animalType";
+import { LABEL, silhouetteOf, useAnimalType } from "@/src/shoats/animalType";
 import { useShoatHerds } from "@/src/shoats/hooks";
 import { classSummary } from "@/src/shoats/logic";
 
@@ -51,7 +51,7 @@ export default function ShoatHerds() {
         herds.map((h) => (
           <Row
             key={h.name}
-            left={<Avatar icon="sheep" />}
+            left={<Avatar art={silhouetteOf(type)} />}
             title={h.label}
             meta={`${h.head} head${h.classes.length ? ` · ${classSummary(h.classes)}` : ""}`}
             chevron

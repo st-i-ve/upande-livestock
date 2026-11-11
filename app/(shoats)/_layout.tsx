@@ -5,12 +5,14 @@ import { StyleSheet } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SilhouetteArt } from "@/components/AnimalSilhouette";
 import { RecordTabButton } from "@/components/RecordTabButton";
 import { TabSwipe } from "@/components/TabSwipe";
 import { ContinueRecording } from "@/components/ContinueRecording";
 import { useRecordDrafts } from "@/src/record/draft";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
+import { silhouetteOf, useAnimalType } from "@/src/shoats/animalType";
 
 const ICON_SIZE = 31;
 const BAR_CONTENT_HEIGHT = 58;
@@ -21,6 +23,7 @@ export default function ShoatsTabLayout() {
   const insets = useSafeAreaInsets();
   const { canRecord } = useCanRecord();
   const reduceMotion = useReducedMotion();
+  const type = useAnimalType((s) => s.type);
   // Swiping skips the Record tab when the user has no Employee and it is hidden.
   const hidden = canRecord ? [] : ["record"];
 
@@ -55,8 +58,8 @@ export default function ShoatsTabLayout() {
             elevation: 0,
           },
           tabBarItemStyle: { paddingTop: 0, paddingBottom: 0 },
-          // The navigator draws each icon in a small fixed box; a font glyph at
-          // the bar's size (the sheep) was clipped by it. Room for the glyph.
+          // The navigator draws each icon in a small fixed box; a drawing at the
+          // bar's size was clipped by it. Room for the sheep or the goat.
           tabBarIconStyle: { width: ICON_SIZE + 9, height: ICON_SIZE + 5 },
         }}
       >
@@ -64,7 +67,10 @@ export default function ShoatsTabLayout() {
           name="herds"
           options={{
             title: "Herds",
-            tabBarIcon: ({ color }) => <MaterialCommunityIcons name="sheep" size={ICON_SIZE + 3} color={color as string} />,
+            // The traced sheep or goat, whichever animals the phone is working with.
+            tabBarIcon: ({ color }) => (
+              <SilhouetteArt pose={silhouetteOf(type)} color={color} width={ICON_SIZE + 7} height={ICON_SIZE + 1} />
+            ),
           }}
         />
         <Tabs.Screen

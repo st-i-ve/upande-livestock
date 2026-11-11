@@ -16,6 +16,9 @@ export const speciesOf = (t: AnimalType): "Sheep" | "Goat" | null =>
 
 export const isShoats = (t: AnimalType | null): t is "sheep" | "goats" => t === "sheep" || t === "goats";
 
+/** The traced drawing that stands for the chosen shoat type (tab icon, herd avatars). */
+export const silhouetteOf = (t: AnimalType | null): "sheep" | "goat" => (t === "goats" ? "goat" : "sheep");
+
 export const LABEL: Record<AnimalType, string> = { cattle: "Cattle", sheep: "Sheep", goats: "Goats" };
 
 /** Where each animal type opens. */

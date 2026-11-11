@@ -12,25 +12,29 @@
  * from the backend's design/silhouettes/).
  */
 
-export type SilhouetteClass = "cow" | "heifer" | "bull" | "steer" | "calf" | "sheep" | "goat";
+export type SilhouetteClass =
+  "cow" | "heifer" | "bull" | "steer" | "calf" | "sheep" | "goat" | "goat-kid";
 
 export type Silhouette =
   | "cow" | "cow-udder" | "cow-grazing" | "cow-grazing-2"
   | "heifer"
   | "bull"
   | "steer" | "steer-turned" | "steer-grazing"
-  | "calf" | "calf-grazing";
+  | "calf" | "calf-grazing"
+  | "sheep"
+  | "goat" | "goat-kid";
 
 /** The poses of each class (the first is the plain standing one). Sheep and
- *  goats have no artwork yet, so they wear the calf's two pictures. */
+ *  goats have one drawing each: the sheep, the horned adult goat and the kid. */
 export const POSES: Record<SilhouetteClass, readonly Silhouette[]> = {
   cow: ["cow", "cow-udder", "cow-grazing-2", "cow-grazing"],
   heifer: ["heifer", "cow-grazing"],
   bull: ["bull"],
   steer: ["steer", "steer-turned", "steer-grazing"],
   calf: ["calf", "calf-grazing"],
-  sheep: ["calf", "calf-grazing"],
-  goat: ["calf", "calf-grazing"],
+  sheep: ["sheep"],
+  goat: ["goat"],
+  "goat-kid": ["goat-kid"],
 };
 
 /** What the pick reads. Every field but the number may be missing. The phone
@@ -45,7 +49,7 @@ export type SilhouetteSubject = {
   repro?: string | null;
 };
 
-/** Younger than this and it is drawn as a calf, whatever its stage says. */
+/** Younger than this and it is drawn as a calf (a goat as a kid), whatever its stage says. */
 export const CALF_DAYS = 210;
 /** A female younger than this, whose stage does not say she has calved, is a heifer. */
 export const HEIFER_DAYS = 730;
@@ -69,12 +73,13 @@ function sexOf(sex: string | null | undefined): "Male" | "Female" | null {
 
 export function silhouetteClass(a: Omit<SilhouetteSubject, "id">, now = new Date()): SilhouetteClass {
   const species = (a.species || "").toLowerCase();
-  if (species === "sheep") return "sheep";
-  if (species === "goat" || species === "goats") return "goat";
-
   const stage = a.stage || (a.repro === "Calf" ? "calf" : null);
   const age = ageDays(a.dob, now);
-  if (stage === "calf" || (age !== null && age < CALF_DAYS)) return "calf";
+  const young = stage === "calf" || (age !== null && age < CALF_DAYS);
+  if (species === "sheep") return "sheep";
+  if (species === "goat" || species === "goats") return young ? "goat-kid" : "goat";
+
+  if (young) return "calf";
 
   const sex = sexOf(a.sex);
   if (sex === "Male") return stage === "bull" ? "bull" : "steer";

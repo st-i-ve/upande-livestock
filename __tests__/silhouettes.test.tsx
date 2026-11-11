@@ -13,7 +13,15 @@ const born = (days: number) => new Date(NOW.getTime() - days * 86400000).toISOSt
 describe("silhouetteClass", () => {
   it("sheep and goats by species, whatever else is known", () => {
     expect(silhouetteClass({ species: "Sheep", sex: "M", stage: "bull" }, NOW)).toBe("sheep");
-    expect(silhouetteClass({ species: "Goat", sex: "F", dob: born(30) }, NOW)).toBe("goat");
+    expect(silhouetteClass({ species: "Sheep", stage: "calf", dob: born(30) }, NOW)).toBe("sheep");
+    expect(silhouetteClass({ species: "Goat", sex: "F", dob: born(CALF_DAYS) }, NOW)).toBe("goat");
+    expect(silhouetteClass({ species: "Goats", sex: "M" }, NOW)).toBe("goat");
+  });
+
+  it("a young goat is a kid, by stage or by age, like a calf", () => {
+    expect(silhouetteClass({ species: "Goat", sex: "F", dob: born(30) }, NOW)).toBe("goat-kid");
+    expect(silhouetteClass({ species: "Goat", stage: "calf" }, NOW)).toBe("goat-kid");
+    expect(silhouetteClass({ species: "Goat", repro: "Calf" }, NOW)).toBe("goat-kid");
   });
 
   it("a calf by stage, or by age under seven months", () => {
@@ -88,9 +96,14 @@ describe("the drawings", () => {
     }
   });
 
-  it("sheep and goats, with no artwork of their own yet, wear the calf's", () => {
-    expect(POSES.sheep).toEqual(POSES.calf);
-    expect(POSES.goat).toEqual(POSES.calf);
+  it("sheep and goats wear their own drawings, never the calf's", () => {
+    expect(POSES.sheep).toEqual(["sheep"]);
+    expect(POSES.goat).toEqual(["goat"]);
+    expect(POSES["goat-kid"]).toEqual(["goat-kid"]);
+    expect(pickSilhouette({ id: "S1", species: "Sheep" }, NOW)).toBe("sheep");
+    expect(pickSilhouette({ id: "G1", species: "Goat", dob: born(900) }, NOW)).toBe("goat");
+    expect(pickSilhouette({ id: "G2", species: "Goat", dob: born(20) }, NOW)).toBe("goat-kid");
+    for (const p of ["sheep", "goat", "goat-kid"] as const) expect(SILHOUETTE_PATHS[p].d.length).toBeGreaterThan(100);
   });
 
   it("renders the picked pose in the colour it is given", () => {

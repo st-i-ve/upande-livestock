@@ -3,20 +3,27 @@ import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { SilhouetteArt } from "@/components/AnimalSilhouette";
 import { Screen } from "@/components/Screen";
 import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { homeOf, useAnimalType, type AnimalType } from "@/src/shoats/animalType";
+import type { Silhouette } from "@/src/silhouettes";
 
-type Option = { id: string; label: string; blurb: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
+/** Each card wears the farm's traced drawings (Shoats: the sheep and the goat side by side). */
+type Option = { id: string; label: string; blurb: string; art: Silhouette[] };
+
+/** The drawing box: the old 34 px glyph's height, wide enough for a cow side on. */
+const ART_W = 52;
+const ART_H = 34;
 
 const TOP: Option[] = [
-  { id: "cattle", label: "Cattle", blurb: "Individual animals: weights, breeding, health, feeding.", icon: "cow" },
-  { id: "shoats", label: "Shoats", blurb: "Sheep and goats, kept by herd numbers.", icon: "sheep" },
+  { id: "cattle", label: "Cattle", blurb: "Individual animals: weights, breeding, health, feeding.", art: ["cow"] },
+  { id: "shoats", label: "Shoats", blurb: "Sheep and goats, kept by herd numbers.", art: ["sheep", "goat"] },
 ];
 const SHOATS: Option[] = [
-  { id: "sheep", label: "Sheep", blurb: "Flocks: ewes, rams, lambs.", icon: "sheep" },
-  { id: "goats", label: "Goats", blurb: "Herds: does, bucks, kids.", icon: "sheep" },
+  { id: "sheep", label: "Sheep", blurb: "Flocks: ewes, rams, lambs.", art: ["sheep"] },
+  { id: "goats", label: "Goats", blurb: "Herds: does, bucks, kids.", art: ["goat"] },
 ];
 
 /**
@@ -69,7 +76,17 @@ export default function Choose() {
           onPress={() => pick(o.id)}
           style={({ pressed }) => [s.card, selected(o.id) && s.cardOn, pressed && { backgroundColor: c.bgMuted }]}
         >
-          <MaterialCommunityIcons name={o.icon} size={34} color={c.text} />
+          <View style={s.art} testID={`choose-art-${o.id}`}>
+            {o.art.map((pose) => (
+              <SilhouetteArt
+                key={pose}
+                pose={pose}
+                color={c.text}
+                width={o.art.length > 1 ? ART_W / 2 : ART_W}
+                height={o.art.length > 1 ? ART_H * 0.8 : ART_H}
+              />
+            ))}
+          </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={s.label}>{o.label}</Text>
             <Text style={s.blurb}>{o.blurb}</Text>
@@ -83,6 +100,7 @@ export default function Choose() {
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
+    art: { width: ART_W, height: ART_H, flexDirection: "row", alignItems: "flex-end", justifyContent: "center" },
     card: {
       flexDirection: "row",
       alignItems: "center",
