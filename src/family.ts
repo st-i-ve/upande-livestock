@@ -79,6 +79,26 @@ export type Family = {
   local?: boolean;
 };
 
+export type KnownParent = { role: "Dam" | "Sire"; kin: Kin };
+
+/**
+ * What the family tree draws: only the parents that are known (no "not
+ * recorded" boxes), the offspring only when there are some, and nothing at all
+ * when the animal has neither a parent nor a calf on record.
+ */
+export function treeParts(family: Family | null | undefined): {
+  parents: KnownParent[];
+  offspring: boolean;
+  show: boolean;
+} {
+  if (!family) return { parents: [], offspring: false, show: false };
+  const parents: KnownParent[] = [];
+  if (family.parents.dam) parents.push({ role: "Dam", kin: family.parents.dam });
+  if (family.parents.sire) parents.push({ role: "Sire", kin: family.parents.sire });
+  const offspring = family.offspring.length > 0;
+  return { parents, offspring, show: parents.length > 0 || offspring };
+}
+
 export function countOffspring(kids: { sex: string | null }[]) {
   let sons = 0;
   let daughters = 0;

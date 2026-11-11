@@ -4,6 +4,9 @@ import {
   measuresFor,
   sectionsFor,
   sortOffspring,
+  treeParts,
+  type Family,
+  type Kin,
   type LocalKin,
 } from "@/src/family";
 
@@ -88,5 +91,38 @@ describe("offspring", () => {
     expect(f.breedingBull).toBe(true);
     const ai = localFamily(all[3], all);
     expect(ai.parents.sire).toMatchObject({ id: null, name: "AI Straw", onRecord: false });
+  });
+});
+
+describe("what the family tree draws", () => {
+  const kin = (name: string, sex: string): Kin => ({ id: name, name, sex, dob: null, active: true, onRecord: true });
+  const fam = (dam: Kin | null, sire: Kin | null, offspring: Kin[] = []): Family => ({
+    parents: { dam, sire },
+    offspring,
+    sons: 0,
+    daughters: 0,
+    bred: null,
+    breedingBull: false,
+  });
+
+  it("nothing at all when neither parent nor any calf is known", () => {
+    expect(treeParts(fam(null, null))).toEqual({ parents: [], offspring: false, show: false });
+    expect(treeParts(null).show).toBe(false);
+  });
+  it("only the known parent, with no box for the missing one", () => {
+    const dam = kin("D1", "Female");
+    expect(treeParts(fam(dam, null)).parents).toEqual([{ role: "Dam", kin: dam }]);
+    const sire = kin("S1", "Male");
+    expect(treeParts(fam(null, sire)).parents).toEqual([{ role: "Sire", kin: sire }]);
+    expect(treeParts(fam(dam, sire)).parents.map((p) => p.role)).toEqual(["Dam", "Sire"]);
+  });
+  it("the offspring section only when there are calves", () => {
+    expect(treeParts(fam(kin("D1", "Female"), null)).offspring).toBe(false);
+    const parts = treeParts(fam(null, null, [kin("C1", "Male")]));
+    expect(parts).toEqual({ parents: [], offspring: true, show: true });
+  });
+  it("an offline family with no parent or calf on the phone draws nothing", () => {
+    const me: LocalKin = { id: "A1", name: "A1", sex: "F", dob: "2020-01-01" };
+    expect(treeParts(localFamily(me, [me])).show).toBe(false);
   });
 });

@@ -8,7 +8,7 @@ import { AnimalImage } from "@/components/AnimalImage";
 import { Banner } from "@/components/Banner";
 import { Loader } from "@/components/Loader";
 import { SectionTitle } from "@/components/SectionTitle";
-import { isMale, type BullRecord, type Family, type Kin } from "@/src/family";
+import { isMale, treeParts, type BullRecord, type Family, type Kin } from "@/src/family";
 import { useColors } from "@/src/hooks/useColors";
 
 const open = (id: string | null) => {
@@ -17,7 +17,10 @@ const open = (id: string | null) => {
 
 /**
  * Her family as a small tree: dam and sire on top, her in the middle, her
- * calves underneath with a sons/daughters count. Every animal on record opens
+ * calves underneath with a sons/daughters count. Only what is known is drawn:
+ * no parents row when neither parent is on record (and only the known one when
+ * one is), no offspring section without calves, and no tree at all when there
+ * is neither. Every animal on record opens
  * its own page; a calf that has left the farm is greyed with its status.
  * Photo-less animals wear their silhouette (src/silhouettes.ts).
  */
@@ -32,7 +35,6 @@ export function FamilyTree({
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const male = isMale(me.sex);
 
   if (loading && !family) {
     return (
@@ -42,27 +44,31 @@ export function FamilyTree({
       </>
     );
   }
-  if (!family) return null;
-  const { parents, offspring, sons, daughters } = family;
-  const kidsLabel = offspring.length
-    ? `${sons} ${sons === 1 ? "son" : "sons"} · ${daughters} ${daughters === 1 ? "daughter" : "daughters"}`
-    : male
-      ? "No calves recorded to him"
-      : "No calves recorded";
+  const parts = treeParts(family);
+  if (!family || !parts.show) return null;
+  const { offspring, sons, daughters } = family;
+  const kidsLabel = `${sons} ${sons === 1 ? "son" : "sons"} · ${daughters} ${daughters === 1 ? "daughter" : "daughters"}`;
 
   return (
     <>
       <SectionTitle>Family</SectionTitle>
       <View style={s.card} testID="family-tree">
-        <View style={s.parents}>
-          <Parent role="Dam" kin={parents.dam} />
-          <Parent role="Sire" kin={parents.sire} />
-        </View>
-        <View style={s.joinRow}>
-          <View style={s.joinLeft} />
-          <View style={s.joinRight} />
-        </View>
-        <View style={s.stem} />
+        {parts.parents.length ? (
+          <>
+            <View style={[s.parents, parts.parents.length === 1 && s.parentsOne]} testID="family-parents">
+              {parts.parents.map((p) => (
+                <Parent key={p.role} role={p.role} kin={p.kin} />
+              ))}
+            </View>
+            {parts.parents.length === 2 ? (
+              <View style={s.joinRow}>
+                <View style={s.joinLeft} />
+                <View style={s.joinRight} />
+              </View>
+            ) : null}
+            <View style={s.stem} />
+          </>
+        ) : null}
         <View style={s.meNode}>
           <AnimalImage
             image={me.image}
@@ -72,17 +78,19 @@ export function FamilyTree({
           />
           <Text style={s.meName} numberOfLines={1}>{me.name}</Text>
         </View>
-        {offspring.length ? <View style={s.stem} /> : null}
-        <View style={s.kidsHead}>
-          <Text style={s.kidsTitle}>Offspring{offspring.length ? ` (${offspring.length})` : ""}</Text>
-          <Text style={s.kidsCount}>{kidsLabel}</Text>
-        </View>
-        {offspring.length ? (
-          <View style={s.kids}>
-            {offspring.map((k, i) => (
-              <Child key={k.id ?? `${k.name}-${i}`} kin={k} last={i === offspring.length - 1} />
-            ))}
-          </View>
+        {parts.offspring ? (
+          <>
+            <View style={s.stem} />
+            <View style={s.kidsHead} testID="family-offspring">
+              <Text style={s.kidsTitle}>Offspring ({offspring.length})</Text>
+              <Text style={s.kidsCount}>{kidsLabel}</Text>
+            </View>
+            <View style={s.kids}>
+              {offspring.map((k, i) => (
+                <Child key={k.id ?? `${k.name}-${i}`} kin={k} last={i === offspring.length - 1} />
+              ))}
+            </View>
+          </>
         ) : null}
         {family.local ? (
           <Text style={s.note}>Offline: from the animals on this phone; sold or dead calves are not shown.</Text>
@@ -92,38 +100,30 @@ export function FamilyTree({
   );
 }
 
-function Parent({ role, kin }: { role: "Dam" | "Sire"; kin: Kin | null }) {
+function Parent({ role, kin }: { role: "Dam" | "Sire"; kin: Kin }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const can = !!kin?.id && kin.onRecord !== false;
+  const can = !!kin.id && kin.onRecord !== false;
   return (
     <Pressable
       accessibilityRole={can ? "button" : undefined}
-      accessibilityLabel={kin ? `${role} ${kin.name}` : `${role} not recorded`}
+      accessibilityLabel={`${role} ${kin.name}`}
       disabled={!can}
-      onPress={() => open(kin?.id ?? null)}
-      style={[s.parent, !kin && s.parentEmpty, kin && !kin.active && kin.onRecord !== false && s.gone]}
+      onPress={() => open(kin.id)}
+      style={[s.parent, !kin.active && kin.onRecord !== false && s.gone]}
     >
-      {kin ? (
-        <AnimalImage
-          image={kin.photo}
-          thumb={kin.thumb}
-          animal={{ id: kin.id ?? kin.name, sex: kin.sex ?? (role === "Dam" ? "Female" : "Male"), dob: kin.dob }}
-          style={s.avatar}
-        />
-      ) : (
-        <View style={[s.avatar, s.avatarEmpty]}>
-          <MaterialCommunityIcons name="help" size={18} color={c.textSubtle} />
-        </View>
-      )}
+      <AnimalImage
+        image={kin.photo}
+        thumb={kin.thumb}
+        animal={{ id: kin.id ?? kin.name, sex: kin.sex ?? (role === "Dam" ? "Female" : "Male"), dob: kin.dob }}
+        style={s.avatar}
+      />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={s.role}>{role}</Text>
-        <Text style={s.name} numberOfLines={1}>{kin?.name ?? "Not recorded"}</Text>
-        {kin ? (
-          <Text style={s.meta} numberOfLines={1}>
-            {kin.onRecord === false ? "not on the farm's record" : [kin.tag && kin.tag !== kin.name ? kin.tag : null, !kin.active ? kin.status : null].filter(Boolean).join(" · ") || kin.id}
-          </Text>
-        ) : null}
+        <Text style={s.name} numberOfLines={1}>{kin.name}</Text>
+        <Text style={s.meta} numberOfLines={1}>
+          {kin.onRecord === false ? "not on the farm's record" : [kin.tag && kin.tag !== kin.name ? kin.tag : null, !kin.active ? kin.status : null].filter(Boolean).join(" · ") || kin.id}
+        </Text>
       </View>
     </Pressable>
   );
@@ -218,9 +218,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       flex: 1, flexDirection: "row", alignItems: "center", gap: 8, padding: 8,
       borderRadius: 12, backgroundColor: c.bgMuted,
     },
-    parentEmpty: { backgroundColor: "transparent", borderWidth: 1, borderStyle: "dashed", borderColor: c.border },
+    parentsOne: { alignSelf: "center", width: "60%" },
     avatar: { width: AV, height: AV, borderRadius: AV / 2 },
-    avatarEmpty: { alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: c.border },
     role: { fontSize: 9, ...font("600"), letterSpacing: 1, textTransform: "uppercase", color: c.textSubtle },
     name: { fontSize: 14, ...font("600"), color: c.text, flexShrink: 1 },
     meta: { fontSize: 11, color: c.textMuted },
