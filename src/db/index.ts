@@ -55,6 +55,12 @@ const MIGRATIONS: string[][] = [
     `ALTER TABLE animals ADD COLUMN thumb TEXT`,
     `DELETE FROM meta WHERE key = 'animals_server_time'`,
   ],
+  // 4 -> 5: the date of her latest weighing, for the recently-weighed warning on
+  // Record → Weight. Rows on the phone have none: drop the cursor, full sync.
+  [
+    `ALTER TABLE animals ADD COLUMN last_weight_date TEXT`,
+    `DELETE FROM meta WHERE key = 'animals_server_time'`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

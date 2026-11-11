@@ -9,13 +9,16 @@ import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
+import { SuccessTick } from "@/components/SuccessTick";
 import { RADIUS, font } from "@/constants/theme";
+import { markWeighed } from "@/src/db/animals";
 import { syncAnimals } from "@/src/db/sync";
 import {
   getWeightSettings,
@@ -29,6 +32,8 @@ import { useColors } from "@/src/hooks/useColors";
 import { useOperator } from "@/src/hooks/useOperator";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
+import { findRecent, recentMessage, type RecentWeighing } from "@/src/weights/recent";
+import { EMPTY_ENTRY as EMPTY, type Entry, allSaved, formAfterSave, kg, num, savedMessage, savedWeights } from "@/src/weights/session";
 import type { Animal } from "@/types";
 
 // The same three ways the web Weights page offers. The last two are estimates
@@ -38,15 +43,6 @@ const MODES: { mode: WeighingMode; title: string; blurb: string }[] = [
   { mode: "platform", title: "A pen on the platform", blurb: "One total for the group, divided by head." },
   { mode: "alike", title: "One weight for animals of a size", blurb: "One figure stands for them all." },
 ];
-
-type Entry = { weight: string; girth: string; bcs: string };
-const EMPTY: Entry = { weight: "", girth: "", bcs: "" };
-
-const num = (v: string) => {
-  const n = Number(v.replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-};
-const kg = (n: number) => (Math.round(n * 10) / 10).toString();
 
 export default function WeightSession() {
   const c = useColors();
@@ -61,7 +57,7 @@ export default function WeightSession() {
   const finish = useFinishRecording();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  useSeedAnimal(preset, selected, (a) => setSelected([a]));
+  useSeedAnimal(preset, selected, (a) => pick([a]));
 
   const [mode, setMode] = useState<WeighingMode>("each");
   const [methodPick, setMethodPick] = useState("");
@@ -71,6 +67,12 @@ export default function WeightSession() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<WeightOutcome | null>(null);
+  // Recently weighed: animals the operator chose to weigh again (asked no more),
+  // the warning shown on a pick, and the one shown at save time.
+  const [again, setAgain] = useState<Set<string>>(new Set());
+  const [pickWarn, setPickWarn] = useState<RecentWeighing[]>([]);
+  const [saveWarn, setSaveWarn] = useState<RecentWeighing[]>([]);
+  const [tick, setTick] = useState<string | null>(null);
   const inputs = useRef<Record<string, TextInputInstance | null>>({});
 
   const methods = settings.data?.methods ?? [];
@@ -78,10 +80,27 @@ export default function WeightSession() {
   // unless the farm has since stopped offering it.
   const method = methods.includes(methodPick) ? methodPick : settings.data?.defaultMethod ?? "";
 
+  // The day being recorded: the backdated one, or the server's today.
+  const onDay = isBackdating ? backdateDate : serverToday;
+  const unasked = (list: Animal[]) => findRecent(list, onDay).filter((r) => !again.has(r.id));
+
+  // Every change of selection goes through here, so a recently weighed animal is
+  // flagged as soon as she is picked, before anyone types her weight.
+  function pick(list: Animal[]) {
+    setSelected(list);
+    setPickWarn(unasked(list));
+  }
+  const skipRecent = (ids: string[]) => {
+    const drop = new Set(ids);
+    setSelected((p) => p.filter((a) => !drop.has(a.id)));
+    setEntries((p) => Object.fromEntries(Object.entries(p).filter(([id]) => !drop.has(id))));
+  };
+  const weighAgain = (ids: string[]) => setAgain((p) => new Set([...p, ...ids]));
+
   const nameOf = useMemo(() => new Map(selected.map((a) => [a.id, a])), [selected]);
   const set = (id: string, field: keyof Entry, v: string) =>
     setEntries((p) => ({ ...p, [id]: { ...(p[id] ?? EMPTY), [field]: v } }));
-  const removeOne = (id: string) => setSelected((p) => p.filter((a) => a.id !== id));
+  const removeOne = (id: string) => skipRecent([id]);
 
   const written = selected.filter((a) => num((entries[a.id] ?? EMPTY).weight) > 0);
   const figure = num(groupFigure);
@@ -90,18 +109,28 @@ export default function WeightSession() {
     !!operator &&
     (mode === "each" ? written.length > 0 : selected.length > 0 && figure > 0);
 
-  // After a save: only the animals the server refused stay on the list, with
-  // their typed figures, so the operator can correct them and send again.
-  const keepRefused = (o: WeightOutcome) => {
-    const bad = new Set(o.failed.map((f) => f.animal));
-    setSelected((p) => p.filter((a) => bad.has(a.id)));
-    setEntries((p) => Object.fromEntries(Object.entries(p).filter(([id]) => bad.has(id))));
+  // After the tick: an empty form, ready for the next animal.
+  const clearForm = () => {
+    setTick(null);
+    setSelected([]);
+    setEntries({});
+    setGroupFigure("");
+    setAgain(new Set());
+    setOutcome(null);
+    if (preset) finish("Weight recording");
   };
 
   const submit = async () => {
     setError(null);
     if (!operator) return setError(missingMessage);
     if (!ready) return;
+    // Asked again at save time, for a recent animal the pick warning was waved away on.
+    const recent = unasked(mode === "each" ? written : selected);
+    if (recent.length) return setSaveWarn(recent);
+    await save();
+  };
+
+  const save = async () => {
     setBusy(true);
     try {
       const o = await recordWeights({
@@ -123,15 +152,26 @@ export default function WeightSession() {
           ...(mode === "platform" ? { total_weight_kg: figure } : { weight_kg: figure }),
         },
       });
-      setOutcome(o);
-      // Pull the new last_weight_kg into the local store (delta sync).
+      const form = { selected, entries, groupFigure };
+      const saved = savedWeights(mode, form, o);
+      // The local rows learn the new weight and its day now, so picking the same
+      // animal again warns before the next sync brings it from the server.
+      await markWeighed(saved, onDay).catch(() => {});
       void syncAnimals();
       qc.invalidateQueries({ queryKey: ["animals"] });
       qc.invalidateQueries({ queryKey: ["animal"] });
-      keepRefused(o);
-      setGroupFigure("");
-      // Opened for one animal and nothing was refused: back to her page.
-      if (preset && o.failed.length === 0) finish("Weight recording");
+      if (allSaved(o)) {
+        // The tick, then clearForm (and, opened for one animal, back to her page).
+        setOutcome(null);
+        setTick(savedMessage(saved, selected));
+      } else {
+        // Only the refused animals stay, with their figures, to correct and resend.
+        setOutcome(o);
+        const next = formAfterSave(form, o);
+        setSelected(next.selected);
+        setEntries(next.entries);
+        setGroupFigure(next.groupFigure);
+      }
     } catch (e) {
       setError(extractFrappeError(e));
     } finally {
@@ -168,7 +208,7 @@ export default function WeightSession() {
           title="Who went through"
           placeholder={selected.length ? `${selected.length} selected — tap to change` : "Select one or many..."}
           value={selected}
-          onPickMulti={setSelected}
+          onPickMulti={pick}
         />
       </Field>
 
@@ -355,6 +395,31 @@ export default function WeightSession() {
           onPress={submit}
         />
       </FieldRow>
+
+      <ConfirmModal
+        visible={pickWarn.length > 0}
+        title="Weighed recently"
+        message={recentMessage(pickWarn)}
+        cancelLabel="Skip"
+        confirmLabel="Weigh again"
+        onCancel={() => { skipRecent(pickWarn.map((r) => r.id)); setPickWarn([]); }}
+        onConfirm={() => { weighAgain(pickWarn.map((r) => r.id)); setPickWarn([]); }}
+        onDismiss={() => setPickWarn([])}
+      />
+      <ConfirmModal
+        visible={saveWarn.length > 0}
+        title="Save anyway?"
+        message={recentMessage(saveWarn).replace(/You can skip[^\n]*$/, "Save this weighing as well?")}
+        cancelLabel="Not now"
+        confirmLabel="Save"
+        onCancel={() => setSaveWarn([])}
+        onConfirm={() => {
+          weighAgain(saveWarn.map((r) => r.id));
+          setSaveWarn([]);
+          void save();
+        }}
+      />
+      <SuccessTick visible={tick !== null} message={tick ?? ""} onDone={clearForm} />
     </Screen>
   );
 }

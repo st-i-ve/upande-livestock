@@ -121,15 +121,22 @@ export function AnimalPickerSheet({
 
   const renderAnimal = (a: Animal, indent = false) => {
     const p = pillFor(a);
+    // Single mode: the animal already chosen on the form (initialSelectedIds).
     const isSel = selected.has(a.id);
     return (
       <Pressable
         onPress={() => toggle(a.id)}
-        style={({ pressed }) => [s.item, indent && { paddingLeft: 24 }, pressed && { backgroundColor: c.bgMuted }]}
+        accessibilityState={{ selected: isSel }}
+        style={({ pressed }) => [
+          s.item,
+          indent && { paddingLeft: 24 },
+          pressed && { backgroundColor: c.bgMuted },
+          isSel && s.itemSel,
+        ]}
       >
         {mode === "multi" ? (
-          <View style={[s.cb, isSel && { backgroundColor: c.text, borderColor: c.text }]}>
-            {isSel ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
+          <View style={[s.cb, isSel && { backgroundColor: c.selected, borderColor: c.selected }]}>
+            {isSel ? <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" /> : null}
           </View>
         ) : null}
         <AnimalImage image={a.image} thumb={a.thumb} animal={a} style={{ width: 30, height: 30, borderRadius: 15 }} iconSize={15} />
@@ -195,8 +202,8 @@ export function AnimalPickerSheet({
               ListHeaderComponent={
                 mode === "multi" ? (
                   <Pressable onPress={toggleAll} style={s.item}>
-                    <View style={[s.cb, allSelected && { backgroundColor: c.text, borderColor: c.text }]}>
-                      {allSelected ? <MaterialCommunityIcons name="check" size={13} color={c.bg} /> : null}
+                    <View style={[s.cb, allSelected && { backgroundColor: c.selected, borderColor: c.selected }]}>
+                      {allSelected ? <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" /> : null}
                     </View>
                     <Text style={[s.itemName, { ...font("700") }]}>Select all ({list.length})</Text>
                   </Pressable>
@@ -218,12 +225,12 @@ export function AnimalPickerSheet({
                       {mode === "multi" ? (
                         <View style={[
                           s.cb,
-                          (allSel || someSel) && { backgroundColor: c.text, borderColor: c.text },
+                          (allSel || someSel) && { backgroundColor: c.selected, borderColor: c.selected },
                         ]}>
                           {allSel ? (
-                            <MaterialCommunityIcons name="check" size={13} color={c.bg} />
+                            <MaterialCommunityIcons name="check" size={13} color="#FFFFFF" />
                           ) : someSel ? (
-                            <MaterialCommunityIcons name="minus" size={13} color={c.bg} />
+                            <MaterialCommunityIcons name="minus" size={13} color="#FFFFFF" />
                           ) : null}
                         </View>
                       ) : null}
@@ -294,6 +301,16 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: c.borderSubtle,
+  },
+  // The chosen animal: orange border and a soft orange tint (theme.selected*).
+  itemSel: {
+    backgroundColor: c.selectedBg,
+    borderWidth: 1.5,
+    borderColor: c.selected,
+    borderBottomColor: c.selected,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 6,
+    marginVertical: 2,
   },
   cb: {
     width: 18, height: 18, borderRadius: 4,

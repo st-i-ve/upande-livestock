@@ -33,7 +33,11 @@ export function AnimalPickerButton({
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [open, setOpen] = useState(false);
-  const [label, setLabel] = useState<string | null>(() => deriveLabel(mode, value));
+  const [picked, setLabel] = useState<string | null>(() => deriveLabel(mode, value));
+  // A screen that passes `value` owns the selection: when it clears or changes
+  // it (after a save, or Skip on the recently-weighed warning) the label follows.
+  const label = value !== undefined ? deriveLabel(mode, value) : picked;
+  const chosen = !!label;
 
   const initialIds: string[] | undefined = Array.isArray(value)
     ? value.map((a) => a.id)
@@ -43,7 +47,7 @@ export function AnimalPickerButton({
 
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} style={s.btn}>
+      <Pressable onPress={() => setOpen(true)} style={[s.btn, chosen && s.btnChosen]}>
         <MaterialCommunityIcons name="magnify" size={16} color={c.textMuted} />
         <Text style={[s.text, label ? { color: c.text } : null]} numberOfLines={1}>
           {label || placeholder}
@@ -92,5 +96,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderRadius: RADIUS.md,
       backgroundColor: c.bg,
     },
+    btnChosen: { borderWidth: 1.5, borderColor: c.selected, backgroundColor: c.selectedBg },
     text: { flex: 1, fontSize: 13, color: c.textMuted },
   });

@@ -25,6 +25,10 @@ export const LIGHT = {
   // Legacy keys mapped to monochrome equivalents so existing components
   // keep compiling without further edits. Do not introduce new tinted keys.
   brand: "#000000",
+  // The chosen animal in a picker: the one orange the farm asked for, so the
+  // pick stands out from the monochrome list. Border + a soft tint behind.
+  selected: "#EA580C",
+  selectedBg: "rgba(234, 88, 12, 0.10)",
 } as const;
 
 export type Palette = { [K in keyof typeof LIGHT]: string };
@@ -46,6 +50,8 @@ export const DARK: Palette = {
   warning: "#9CA3AF",
   danger: "#E5484D",
   brand: "#FFFFFF",
+  selected: "#FB923C",
+  selectedBg: "rgba(251, 146, 60, 0.16)",
 };
 
 // Backwards-compatible static export. Screens not yet migrated to useColors()

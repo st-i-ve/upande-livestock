@@ -21,6 +21,8 @@ export type ServerAnimal = {
   sire: string | null;
   parity: number | null;
   last_weight_kg: number | null;
+  /** ISO date of her latest submitted weighing. */
+  last_weight_date?: string | null;
   modified: string | null;
 };
 
@@ -28,7 +30,7 @@ type Row = Omit<ServerAnimal, "dob"> & { dob: string | null };
 
 const COLS = [
   "name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage",
-  "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "modified",
+  "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "last_weight_date", "modified",
 ] as const;
 
 /**
@@ -71,6 +73,7 @@ const toAnimal = (r: Row): Animal => ({
   dim: null,
   parity: r.parity ?? 0,
   lastWt: r.last_weight_kg ?? 0,
+  lastWtDate: r.last_weight_date ?? null,
   inTreatment: 0,
   pregnant: String(r.repro_status ?? "").toLowerCase().includes("pregnant") ? 1 : 0,
   tag: r.tag,
@@ -111,4 +114,24 @@ export async function countAnimals(): Promise<number> {
   const db = await getDb();
   const r = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM animals");
   return r?.n ?? 0;
+}
+
+/**
+ * A weighing just saved on this phone, written to the local row straight away
+ * so the recently-weighed warning knows of it before the next sync brings it.
+ * Only moves the date forward: a backdated weighing older than what the row has
+ * leaves it alone.
+ */
+export async function markWeighed(weights: { id: string; kg: number }[], date: string): Promise<void> {
+  if (!weights.length) return;
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    for (const w of weights) {
+      await db.runAsync(
+        `UPDATE animals SET last_weight_kg = ?, last_weight_date = ?
+          WHERE name = ? AND (last_weight_date IS NULL OR last_weight_date <= ?)`,
+        w.kg, date, w.id, date,
+      );
+    }
+  });
 }

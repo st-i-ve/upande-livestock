@@ -16,6 +16,7 @@ export function ConfirmModal({
   destructive,
   onConfirm,
   onCancel,
+  onDismiss,
 }: {
   visible: boolean;
   title: string;
@@ -25,6 +26,8 @@ export function ConfirmModal({
   destructive?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Back button or a tap outside the card; defaults to `onCancel`. */
+  onDismiss?: () => void;
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
@@ -36,9 +39,9 @@ export function ConfirmModal({
       animationType="fade"
       statusBarTranslucent
       navigationBarTranslucent
-      onRequestClose={onCancel}
+      onRequestClose={onDismiss ?? onCancel}
     >
-      <Pressable style={s.scrim} onPress={onCancel}>
+      <Pressable style={s.scrim} onPress={onDismiss ?? onCancel}>
         {/* Swallow taps on the card so they don't dismiss via the scrim. */}
         <Pressable style={s.card} onPress={() => {}}>
           <View style={[s.corner, s.tl]} />

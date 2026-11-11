@@ -8,6 +8,8 @@ export type Animal = {
   dim: number | null;
   parity: number;
   lastWt: number;
+  /** ISO date of the latest weighing, when the local store knows it. */
+  lastWtDate?: string | null;
   inTreatment: 0 | 1;
   pregnant: 0 | 1;
   /** Set when the animal comes from the local store (animals_since). */
