@@ -59,17 +59,22 @@ export default function ShoatsTabLayout() {
               }
             },
           }}
-          options={{
-            href: canRecord ? undefined : null,
-            tabBarLabel: () => null,
-            tabBarButton: (props) => (
-              <RecordTabButton
-                onPress={props.onPress}
-                onLongPress={props.onLongPress}
-                accessibilityState={props.accessibilityState}
-              />
-            ),
-          }}
+          options={
+            // `href: null` and a custom `tabBarButton` must never be set together:
+            // expo-router throws on it while laying out the tabs (see (tabs)/_layout).
+            canRecord
+              ? {
+                  tabBarLabel: () => null,
+                  tabBarButton: (props) => (
+                    <RecordTabButton
+                      onPress={props.onPress}
+                      onLongPress={props.onLongPress}
+                      accessibilityState={props.accessibilityState}
+                    />
+                  ),
+                }
+              : { href: null }
+          }
         />
         <Tabs.Screen
           name="profile"

@@ -63,18 +63,25 @@ export default function TabLayout() {
             }
           },
         }}
-        options={{
-          // No Employee, no recording: the tab is not there at all.
-          href: canRecord ? undefined : null,
-          tabBarLabel: () => null,
-          tabBarButton: (props) => (
-            <RecordTabButton
-              onPress={props.onPress}
-              onLongPress={props.onLongPress}
-              accessibilityState={props.accessibilityState}
-            />
-          ),
-        }}
+        options={
+          // No Employee, no recording: the tab is not there at all. `href: null`
+          // and a custom `tabBarButton` must never be set together — expo-router
+          // throws "Cannot use `href` and `tabBarButton` together" while laying
+          // out the tabs, which closes a release build on launch for every user
+          // without an Employee. So the hidden tab carries `href` alone.
+          canRecord
+            ? {
+                tabBarLabel: () => null,
+                tabBarButton: (props) => (
+                  <RecordTabButton
+                    onPress={props.onPress}
+                    onLongPress={props.onLongPress}
+                    accessibilityState={props.accessibilityState}
+                  />
+                ),
+              }
+            : { href: null }
+        }
       />
       <Tabs.Screen
         name="profile"
