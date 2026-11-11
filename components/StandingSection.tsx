@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { font } from "@/constants/theme";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -9,6 +9,9 @@ import type { Peers, StandingMetric } from "@/src/frappe/standing";
 import { useAnimalStanding } from "@/src/hooks/useAnimal";
 import { useColors } from "@/src/hooks/useColors";
 import { measuresFor } from "@/src/family";
+import { StandingRadar, StandingViewToggle } from "@/components/StandingRadar";
+import { viewFor } from "@/src/standingRadar";
+import { useStandingView } from "@/src/stores/standingView";
 
 const fmt = (n: number | null, unit: string) =>
   n == null ? "—" : `${Number.isInteger(n) ? n : n.toFixed(1)}${unit ? ` ${unit}` : ""}`;
@@ -37,10 +40,22 @@ export function StandingSection({ id, male = false }: { id: string; male?: boole
   const s = useMemo(() => makeStyles(c), [c]);
   const q = useAnimalStanding(id);
   const d = q.data;
+  const chosen = useStandingView((v) => v.chosen);
+  const choose = useStandingView((v) => v.set);
+  const hydrate = useStandingView((v) => v.hydrate);
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+  const metrics = useMemo(() => (d ? measuresFor(d.metrics, male) : []), [d, male]);
+  // Radar by default with three or more measures, bars with fewer; the user's choice wins.
+  const view = viewFor(metrics, chosen);
 
   return (
     <>
-      <SectionTitle>Performance vs other animals</SectionTitle>
+      <View style={s.head}>
+        <SectionTitle style={s.headTitle}>Performance vs other animals</SectionTitle>
+        {metrics.length ? <StandingViewToggle value={view} onChange={choose} /> : null}
+      </View>
       {q.isLoading ? (
         <Loader />
       ) : !d ? (
@@ -57,9 +72,11 @@ export function StandingSection({ id, male = false }: { id: string; male?: boole
           <Text style={s.scope}>
             vs {d.herd.name} ({d.herd.n}) and {d.group.label} ({d.group.n})
           </Text>
-          {measuresFor(d.metrics, male).map((m) => (
-            <MetricBar key={m.key} m={m} />
-          ))}
+          {view === "chart" ? (
+            <StandingRadar metrics={metrics} groupLabel={d.group.n > 1 ? d.group.label : d.herd.name} />
+          ) : (
+            metrics.map((m) => <MetricBar key={m.key} m={m} />)
+          )}
         </View>
       )}
     </>
@@ -99,6 +116,8 @@ function MetricBar({ m }: { m: StandingMetric }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
+    head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14, marginBottom: 8 },
+    headTitle: { marginTop: 0, marginBottom: 0, flexShrink: 1 },
     card: { borderWidth: 1, borderColor: c.borderSubtle, borderRadius: 12, padding: 12, gap: 12 },
     scope: { fontSize: 12, color: c.textMuted },
     item: { gap: 4 },
