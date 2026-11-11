@@ -10,7 +10,6 @@ import { RecordTabButton } from "@/components/RecordTabButton";
 import { TabSwipe } from "@/components/TabSwipe";
 import { ContinueRecording } from "@/components/ContinueRecording";
 import { useRecordDrafts } from "@/src/record/draft";
-import { LiveToast } from "@/components/LiveToast";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -111,7 +110,6 @@ export default function TabLayout() {
       />
     </Tabs>
     <ContinueRecording bottom={BAR_CONTENT_HEIGHT + insets.bottom + 12} />
-    <LiveToast />
     </>
   );
 }

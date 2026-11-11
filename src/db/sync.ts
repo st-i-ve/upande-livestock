@@ -2,6 +2,7 @@ import { AppState, AppStateStatus } from "react-native";
 
 import { getClient } from "@/src/services/api";
 import { queryClient } from "@/src/services/queryClient";
+import { useSyncStore } from "@/src/sync/syncStore";
 
 import { ServerAnimal, applySync } from "./animals";
 import { clearDb, getMeta, setMeta } from "./index";
@@ -32,19 +33,26 @@ let lastRun = 0;
 export function syncAnimals(opts: { full?: boolean } = {}): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
+    // The header dot and the syncing bar follow this through the sync store.
+    const progress = useSyncStore.getState();
+    progress.begin("animals");
     try {
       const since = opts.full ? null : await getMeta(LAST_SYNC);
       const client = await getClient();
       const res = await client.get(ANIMALS_SINCE, { params: since ? { since } : {} });
       const msg = res.data?.message as Reply | undefined;
       if (!msg || msg.error) throw new Error(msg?.error || "animals_since returned nothing");
-      await applySync(msg.animals, msg.removed, !since);
+      if (msg.animals.length > 0) progress.progress("animals", 0, msg.animals.length);
+      await applySync(msg.animals, msg.removed, !since, (n) => progress.progress("animals", n));
       await setMeta(LAST_SYNC, msg.server_time);
+      progress.animalsDone(true);
       queryClient.invalidateQueries({ queryKey: ["animals"] });
       queryClient.invalidateQueries({ queryKey: ["animal"] });
     } catch (e) {
       console.warn("[sync] animals sync failed", e);
+      progress.animalsDone(false, e instanceof Error ? e.message : String(e));
     } finally {
+      progress.end("animals");
       lastRun = Date.now();
       inFlight = null;
     }

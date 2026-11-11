@@ -38,10 +38,14 @@ const COLS = [
  * first (a full sync), so a login as another user or on another site never keeps
  * the previous herd.
  */
+const PROGRESS_EVERY = 25;
+
 export async function applySync(
   animals: ServerAnimal[],
   removed: string[],
   replace: boolean,
+  /** Rows written so far, every PROGRESS_EVERY rows and at the end. */
+  onProgress?: (written: number) => void,
 ): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
@@ -50,8 +54,11 @@ export async function applySync(
       `INSERT OR REPLACE INTO animals (${COLS.join(",")}) VALUES (${COLS.map(() => "?").join(",")})`,
     );
     try {
+      let written = 0;
       for (const a of animals) {
         await upsert.executeAsync(COLS.map((c) => a[c] ?? null));
+        written += 1;
+        if (onProgress && (written % PROGRESS_EVERY === 0 || written === animals.length)) onProgress(written);
       }
     } finally {
       await upsert.finalizeAsync();

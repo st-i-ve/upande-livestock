@@ -1,4 +1,5 @@
 import { getClient } from "@/src/services/api";
+import { useSyncStore } from "@/src/sync/syncStore";
 
 export type FileAsset = {
   uri: string;
@@ -11,6 +12,17 @@ export type FileAsset = {
  * for a picture the server will adopt as a field value (a calf's `image`).
  */
 export async function uploadFile(asset: FileAsset, isPrivate = false): Promise<string> {
+  // Shown in the syncing bar ("Uploading photo 1 of 2") until it is done.
+  const progress = useSyncStore.getState();
+  progress.add("photos");
+  try {
+    return await upload(asset, isPrivate);
+  } finally {
+    progress.tick("photos");
+  }
+}
+
+async function upload(asset: FileAsset, isPrivate: boolean): Promise<string> {
   const client = await getClient();
   const form = new FormData();
   form.append("file", { uri: asset.uri, name: asset.name, type: asset.mimeType } as any);

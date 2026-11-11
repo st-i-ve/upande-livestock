@@ -30,7 +30,7 @@ const EVENT = "livestock_changed";
 const REALTIME_INFO = "/api/method/upande_livestock.serverscripts.mobile.realtime_info.realtime_info";
 const DEBOUNCE_MS = 1000;
 const POLL_MS = 60_000;
-/** Failed attempts in a row before the dot says offline rather than reconnecting. */
+/** Failed attempts in a row before the live link counts as offline rather than reconnecting. */
 const OFFLINE_AFTER = 3;
 
 type Change = {
@@ -82,7 +82,6 @@ function onChange(msg: Change) {
       pend.lists = true;
       if (msg.truncated || !msg.animals?.length) pend.all = pend.all || !!msg.truncated;
       for (const a of msg.animals ?? []) pend.animals.add(a);
-      useLiveStore.getState().noteUpdate();
       break;
     case "stock":
       pend.stock = true;
@@ -225,4 +224,20 @@ export function startRealtime(): () => void {
     debounce = null;
     disconnect();
   };
+}
+
+/**
+ * "Sync now" from the header dot: if the live link is down, try it again at
+ * once instead of waiting out the back-off. A no-op while live or signed out.
+ */
+export function retryRealtime(): void {
+  if (stopped || !active) return;
+  if (socket) {
+    if (!socket.connected) socket.connect();
+    return;
+  }
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  failures = 0;
+  void connect();
 }

@@ -5,7 +5,6 @@ import { StyleSheet } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { LiveToast } from "@/components/LiveToast";
 import { RecordTabButton } from "@/components/RecordTabButton";
 import { TabSwipe } from "@/components/TabSwipe";
 import { ContinueRecording } from "@/components/ContinueRecording";
@@ -107,7 +106,6 @@ export default function ShoatsTabLayout() {
         />
       </Tabs>
       <ContinueRecording bottom={BAR_CONTENT_HEIGHT + insets.bottom + 12} />
-      <LiveToast />
     </>
   );
 }

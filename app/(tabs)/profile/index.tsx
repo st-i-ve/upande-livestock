@@ -13,13 +13,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { OnlineDot } from "@/components/OnlineDot";
+import { SyncBar } from "@/components/SyncBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
-import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
-import { useLiveStore } from "@/src/realtime/liveStore";
 import { LABEL, useAnimalType } from "@/src/shoats/animalType";
 
 type RowProps = {
@@ -89,9 +89,7 @@ export default function Profile() {
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
   const isEmployee = useAuthStore((s) => s.isEmployee);
-  const online = useNetworkStatus();
   const ota = useOtaUpdate();
-  const live = useLiveStore((x) => x.status);
   const animalType = useAnimalType((x) => x.type);
 
   const displayName = fullname || email || "Signed in";
@@ -108,8 +106,10 @@ export default function Profile() {
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
       <View style={s.appbar}>
-        <Text style={s.appbarTitle}>Profile</Text>
+        <Text style={[s.appbarTitle, { flex: 1 }]}>Profile</Text>
+        <OnlineDot />
       </View>
+      <SyncBar />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.userSection}>
@@ -135,31 +135,6 @@ export default function Profile() {
             onPress={() => router.push("/choose")}
           />
           <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
-          <Row
-            icon={online === false ? "wifi-off" : "wifi"}
-            label={online === false ? "Offline · recording needs a connection" : "Online"}
-            right={<View />}
-          />
-
-          <Row
-            icon="broadcast"
-            label={
-              live === "live" ? "Live updates" : live === "reconnecting" ? "Live updates · reconnecting" : "Live updates · offline"
-            }
-            right={
-              <View
-                accessibilityLabel={`Live updates ${live}`}
-                style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: 5,
-                  backgroundColor: live === "live" ? c.text : live === "reconnecting" ? c.textMuted : c.danger,
-                  marginRight: 4,
-                }}
-              />
-            }
-          />
-
           <Row
             icon="cloud-download-outline"
             label={OTA_LABEL[ota.stage]}
@@ -239,6 +214,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.bg },
     appbar: {
+      flexDirection: "row",
+      alignItems: "center",
       paddingHorizontal: 16,
       paddingVertical: 14,
       backgroundColor: c.bg,

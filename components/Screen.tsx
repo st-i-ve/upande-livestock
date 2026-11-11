@@ -4,6 +4,8 @@ import React, { useMemo } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { OnlineDot } from "@/components/OnlineDot";
+import { SyncBar } from "@/components/SyncBar";
 import { FONT_FAMILY } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
@@ -51,7 +53,10 @@ export function Screen({
           {subtitle ? <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
         </View>
         {headerRight ?? null}
+        {/* A tab's first screen (no back) carries the connection dot, top right. */}
+        {back ? null : <OnlineDot />}
       </View>
+      <SyncBar />
       {scroll ? (
         <ScrollView
           contentContainerStyle={[s.body, { paddingBottom: 24 + insets.bottom }]}
