@@ -18,25 +18,25 @@ import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
 import { useAnimalGroups } from "@/src/stores/animalGroups";
-import { sexMatches, useAnimalSexFilter, type SexFilter } from "@/src/stores/animalSexFilter";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { breedingCards } from "@/src/beef/breeding";
 import { useBeefSettings, useHerdFacts, useHerds, type HerdFacts } from "@/src/hooks/useHerds";
 import type { Animal } from "@/types";
 
+/**
+ * ONE row of chips, one choice. There used to be two rows — All / Cows / Bulls,
+ * and All / Breeding / … / Bulls — which showed "All" and "Bulls" twice with
+ * different numbers (Bulls = every male in one row, males over a year in the
+ * other) and filtered each other, so picking a group turned "Cows" to 0.
+ */
 const FILTERS = [
   { id: "all", label: "All" },
+  { id: "cows", label: "Cows" },
+  { id: "bulls", label: "Bulls" },
   { id: "breeding", label: "Breeding" },
   { id: "heifer", label: "Heifers" },
   { id: "calf", label: "Calves" },
   { id: "incalf", label: "In-calf" },
-  { id: "bulls", label: "Bulls" },
-];
-
-const SEX_FILTERS: { id: SexFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "cows", label: "Cows" },
-  { id: "bulls", label: "Bulls" },
 ];
 
 const monthsOld = (dob: string) => {
@@ -51,8 +51,9 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
   const heiferHerds = new Set(facts.heifer);
   const inCalfHerds = new Set(facts.inCalf);
   switch (id) {
+    case "cows": return (a) => a.sex !== "M";
+    case "bulls": return (a) => a.sex === "M";
     case "breeding": return (a) => breeding.has(a.herd);
-    case "bulls": return (a) => a.sex === "M" && monthsOld(a.dob) >= 12;
     case "heifer":
       // The farm's heifer herds when set; otherwise unserved females that are
       // old enough not to be calves.
@@ -64,10 +65,11 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
         ? (a) => calfHerds.has(a.herd)
         : (a) => !!a.dob && monthsOld(a.dob) < 6;
     case "incalf":
-      // Only the farm's in-calf herds (bullying heifers, steamers) when set.
+      // The farm's in-calf herds when set; otherwise animals confirmed or
+      // recorded pregnant, or kept in a herd named for it ("In-calf").
       return inCalfHerds.size > 0
         ? (a) => inCalfHerds.has(a.herd)
-        : (a) => a.stage === "confirmed";
+        : (a) => a.stage === "confirmed" || a.pregnant === 1 || /in.?calf/i.test(a.herd);
     default: return () => true;
   }
 }
@@ -76,8 +78,6 @@ export default function Animals() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [filter, setFilter] = useState("all");
-  const sexFilter = useAnimalSexFilter((st) => st.value);
-  const setSexFilter = useAnimalSexFilter((st) => st.set);
   const [query, setQuery] = useState("");
   const [showTop, setShowTop] = useState(false);
   const listRef = useRef<SectionList<Animal>>(null);
@@ -100,20 +100,13 @@ export default function Animals() {
     const any = facts.calf.length > 0;
     return Object.fromEntries(FILTERS.map((f) => [f.id, matcher(f.id, facts, any)]));
   }, [facts]);
+  // The counts follow the search box, so each chip says how many it would show.
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const f of FILTERS) out[f.id] = f.id === "all" ? animals.length : animals.filter(matchers[f.id]).length;
+    for (const f of FILTERS) out[f.id] = f.id === "all" ? found.length : found.filter(matchers[f.id]).length;
     return out;
-  }, [animals, matchers]);
-
-  // Search and the herd filter first; the All / Cows / Bulls counts follow them.
-  const scoped = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
-  const sexCounts = useMemo(() => {
-    const out: Record<SexFilter, number> = { all: scoped.length, cows: 0, bulls: 0 };
-    for (const a of scoped) out[a.sex === "M" ? "bulls" : "cows"] += 1;
-    return out;
-  }, [scoped]);
-  const list = useMemo(() => scoped.filter((a) => sexMatches(sexFilter, a.sex)), [scoped, sexFilter]);
+  }, [found, matchers]);
+  const list = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
 
   // Group the filtered list by herd.
   const groups = useMemo(() => {
@@ -183,11 +176,6 @@ export default function Animals() {
           style={s.input}
         />
       </View>
-      <Chips>
-        {SEX_FILTERS.map((f) => (
-          <Chip key={f.id} label={`${f.label} ${sexCounts[f.id]}`} active={sexFilter === f.id} onPress={() => setSexFilter(f.id)} />
-        ))}
-      </Chips>
       <Chips>
         {FILTERS.map((f) => (
           <Chip key={f.id} label={`${f.label} ${counts[f.id] ?? 0}`} active={filter === f.id} onPress={() => setFilter(f.id)} />
