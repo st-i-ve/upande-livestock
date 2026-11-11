@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } from "react-native";
 
@@ -30,7 +31,8 @@ import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useColors } from "@/src/hooks/useColors";
 import { useOperator } from "@/src/hooks/useOperator";
-import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { titleFor, useFinishRecording, useLockedAnimalId, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { extractFrappeError } from "@/src/services/api";
 import { findRecent, recentMessage, type RecentWeighing } from "@/src/weights/recent";
 import { EMPTY_ENTRY as EMPTY, type Entry, allSaved, formAfterSave, kg, num, savedMessage, savedWeights } from "@/src/weights/session";
@@ -74,6 +76,28 @@ export default function WeightSession() {
   const [saveWarn, setSaveWarn] = useState<RecentWeighing[]>([]);
   const [tick, setTick] = useState<string | null>(null);
   const inputs = useRef<Record<string, TextInputInstance | null>>({});
+  // Opened from her page: she is the only animal here, and cannot be taken off.
+  const locked = !!useLockedAnimalId();
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Weight",
+    preset: preset?.id,
+    state: { selected, entries, groupFigure, mode, methodPick, withExtras, again },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      Object.values(entries).some((e) => !!(e.weight || e.girth || e.bcs).trim()) ||
+      !!groupFigure.trim(),
+    restore: (d) => {
+      setSelected(d.selected);
+      setEntries(d.entries);
+      setGroupFigure(d.groupFigure);
+      setMode(d.mode);
+      setMethodPick(d.methodPick);
+      setWithExtras(d.withExtras);
+      setAgain(d.again);
+    },
+  });
 
   const methods = settings.data?.methods ?? [];
   // Settings supply the default once; after that the operator's choice stands,
@@ -311,9 +335,11 @@ export default function WeightSession() {
                       />
                     </>
                   ) : null}
-                  <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
-                    <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
-                  </Pressable>
+                  {locked ? null : (
+                    <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
+                      <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
+                    </Pressable>
+                  )}
                 </View>
               );
             })}
@@ -334,9 +360,11 @@ export default function WeightSession() {
                   {a.herd} · {a.lastWt > 0 ? `last ${kg(a.lastWt)} kg` : "no weight yet"}
                 </Text>
               </View>
-              <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
-                <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
-              </Pressable>
+              {locked ? null : (
+                <Pressable onPress={() => removeOne(a.id)} hitSlop={10} style={s.remove}>
+                  <MaterialCommunityIcons name="close" size={16} color={c.textMuted} />
+                </Pressable>
+              )}
             </View>
           ))}
         </View>
@@ -400,9 +428,14 @@ export default function WeightSession() {
         visible={pickWarn.length > 0}
         title="Weighed recently"
         message={recentMessage(pickWarn)}
-        cancelLabel="Skip"
+        cancelLabel={locked ? "Not now" : "Skip"}
         confirmLabel="Weigh again"
-        onCancel={() => { skipRecent(pickWarn.map((r) => r.id)); setPickWarn([]); }}
+        // Locked to her: skipping her would leave nothing to weigh, so "Not now" goes back.
+        onCancel={() => {
+          setPickWarn([]);
+          if (locked) router.back();
+          else skipRecent(pickWarn.map((r) => r.id));
+        }}
         onConfirm={() => { weighAgain(pickWarn.map((r) => r.id)); setPickWarn([]); }}
         onDismiss={() => setPickWarn([])}
       />

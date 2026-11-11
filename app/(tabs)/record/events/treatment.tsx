@@ -35,6 +35,7 @@ import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 
 type Dose = {
   id: number;
@@ -112,6 +113,27 @@ export default function Treatment() {
   const [doses, setDoses] = useState<Dose[]>(() => [blankDose(1)]);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Treatment",
+    state: { animal, freshPick, complaint, suspected, severity, photo, doses, vetFee, vet },
+    filled:
+      (!!animal && animal.id !== preset?.id) ||
+      !!(complaint.trim() || suspected || severity || photo || vetFee.trim()) ||
+      doses.some((d) => !!(d.pick.itemCode || d.drugName.trim() || d.dosage.trim() || d.route || d.withdrawal || d.response)),
+    restore: (d) => {
+      setAnimal(d.animal);
+      setFreshPick(d.freshPick);
+      setComplaint(d.complaint);
+      setSuspected(d.suspected);
+      setSeverity(d.severity);
+      setPhoto(d.photo);
+      setDoses(d.doses);
+      setVetFee(d.vetFee);
+      setVet(d.vet);
+    },
+  });
 
   const patch = (id: number, p: Partial<Dose>) =>
     setDoses((rows) => rows.map((r) => (r.id === id ? { ...r, ...p } : r)));

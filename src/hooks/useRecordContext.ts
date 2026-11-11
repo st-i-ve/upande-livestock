@@ -2,6 +2,8 @@ import { router, useLocalSearchParams, useSegments } from "expo-router";
 import { useEffect } from "react";
 
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
+import { useRecordDrafts } from "@/src/record/draft";
+import { lockedAnimalId } from "@/src/record/locked";
 import type { Animal } from "@/types";
 
 /**
@@ -20,6 +22,16 @@ export function usePresetAnimal(): Animal | null {
   const id = animal ? decodeURIComponent(String(animal)) : undefined;
   const { data } = useLocalAnimal(id);
   return (id && (data as Animal | null | undefined)) || null;
+}
+
+/**
+ * The animal this screen is locked to: opened from her page (`animals/act/*`
+ * with `?animal=`), or with `locked=1`. The picker shows her as a fixed card
+ * and nothing on the screen may change or remove her. Null from the Record tab.
+ */
+export function useLockedAnimalId(): string | null {
+  const params = useLocalSearchParams<{ animal?: string; locked?: string }>();
+  return lockedAnimalId(params, useSegments() as string[]);
 }
 
 /** Seed a screen's selection with the preset animal, once, if nothing is chosen. */
@@ -43,6 +55,8 @@ export function useFinishRecording() {
   const fromAnimals = useFromAnimals();
   const { animal } = useLocalSearchParams<{ animal?: string }>();
   return (name: string) => {
+    // Saved: nothing is left to continue.
+    useRecordDrafts.getState().clear();
     if (!fromAnimals) {
       router.replace(`/(tabs)/record/success?name=${encodeURIComponent(name)}`);
       return;

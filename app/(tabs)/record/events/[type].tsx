@@ -30,6 +30,7 @@ import { useEventItems } from "@/src/hooks/useEventItems";
 import { useOperator } from "@/src/hooks/useOperator";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -76,6 +77,23 @@ export default function GenericEvent() {
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: spec?.title ?? "Record",
+    state: { selected, vetFee, drugs, remarks, vet },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      !!(vetFee.trim() || remarks.trim()) ||
+      drugs.some((d) => !!(d.itemCode.trim() || d.qty.trim() || d.withdrawalDays.trim())),
+    restore: (d) => {
+      setSelected(d.selected);
+      setVetFee(d.vetFee);
+      setDrugs(d.drugs);
+      setRemarks(d.remarks);
+      setVet(d.vet);
+    },
+  });
 
   // The drugs come from the event type's own stock rule (items_by_event). A type
   // the farm has not set to issue stock shows no drug section at all.

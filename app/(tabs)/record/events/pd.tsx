@@ -26,6 +26,7 @@ import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
 type Result = "Confirmed" | "Not Pregnant" | "Aborted";
@@ -64,6 +65,23 @@ export default function PD() {
   const needsConception = result === "Confirmed" && noService.length > 0;
   const [conception, setConception] = useState("");
   const [weeks, setWeeks] = useState("");
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Pregnancy diagnosis",
+    state: { selected, result, remarks, conception, weeks, vet },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      result !== "Confirmed" ||
+      !!(remarks.trim() || conception || weeks.trim()),
+    restore: (d) => {
+      setSelected(d.selected);
+      setResult(d.result);
+      setRemarks(d.remarks);
+      setConception(d.conception);
+      setWeeks(d.weeks);
+      setVet(d.vet);
+    },
+  });
   const single = needsConception && selected.length === 1 ? selected[0] : null;
   const sire = useSireChoice(single, conception, !!single && !!conception);
   const facts = useHerdFacts();

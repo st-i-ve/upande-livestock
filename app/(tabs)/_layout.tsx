@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CowIcon } from "@/components/CowIcon";
 import { RecordTabButton } from "@/components/RecordTabButton";
 import { TabSwipe } from "@/components/TabSwipe";
+import { ContinueRecording } from "@/components/ContinueRecording";
+import { useRecordDrafts } from "@/src/record/draft";
 import { LiveToast } from "@/components/LiveToast";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
@@ -32,8 +34,12 @@ export default function TabLayout() {
           {children}
         </TabSwipe>
       )}
+      // A record form left with input in it is kept for "Continue recording".
+      screenListeners={{ blur: () => useRecordDrafts.getState().markPending() }}
       screenOptions={{
         headerShown: false,
+        // Coming back to a tab shows its top screen, not the one left deep in its stack.
+        popToTopOnBlur: true,
         animation: reduceMotion ? "none" : "shift",
         sceneStyle: { backgroundColor: c.bg },
         tabBarShowLabel: false,
@@ -104,6 +110,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <ContinueRecording bottom={BAR_CONTENT_HEIGHT + insets.bottom + 12} />
     <LiveToast />
     </>
   );
