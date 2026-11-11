@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { BACKDATE_AMBER_DARK, BACKDATE_AMBER_LIGHT } from "@/components/BackdateButton";
@@ -12,6 +12,7 @@ import { DateField, fromISODate } from "@/components/DateTimeField";
 import { ErrorState } from "@/components/ErrorState";
 import { Field, Input } from "@/components/Field";
 import { FrappeSearchPicker } from "@/components/FrappeSearchPicker";
+import { GroupTotalField } from "@/components/GroupTotalField";
 import { KV } from "@/components/KV";
 import { Loader } from "@/components/Loader";
 import { Picker } from "@/components/Picker";
@@ -22,6 +23,30 @@ import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useFeedDayStatus } from "@/src/hooks/useFeedDayStatus";
+import { useFeedUnits } from "@/src/hooks/useFeedUnits";
+import {
+  changeUnit,
+  groupTotal,
+  kgEquivalent,
+  linesToSend,
+  manualLine,
+  perHeadLabel,
+  unitOptionLabel,
+  unitOptions,
+  withKgPer,
+  type ManualLine,
+} from "@/src/feed/manualLines";
+import {
+  changeTotal,
+  doseForHerd,
+  editLine,
+  hasDefiniteTotal,
+  isWeighed,
+  kgTotal,
+  rebalance,
+  toggleLock,
+  unheld,
+} from "@/src/feed/rationMaths";
 import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
 import { useHerdRecipes } from "@/src/hooks/useHerdRecipes";
 import { useHerds } from "@/src/hooks/useHerds";
@@ -272,6 +297,8 @@ function SystemTab({
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Typed group total (Feed by Head Count off); null follows the suggestion.
+  const [typedTotal, setTypedTotal] = useState<string | null>(null);
 
   // What the picker's choice actually mixes: the selected recipe's own
   // per-head figures where one is resolved, falling back to `info` (always
@@ -290,6 +317,9 @@ function SystemTab({
   const portionNum: number = portion ?? 0;
   const d = info.data;
   const st = day.data;
+  const byHeadCount = st?.feedByHeadCount ?? true;
+  const activePerHead = selectedRecipe?.perHeadQty ?? d?.perHeadQty ?? 0;
+  const group = groupTotal(byHeadCount, typedTotal, activePerHead, d?.heads ?? 0, portionNum || 1);
 
   // One route, always: `manufactureHerdFeed` (the "manufacture" action),
   // whichever recipe is picked above. `record_feeding.py` now reads `bom_no`
@@ -303,12 +333,14 @@ function SystemTab({
     if (!herd) return setSubmitError("Pick a herd.");
     if (!d) return setSubmitError("Still loading the herd's programme — try again in a moment.");
     if (portionNum <= 0) return setSubmitError("A run has to be for more than nothing.");
+    if (group.error) return setSubmitError(group.error);
     try {
       const r = await manufacture.mutateAsync({
         herd,
         portion: portionNum,
         postingDate: backdatingOpen ? date : undefined,
         bomNo: selectedBom || undefined,
+        totalQty: group.send,
       });
       await Promise.all([info.refetch(), day.refetch()]);
       Alert.alert(
@@ -352,6 +384,10 @@ function SystemTab({
         })),
       };
   const activeTotal = active.perHeadQty * d.heads;
+  // What each line comes to for this run: heads x portion, or, where the farm
+  // types the group's total, scaled to it as the Work Order scales the lines.
+  const runHeads =
+    d.heads * portionNum * (byHeadCount || !activeTotal || !portionNum ? 1 : (group.send ?? 0) / (activeTotal * portionNum));
 
   return (
     <>
@@ -400,10 +436,25 @@ function SystemTab({
         )}
       </Field>
 
+      {byHeadCount ? null : (
+        <GroupTotalField
+          value={group.shown}
+          onChange={setTypedTotal}
+          heads={d.heads}
+          perHeadKg={active.perHeadQty}
+          portion={portionNum}
+          suggestion={group.suggestion}
+        />
+      )}
+
       <Calc
         label="This run mixes and feeds"
-        value={kg(activeTotal * portionNum)}
-        footer={`${d.heads} head · mixed into ${d.store} and issued in the same action`}
+        value={kg(byHeadCount ? activeTotal * portionNum : (group.send ?? 0))}
+        footer={
+          byHeadCount
+            ? `${d.heads} head · mixed into ${d.store} and issued in the same action`
+            : `The group's total as entered · mixed into ${d.store} and issued in the same action`
+        }
       />
 
       <SectionTitle>Raw materials for this run</SectionTitle>
@@ -415,8 +466,10 @@ function SystemTab({
         {active.lines.map((l) => (
           <KV
             key={l.itemCode}
-            k={`${l.itemName} (${l.qty.toLocaleString()} ${l.uom}/head)`}
-            v={`${(l.qty * d.heads * portionNum).toLocaleString()} ${l.uom}`}
+            k={`${l.itemName} (${l.qty.toLocaleString()} ${perHeadLabel(l)})`}
+            v={l.uom === "Gram" || l.uom === "Millilitre"
+              ? doseForHerd(l.qty, l.uom, runHeads)
+              : `${(Math.round(l.qty * runHeads * 1000) / 1000).toLocaleString()} ${l.uom}`}
           />
         ))}
       </View>
@@ -438,34 +491,26 @@ function SystemTab({
   );
 }
 
-type TunedRow = { itemCode: string; itemName: string; uom: string; qty: string };
-
 /** The operator's own recipe and head count, for the day the store could
  *  actually cover — not necessarily today, and not necessarily the herd's
  *  registered count.
  *
- *  `rows` seeds from the *selected recipe's* own `lines[]` — arriving as part
- *  of the same `herd_recipes` payload the recipe picker (`RecipePicker`,
- *  shared with the System tab) already fetched, so picking a recipe here is
- *  never a second round trip. Each line is already a per-head figure in the
- *  recipe's own unit of measure (`HerdRecipeLine.qty`/`uom` — `BOM Item.qty`,
- *  never `stock_qty`), so it is used exactly as it arrives.
+ *  Rows seed from the *selected recipe's* own `lines[]` (the same
+ *  `herd_recipes` payload the recipe picker fetched, so no second round trip).
+ *  Each line is a per-head figure in the recipe's own unit (`BOM Item.qty`,
+ *  never `stock_qty`) and is sent back with that unit: hay written 2 kg a head
+ *  and stocked in BALE stays 2 kg, and a 7 g dose of yeast stays 7 g (sending
+ *  7 with no unit would read as 7 kg). A line may be put in another unit the
+ *  item knows (its stock unit and conversions, from `feed_units`): the kilos
+ *  stay and the quantity follows, with "3 Litre ≈ 4.20 kg" beside it. The
+ *  server converts to stock units; nothing here scales by heads.
  *
- *  This used to seed from `getHerdFeedInfo(herd).lines[]` (`recipeQty /
- *  heads`) — always the herd's *standing* BOM, with no way to start from a
- *  previously tuned one. Before that it read `info.breakdown[].perHeadQty`,
- *  which is not a key the "info" action returns at all, so every herd opened
- *  here showed "No ingredients. Add one below." The obvious repair then was
- *  the wrong one too: `breakdown` lives on the server's `get_herd_feed_info()`,
- *  whose `per_head_qty` is `required_qty / heads` with `required_qty` in STOCK
- *  units — hay is written 2 kg per head in the recipe and stocked in BALE at
- *  0.07 bale/kg, so that route would put 0.14 in a box labelled kg and send a
- *  fourteenth of the ration.
- *
- *  Every value typed here is sent to the server exactly as shown — never
- *  scaled by heads, never converted between UOMs. The server derives the
- *  conversion from the herd's BOM and multiplies by the head count itself;
- *  doing either of those here would silently issue the wrong amount of stock.
+ *  Kilos and shares: every weighed line shows its amount and its % of the
+ *  ration's kilos, and either may be typed, by the Ration Editor's rule
+ *  (src/feed/rationMaths.ts, "THE RULE"): with Kg per head typed, typing a
+ *  line locks it and the unlocked lines take up the change; with none, a line's
+ *  kilos change alone; typing a % always locks. Doses (g, ml a head) are
+ *  outside the 100% and never lock. Locks and shares are screen state only.
  */
 function ManualTab({
   herd,
@@ -483,53 +528,51 @@ function ManualTab({
   const amber = useScheme() === "dark" ? BACKDATE_AMBER_DARK : BACKDATE_AMBER_LIGHT;
   const s = useMemo(() => makeStyles(c), [c]);
   const { data: info, isLoading } = useHerdFeedInfo(herd);
+  const day = useFeedDayStatus(herd);
   const { operator, missingMessage } = useOperator();
   const feed = useManualFeed();
 
-  const [rows, setRows] = useState<TunedRow[] | null>(null);
+  const [rawRows, setRows] = useState<ManualLine[] | null>(null);
+  // The ration's Kg per head, typed; "" is no definite total (the lines' sum shows in grey).
+  const [total, setTotal] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
   const [headsEdit, setHeads] = useState<string | null>(null);
   const heads = headsEdit ?? (info?.heads ? String(info.heads) : "");
+  const [typedTotal, setTypedTotal] = useState<string | null>(null);
   const [date, setDate] = useState(todayISO());
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [error, setError] = useState<string | null>(null);
 
-  // Which recipe `rows` currently reflects, and a snapshot of the rows it was
-  // seeded with — the pair `isDirty` below compares the live rows against, to
-  // tell a tuned edit from an unopened recipe before letting a picker change
-  // silently overwrite it.
+  const units = useFeedUnits(useMemo(() => (rawRows ?? []).map((r) => r.itemCode), [rawRows]));
+  // With no definite total the shares are always the kilos' shares, worked out
+  // again once the units (and so the kilos of a Litre or BALE line) arrive.
+  const rows = useMemo(() => {
+    if (!rawRows) return null;
+    const weighed = withKgPer(rawRows, units);
+    return hasDefiniteTotal(total) ? weighed : unheld(weighed);
+  }, [rawRows, units, total]);
+
+  // Which recipe `rows` reflects, and a snapshot of what it was seeded with —
+  // what `isDirty` compares against before a picker change overwrites edits.
   const [seededBom, setSeededBom] = useState<string | null>(null);
   const [seedSnapshot, setSeedSnapshot] = useState<string>("");
+  const snapshot = (rs: ManualLine[]) => JSON.stringify(rs.map((r) => [r.itemCode, r.qty, r.uom]));
 
-  // The head count still seeds once from the herd's registered count and is
-  // then left alone — untouched by the recipe picker, per the brief. Only
-  // where the ingredient rows come from has changed (below).
-  // Rows seed from the *selected recipe's* own lines — already per-head, in
-  // the recipe's own unit of measure, arrived with the `herd_recipes` payload
-  // — never from `info.lines` (the herd's standing BOM only) and never
-  // re-derived by dividing anything by heads. Seeds once per distinct
-  // `selectedBom`: switching recipes reseeds; typing in a box does not, same
-  // "seed once" shape as the old effect this replaces.
+  // Seeds once per distinct `selectedBom`: switching recipes reseeds; typing does not.
   const seedRecipe =
     selectedBom && seededBom !== selectedBom ? recipes.find((r) => r.bomNo === selectedBom) : undefined;
   if (seedRecipe) {
-    const fresh: TunedRow[] = seedRecipe.lines.map((l) => ({
-      itemCode: l.itemCode,
-      itemName: l.itemName,
-      uom: l.uom,
-      qty: String(l.qty),
-    }));
+    const fresh = unheld(seedRecipe.lines.map((l) => manualLine(l)));
     setRows(fresh);
+    setTotal("");
+    setNotice(null);
     setSeededBom(selectedBom);
-    setSeedSnapshot(JSON.stringify(fresh));
+    setSeedSnapshot(snapshot(fresh));
   }
 
-  const isDirty = seedSnapshot !== "" && JSON.stringify(rows) !== seedSnapshot;
+  const isDirty = seedSnapshot !== "" && rows !== null && snapshot(rows) !== seedSnapshot;
 
-  // Switching recipes reseeds every row from scratch — so a tuned edit not
-  // yet submitted would vanish silently. Warn and require confirmation rather
-  // than either blocking the switch outright or losing the edit quietly;
-  // "keep editing" leaves the picker showing the old recipe until confirmed.
   const requestRecipeChange = (bomNo: string) => {
     if (bomNo === selectedBom) return;
     if (!isDirty) return onSelectBom(bomNo);
@@ -543,41 +586,41 @@ function ManualTab({
     );
   };
 
-  const setQty = (itemCode: string, qty: string) =>
-    setRows((prev) => (prev ?? []).map((r) => (r.itemCode === itemCode ? { ...r, qty } : r)));
+  const apply = (r: { rows: ManualLine[]; total: string; notice: string | null }) => {
+    setRows(r.rows);
+    setTotal(r.total);
+    setNotice(r.notice);
+  };
+  const edit = (i: number, field: "qty" | "pct", v: string) => rows && apply(editLine(rows, total, i, field, v));
+  const onTotal = (v: string) => rows && apply(changeTotal(rows, total, v));
+  const lock = (i: number) => rows && setRows(toggleLock(rows, i, total));
+  const removeRow = (i: number) => rows && apply(rebalance(rows.filter((_, j) => j !== i), total));
+  const setUnit = (i: number, uom: string) =>
+    rows && apply(rebalance(rows.map((r, j) => (j === i ? changeUnit(units, r, uom) : r)), total));
+  const addItem = (name: string, row: any) => {
+    if (!rows || rows.some((r) => r.itemCode === name)) return;
+    // A hand-added feed has no BOM line, so it starts in its stock unit, at nothing, unlocked.
+    const added = manualLine({ itemCode: name, itemName: row?.item_name || name, qty: "", uom: row?.stock_uom || "" });
+    apply(rebalance([...rows, added], total));
+  };
 
-  const removeRow = (itemCode: string) =>
-    setRows((prev) => (prev ?? []).filter((r) => r.itemCode !== itemCode));
-
-  const addItem = (name: string, row: any) =>
-    setRows((prev) =>
-      (prev ?? []).some((r) => r.itemCode === name)
-        ? prev
-        : [
-            ...(prev ?? []),
-            {
-              itemCode: name,
-              itemName: row?.item_name || name,
-              uom: row?.stock_uom || "",
-              qty: "0",
-            },
-          ],
-    );
+  const perHead = rows ? kgTotal(rows) : 0;
+  const byHeadCount = day.data?.feedByHeadCount ?? true;
+  const count = Number(heads);
+  const group = groupTotal(byHeadCount, typedTotal, perHead, Number.isFinite(count) ? count : 0, 1);
 
   const submit = async () => {
     setError(null);
     if (!operator) return setError(missingMessage);
-    const count = Number(heads);
     // A JSON body drops an omitted or NaN `heads` key entirely, and the
     // server would then run with none at all — refuse here instead, and
     // require a whole animal count rather than a fraction.
     if (!Number.isInteger(count) || count <= 0) {
       return setError("Enter how many animals were actually fed — a whole number greater than zero.");
     }
-    const lines = (rows ?? [])
-      .map((r) => ({ itemCode: r.itemCode, qty: Number(r.qty) }))
-      .filter((l) => l.qty > 0);
+    const lines = linesToSend(rows ?? []);
     if (!lines.length) return setError("Enter a quantity for at least one ingredient.");
+    if (group.error) return setError(group.error);
     try {
       const r = await feed.mutateAsync({
         herd,
@@ -585,10 +628,10 @@ function ManualTab({
         heads: count,
         postingDate: backdatingOpen ? date : undefined,
         employee: operator ?? undefined,
-        // The recipe the operator was actually tuning from — so the BOM
-        // `manual_feed` builds descends from what was on screen, not from
-        // whichever BOM happens to be the herd's registered one.
+        // The recipe the operator was tuning from, so the tuned BOM descends
+        // from what was on screen, not from the herd's registered one.
         baseBom: selectedBom || undefined,
+        totalQty: group.send,
       });
       Alert.alert(
         `${r.feed_mode} feeding mixed`,
@@ -605,6 +648,8 @@ function ManualTab({
     return <Loader />;
   }
 
+  const definite = hasDefiniteTotal(total);
+
   return (
     <>
       <View style={[s.warning, { borderColor: amber, backgroundColor: `${amber}14` }]}>
@@ -619,20 +664,93 @@ function ManualTab({
         <RecipePicker recipes={recipes} value={selectedBom} onChange={requestRecipeChange} />
       </Field>
 
+      <Field
+        label="Kg per head per day"
+        help={
+          definite
+            ? "Held: typing a line's kilos or % locks it, and the unlocked lines are scaled so the ration still adds up to this. Tap a padlock to unlock a line; clear this to drop every lock."
+            : "Empty, a line's kilos change on their own and the total is their sum. Type a total (or a %) to hold it."
+        }
+      >
+        <Input
+          value={total}
+          onChangeText={onTotal}
+          keyboardType="decimal-pad"
+          placeholder={perHead ? String(Math.round(perHead * 1000) / 1000) : "0"}
+          accessibilityLabel="Kg per head per day"
+        />
+      </Field>
+      {notice ? <Banner tone="warning">{notice}</Banner> : null}
+
       <SectionTitle>Per animal</SectionTitle>
       {rows.length === 0 ? <Text style={s.empty}>No ingredients. Add one below.</Text> : null}
-      {rows.map((r) => (
-        <View key={r.itemCode} style={s.row}>
-          <Field label={`${r.itemName} (${r.uom}/head)`}>
-            <Input
-              value={r.qty}
-              onChangeText={(v) => setQty(r.itemCode, v)}
-              keyboardType="decimal-pad"
-            />
-          </Field>
-          <Button label="Remove ingredient" variant="link" onPress={() => removeRow(r.itemCode)} />
-        </View>
-      ))}
+      {rows.map((r, i) => {
+        const dose = !isWeighed(r);
+        const options = unitOptions(units, r);
+        const labels = options.map((u) => unitOptionLabel(units, r.itemCode, u));
+        const equivalent = kgEquivalent(r);
+        return (
+          <View key={r.itemCode} style={s.row} testID={`manual-line-${r.itemCode}`}>
+            <View style={s.lineHead}>
+              <Text style={s.lineName} numberOfLines={2}>{r.itemName}</Text>
+              {dose ? null : (
+                <Pressable
+                  onPress={() => lock(i)}
+                  disabled={!definite}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${r.locked ? "Unlock" : "Lock"} ${r.itemName}`}
+                  testID={`lock-${r.itemCode}`}
+                >
+                  <MaterialCommunityIcons
+                    name={r.locked ? "lock" : "lock-open-variant-outline"}
+                    size={18}
+                    color={definite ? (r.locked ? c.text : c.textSubtle) : c.borderSubtle}
+                  />
+                </Pressable>
+              )}
+            </View>
+            <View style={s.lineInputs}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.colLbl}>{perHeadLabel(r)}</Text>
+                <Input
+                  value={r.qty}
+                  onChangeText={(v) => edit(i, "qty", v)}
+                  keyboardType="decimal-pad"
+                  accessibilityLabel={`${r.itemName} ${perHeadLabel(r)}`}
+                />
+              </View>
+              {dose ? null : (
+                <View style={{ width: 96 }}>
+                  <Text style={s.colLbl}>% of intake</Text>
+                  <Input
+                    value={r.pct ?? ""}
+                    onChangeText={(v) => edit(i, "pct", v)}
+                    keyboardType="decimal-pad"
+                    accessibilityLabel={`${r.itemName} % of intake`}
+                  />
+                </View>
+              )}
+            </View>
+            {dose ? (
+              <Text style={s.lineNote}>A dose per head, outside the kilos and the 100%.</Text>
+            ) : options.length > 1 ? (
+              <View style={{ marginTop: 6 }}>
+                <Picker
+                  value={labels[Math.max(0, options.indexOf(r.uom))]}
+                  onChange={(label) => {
+                    const uom = options[labels.indexOf(label)];
+                    if (uom && uom !== r.uom) setUnit(i, uom);
+                  }}
+                  options={labels}
+                />
+              </View>
+            ) : null}
+            {equivalent ? <Text style={s.lineNote}>{equivalent}</Text> : null}
+            <Button label="Remove ingredient" variant="link" onPress={() => removeRow(i)} />
+          </View>
+        );
+      })}
 
       <Field label="Add an ingredient">
         <FrappeSearchPicker
@@ -658,6 +776,16 @@ function ManualTab({
       >
         <Input value={heads} onChangeText={setHeads} keyboardType="number-pad" />
       </Field>
+
+      {byHeadCount ? null : (
+        <GroupTotalField
+          value={group.shown}
+          onChange={setTypedTotal}
+          heads={Number.isFinite(count) ? count : 0}
+          perHeadKg={perHead}
+          suggestion={group.suggestion}
+        />
+      )}
 
       <Field label="Date fed">
         {backdatingOpen ? (
@@ -717,6 +845,11 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderRadius: RADIUS.md,
       marginBottom: 7,
     },
+    lineHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+    lineName: { flex: 1, fontSize: 14, color: c.text, fontFamily: FONT_FAMILY.semibold },
+    lineInputs: { flexDirection: "row", gap: 8 },
+    colLbl: { fontSize: 11, color: c.textMuted, fontFamily: FONT_FAMILY.medium, marginBottom: 3 },
+    lineNote: { fontSize: 12, color: c.textMuted, marginTop: 4 },
     empty: {
       color: c.textSubtle,
       fontSize: 12,

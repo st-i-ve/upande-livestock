@@ -6,6 +6,7 @@ import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { Field, FieldRow } from "@/components/Field";
+import { GroupTotalField } from "@/components/GroupTotalField";
 import { Loader } from "@/components/Loader";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { Screen } from "@/components/Screen";
@@ -13,6 +14,7 @@ import { useDayField } from "@/components/shoats/DayField";
 import { useHerdField } from "@/components/shoats/HerdField";
 import { SaveBanners } from "@/components/shoats/SaveBanners";
 import { RADIUS, font } from "@/constants/theme";
+import { groupTotal } from "@/src/feed/manualLines";
 import { manufactureHerdFeed } from "@/src/frappe/feeding";
 import { useColors } from "@/src/hooks/useColors";
 import { useFeedDayStatus } from "@/src/hooks/useFeedDayStatus";
@@ -38,18 +40,23 @@ export default function ShoatFeeding() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Typed group total (Feed by Head Count off); null follows the suggestion.
+  const [typedTotal, setTypedTotal] = useState<string | null>(null);
 
   const st = status.data;
   const portion = portionPick ?? (st ? (st.suggestedPortion === 0.5 ? 0.5 : 1) : 1);
   const d = info.data;
+  const byHeadCount = st?.feedByHeadCount ?? true;
+  const group = groupTotal(byHeadCount, typedTotal, d?.perHeadQty ?? 0, d?.heads ?? 0, portion);
 
   const run = async () => {
     if (!herd) return;
     setError(null);
     setNote(null);
+    if (group.error) return setError(group.error);
     setBusy(true);
     try {
-      const r = await manufactureHerdFeed(herd.name, portion, day.eventDate);
+      const r = await manufactureHerdFeed(herd.name, portion, day.eventDate, undefined, group.send);
       setNote(`${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} mixed and issued to ${herd.label} (${r.heads} head).`);
       refreshShoats(qc);
       await Promise.all([info.refetch(), status.refetch()]);
@@ -99,6 +106,17 @@ export default function ShoatFeeding() {
             <Chip label="A whole day" active={portion === 1} onPress={() => setPortion(1)} />
           </Chips>
         </Field>
+      ) : null}
+
+      {herd && d && !byHeadCount ? (
+        <GroupTotalField
+          value={group.shown}
+          onChange={setTypedTotal}
+          heads={d.heads}
+          perHeadKg={d.perHeadQty}
+          portion={portion}
+          suggestion={group.suggestion}
+        />
       ) : null}
 
       <SaveBanners error={error} note={note} result={null} />
