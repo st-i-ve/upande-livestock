@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -41,6 +41,8 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBeefSettings, useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
+import { calvingFilled, retroOnReset, type CalvingDraft, type HeldRetro } from "@/src/record/calvingDraft";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 
@@ -103,11 +105,39 @@ export default function Calving() {
   const win = normaliseWindow(check?.window?.min_days, check?.window?.max_days);
   const needsRetro = !!check && !check.allowed && outcome !== "Abortion";
   const patchRetro = (patch: Partial<RetroDraft>) => setRetro((r) => (r ? { ...r, ...patch } : r));
+  // A restored retro path, put back by the reset below for its own dam and day.
+  const heldRetro = useRef<HeldRetro | null>(null);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const draft: CalvingDraft<Animal, CalfRow> = {
+    dam, outcome, abortionCause, coatNote, calves,
+    day: isBackdating ? backdateDate : "",
+    retro, herdTouched, strawUom,
+  };
+  const { clear: clearDraft } = useRecordDraft({
+    title: outcome === "Abortion" ? "Abortion" : "Calving",
+    state: draft,
+    filled: calvingFilled(draft),
+    restore: (d) => {
+      heldRetro.current = d.dam
+        ? { dam: d.dam.id, day: d.day || birthDate, retro: d.retro, herdTouched: d.herdTouched }
+        : null;
+      if (isBackdating && d.day) setBackdateDate(d.day);
+      setDam(d.dam);
+      setOutcome(d.outcome);
+      setAbortionCause(d.abortionCause as typeof abortionCause);
+      setCoatNote(d.coatNote);
+      setCalves(d.calves);
+      setStrawUom(d.strawUom);
+    },
+  });
 
   useEffect(() => {
+    const reset = retroOnReset(heldRetro.current, dam?.id ?? null, birthDate);
+    heldRetro.current = reset.held;
     setCheck(null);
-    setRetro(null);
-    setHerdTouched(false);
+    setRetro(reset.retro);
+    setHerdTouched(reset.herdTouched);
     if (!dam || offline) return;
     let live = true;
     setChecking(true);
@@ -192,6 +222,7 @@ export default function Calving() {
           abortionCause,
           abortionNotes: coatNote || undefined,
         });
+        clearDraft();
         Alert.alert(
           "Abortion recorded",
           `${dam.name}'s pregnancy is closed. She becomes servable again once the waiting period is up.`,
@@ -229,6 +260,7 @@ export default function Calving() {
             : [{ sex: calves[0]?.sex ?? "Female", isStillborn: true }],
       });
 
+      clearDraft();
       // The server numbered each calf (A heifers, B bulls). Show them, then pull
       // them into the phone's own animal store now rather than at the next tick.
       const born: { animal: string; tag?: string; herd?: string }[] = r?.calves ?? [];
