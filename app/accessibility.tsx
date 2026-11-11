@@ -4,6 +4,8 @@ import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { PillButton } from "@/components/PillButton";
+import { PillSegmented } from "@/components/PillSegmented";
 import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { TEXT_STEPS, TOTAL_SCALE_CAP, effectiveScale, textStepOf, type ThemePref } from "@/src/theme/textScale";
@@ -52,48 +54,41 @@ export default function Accessibility() {
 
       <ScrollView contentContainerStyle={s.scroll}>
         <Text style={s.section}>Theme</Text>
-        <View style={s.segment} accessibilityRole="radiogroup">
-          {THEMES.map((t) => {
-            const on = pref === t.id;
-            return (
-              <Pressable
-                key={t.id}
-                onPress={() => setThemePref(t.id)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={`${t.label} theme`}
-                style={[s.seg, on && s.segOn]}
-              >
+        <PillSegmented
+          value={pref}
+          onChange={setThemePref}
+          testID="theme-segmented"
+          options={THEMES.map((t) => ({
+            id: t.id,
+            label: `${t.label} theme`,
+            render: (on: boolean) => (
+              <>
                 <MaterialCommunityIcons name={t.icon} size={18} color={on ? c.bg : c.text} />
                 <Text style={[s.segLabel, on && s.segLabelOn]} numberOfLines={1}>{t.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+              </>
+            ),
+          }))}
+        />
         <Text style={s.hint}>
           {pref === "system" ? "Follows the phone's light or dark setting." : `Always ${pref}, whatever the phone is set to.`}
         </Text>
 
         <Text style={[s.section, { marginTop: 28 }]}>Text size · {step.label}</Text>
-        <View style={s.segment} accessibilityRole="radiogroup">
-          {TEXT_STEPS.map((t, i) => {
-            const on = t.id === step.id;
-            return (
-              <Pressable
-                key={t.id}
-                onPress={() => setTextScale(t.scale)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={`${t.label} text`}
-                style={[s.seg, s.sizeSeg, on && s.segOn]}
-              >
-                <Text allowFontScaling={false} style={[s.glyph, { fontSize: STEP_GLYPH[i], lineHeight: STEP_GLYPH[i] + 8 }, on && s.segLabelOn]}>
-                  A
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <PillSegmented
+          value={step.id}
+          onChange={(id) => setTextScale(TEXT_STEPS.find((t) => t.id === id)!.scale)}
+          minHeight={56}
+          testID="text-size-segmented"
+          options={TEXT_STEPS.map((t, i) => ({
+            id: t.id,
+            label: `${t.label} text`,
+            render: (on: boolean) => (
+              <Text allowFontScaling={false} style={[s.glyph, { fontSize: STEP_GLYPH[i], lineHeight: STEP_GLYPH[i] + 8 }, on && s.segLabelOn]}>
+                A
+              </Text>
+            ),
+          }))}
+        />
 
         <Text style={[s.section, { marginTop: 28 }]}>Preview</Text>
         <View style={s.preview}>
@@ -114,9 +109,7 @@ export default function Accessibility() {
       </ScrollView>
 
       <View style={s.footer}>
-        <Pressable onPress={() => router.back()} style={s.done} accessibilityRole="button">
-          <Text style={s.doneText}>Done</Text>
-        </Pressable>
+        <PillButton label="Done" onPress={() => router.back()} testID="accessibility-done" />
       </View>
     </SafeAreaView>
   );
@@ -144,26 +137,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     },
     scroll: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
     section: { fontSize: 13, ...font("600"), color: c.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.4 },
-    segment: {
-      flexDirection: "row",
-      backgroundColor: c.bgMuted,
-      borderRadius: RADIUS.lg,
-      padding: 4,
-      gap: 4,
-    },
-    seg: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-      paddingVertical: 10,
-      paddingHorizontal: 4,
-      borderRadius: RADIUS.md,
-      minWidth: 0,
-    },
-    sizeSeg: { minHeight: 48, paddingVertical: 6 },
-    segOn: { backgroundColor: c.text },
     segLabel: { fontSize: 14, ...font("500"), color: c.text, flexShrink: 1 },
     segLabelOn: { color: c.bg, ...font("600") },
     glyph: { ...font("600"), color: c.text },
@@ -189,11 +162,4 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     previewMain: { fontSize: 16, ...font("600"), color: c.text },
     previewMeta: { fontSize: 13, color: c.textMuted, marginTop: 2 },
     footer: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-    done: {
-      backgroundColor: c.text,
-      borderRadius: RADIUS.lg,
-      paddingVertical: 14,
-      alignItems: "center",
-    },
-    doneText: { fontSize: 16, ...font("600"), color: c.bg },
   });
