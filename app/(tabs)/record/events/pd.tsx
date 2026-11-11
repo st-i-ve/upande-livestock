@@ -1,3 +1,4 @@
+import { backdatedNote } from "@/src/breeding/backdated";
 import React, { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
@@ -122,6 +123,7 @@ export default function PD() {
         `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
         made ? `${made} natural service${made === 1 ? "" : "s"} recorded at the conception date.` : "",
         ...sireLines,
+        backdatedNote(replies),
         ...warned,
       ].filter(Boolean).join("\n\n"),
     );

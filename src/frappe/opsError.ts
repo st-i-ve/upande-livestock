@@ -21,10 +21,14 @@ export class OpsError extends Error {
   /** The server's stable reason for the refusal, when it gave one. */
   readonly code?: string;
 
+  /** Whatever else the refusal carried (the birth window's dates, who may
+   *  back-record a service — see src/breeding/birthWindow). */
+  readonly details?: Record<string, any>;
+
   /** Read by isOfflineError: the server answered, so this is not a network fault. */
   readonly isServerRejection = true;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, details?: Record<string, any>) {
     // Server guards write their messages for the desk, in HTML — "<b>❌ No
     // Active Pregnancy Found!</b><br><br>...". On a phone that renders as
     // tag soup, so the markup comes out here and the text stays.
@@ -40,6 +44,7 @@ export class OpsError extends Error {
     );
     this.name = "OpsError";
     this.code = code;
+    this.details = details;
     if (code === NOT_EMPLOYEE_CODE) onNotEmployee?.();
   }
 }

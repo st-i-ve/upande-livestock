@@ -17,6 +17,7 @@ import { Screen } from "@/components/Screen";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
 import { VetPicker } from "@/components/VetPicker";
+import { backdatedNote } from "@/src/breeding/backdated";
 import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
@@ -153,7 +154,7 @@ export default function Service() {
     }
     Alert.alert(
       stockNote ? "Service saved — stock issue pending" : "Service recorded",
-      [parts.join(" · "), ...sireLines, stockNote, ...warned].filter(Boolean).join("\n\n"),
+      [parts.join(" · "), ...sireLines, stockNote, backdatedNote(replies), ...warned].filter(Boolean).join("\n\n"),
     );
     finish("Service");
   };

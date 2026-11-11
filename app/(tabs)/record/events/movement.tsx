@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
+import { backdatedNote } from "@/src/breeding/backdated";
 import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -126,6 +127,7 @@ export default function Movement() {
     const remarksFor = (a: Animal) =>
       selection.some((x) => x.id === a.id) ? (notes[a.id] ?? "").trim() : reason === "Other" ? otherReason : reason;
     const serverWarnings: string[][] = [];
+    const replies: any[] = [];
     // One Animal Event per moved animal — server script updates per-animal
     // current_herd. We sequence rather than parallelize so a partial failure
     // gives the user a clear "X of Y moved" message.
@@ -141,6 +143,7 @@ export default function Movement() {
           eventDate: isBackdating ? backdateDate : serverToday,
           remarks: remarksFor(a),
         });
+        replies.push(reply);
         if (Array.isArray(reply?.warnings)) serverWarnings.push(reply.warnings);
         succeeded += 1;
       } catch (err) {
@@ -155,7 +158,7 @@ export default function Movement() {
     const warned = mergeWarnings(...serverWarnings);
     Alert.alert(
       warned.length ? "Movement recorded — check this" : "Movement recorded",
-      [parts.join(" · "), ...warned].join("\n\n"),
+      [parts.join(" · "), backdatedNote(replies), ...warned].filter(Boolean).join("\n\n"),
     );
     finish("Movement");
   };

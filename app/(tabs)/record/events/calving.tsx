@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
@@ -15,6 +15,22 @@ import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { CalfPhotoField } from "@/components/CalfPhotoField";
+import { BirthWindowNotice } from "@/components/BirthWindowNotice";
+import { StockItemFields } from "@/components/StockItemFields";
+import {
+  BIRTH_NEEDS_SERVICE,
+  diagnosisFits,
+  normaliseWindow,
+  retroPayload,
+  retroProblem,
+  suggestedDiagnosisDate,
+  suggestedServiceDate,
+  type RetroDraft,
+} from "@/src/breeding/birthWindow";
+import { birthCheck, checkFromRefusal, type BirthCheck } from "@/src/frappe/birthCheck";
+import { stockOutcomeText } from "@/src/frappe/eventItems";
+import { OpsError } from "@/src/frappe/opsError";
+import { useEventItems } from "@/src/hooks/useEventItems";
 import { syncAnimals } from "@/src/db/sync";
 import type { CalfInput } from "@/src/frappe/calves";
 import type { FileAsset } from "@/src/frappe/files";
@@ -23,7 +39,7 @@ import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
-import { useHerds } from "@/src/hooks/useHerds";
+import { useBeefSettings, useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -58,6 +74,7 @@ export default function Calving() {
   const { data: animals = [] } = useAnimals();
   const { data: herds = [] } = useHerds();
   const { data: settings } = useLivestockSettings();
+  const beef = useBeefSettings();
 
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
@@ -73,6 +90,65 @@ export default function Calving() {
   const [error, setError] = useState<string | null>(null);
 
   const pregnantCount = animals.filter((a) => a.pregnant).length;
+  const birthDate = isBackdating ? backdateDate : serverToday;
+
+  // The birth window (server: common/birth_window). Asked as soon as a dam and
+  // a date are picked, so the retro path is offered before the calves are typed.
+  const [check, setCheck] = useState<BirthCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [retro, setRetro] = useState<RetroDraft | null>(null);
+  const [herdTouched, setHerdTouched] = useState(false);
+  const [strawUom, setStrawUom] = useState("");
+  const { choices: strawChoices, consumes: serviceConsumes } = useEventItems("Service");
+  const win = normaliseWindow(check?.window?.min_days, check?.window?.max_days);
+  const needsRetro = !!check && !check.allowed && outcome !== "Abortion";
+  const patchRetro = (patch: Partial<RetroDraft>) => setRetro((r) => (r ? { ...r, ...patch } : r));
+
+  useEffect(() => {
+    setCheck(null);
+    setRetro(null);
+    setHerdTouched(false);
+    if (!dam || offline) return;
+    let live = true;
+    setChecking(true);
+    birthCheck(dam.id, birthDate)
+      .then((got) => live && setCheck(got))
+      .catch(() => live && setCheck(null)) // the server decides again on save
+      .finally(() => live && setChecking(false));
+    return () => {
+      live = false;
+    };
+  }, [dam, birthDate, offline]);
+
+  // A retro path starts from the middle of the window, the farm's default service.
+  useEffect(() => {
+    if (!check || check.allowed || !check.retro_allowed) return;
+    setRetro((r) =>
+      r ?? {
+        serviceDate: suggestedServiceDate(check.birth_date, win),
+        serviceType: beef.defaultServiceType === "A.I." ? "A.I." : "Natural",
+        withDiagnosis: false,
+        herd: "",
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [check]);
+
+  // Where her history puts her on the service date starts the herd picker.
+  const retroServiceDate = retro?.serviceDate ?? "";
+  useEffect(() => {
+    if (!dam || !retroServiceDate || herdTouched || offline) return;
+    let live = true;
+    birthCheck(dam.id, birthDate, retroServiceDate)
+      .then((got) => {
+        if (live) patchRetro({ herd: got.herd_on_service_date || got.current_herd || "" });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dam, birthDate, retroServiceDate, herdTouched, offline]);
 
   // A calf is born into its dam's herd and stays with her until the separation age.
   // Only a dam with no herd falls back to Livestock Settings' calf herd for the sex.
@@ -92,6 +168,14 @@ export default function Calving() {
     if (!dam) return setError("Pick the dam (mother).");
     if (outcome === "Live Birth" && calves.some((c) => !c.isStillborn && !c.burnName.trim())) {
       return setError("Give every live calf a name. Its book number is assigned when you save.");
+    }
+    if (needsRetro) {
+      if (!check?.retro_allowed) {
+        return setError(check?.retro_refusal || "A Livestock Manager must record this birth.");
+      }
+      if (!retro) return setError("Fill in the service this calf came from.");
+      const problem = retroProblem(retro, birthDate, win, !!check?.allow_diagnosis);
+      if (problem) return setError(problem);
     }
 
     // A pregnancy loss is not a calving with a bad outcome. It closes the
@@ -125,7 +209,8 @@ export default function Calving() {
         animal: dam.id,
         currentHerd: dam.herd,
         operator,
-        eventDate: isBackdating ? backdateDate : serverToday,
+        eventDate: birthDate,
+        retro: needsRetro && retro ? retroPayload(retro) : undefined,
         calvingOutcome: outcome as "Live Birth" | "Still Birth",
         calves:
           outcome === "Live Birth"
@@ -161,7 +246,9 @@ export default function Calving() {
           `${dam.name} calved ${born.length === 1 ? "one calf" : `${born.length} calves`}:\n${lines}${photoLine}`,
         );
         const extra = [
-          r?.service_created ? "No service was on file: the natural service was created 280 days before the calving." : "",
+          retroNote(r),
+          r?.is_backdated ? "The calving and its calves are marked Backdated." : "",
+          stockOutcomeText([r]),
           ...(Array.isArray(r?.warnings) ? r.warnings : []),
         ].filter(Boolean);
         if (extra.length) Alert.alert("Note", extra.join("\n"));
@@ -169,9 +256,18 @@ export default function Calving() {
         return;
       }
 
-      Alert.alert("Calving recorded", `${dam.name} marked as calved (${outcome}).`);
+      Alert.alert(
+        "Calving recorded",
+        [`${dam.name} marked as calved (${outcome}).`, retroNote(r), stockOutcomeText([r])].filter(Boolean).join("\n\n"),
+      );
       router.replace("/(tabs)/record/success?name=Calving");
     } catch (err) {
+      // Refused for want of a service: show the rule and offer the retro path
+      // here, rather than a message to retry. Never queued — the server answered.
+      if (err instanceof OpsError && err.code === BIRTH_NEEDS_SERVICE) {
+        const refused = checkFromRefusal(err.details);
+        if (refused) setCheck(refused);
+      }
       setError(extractFrappeError(err));
     }
   };
@@ -189,7 +285,7 @@ export default function Calving() {
       ) : null}
 
 
-      <Field label="Dam (mother)" help="With no pregnancy on file, the server takes conception as 280 days before the calving date and records the natural service for you.">
+      <Field label="Dam (mother)" help="She needs a confirmed pregnancy, or a service that fits the birth date. Without one, record the service first, backdated, below.">
         <AnimalPickerButton
           title="Select dam"
           placeholder="Search cow or heifer..."
@@ -215,6 +311,101 @@ export default function Calving() {
           />
         </Field>
       </FieldRow>
+
+      {dam && checking ? <Banner tone="info">Checking her pregnancy record…</Banner> : null}
+      {dam && check && outcome !== "Abortion" ? <BirthWindowNotice check={check} damName={dam.name} /> : null}
+
+      {needsRetro && check?.retro_allowed && retro ? (
+        <>
+          <SectionTitle>1 · The service (backdated)</SectionTitle>
+          <FieldRow>
+            <Field label="Service date" style={{ flex: 1 }} help={`${check.service_from} to ${check.service_to}`}>
+              <DateField
+                value={retro.serviceDate}
+                onChange={(v) => patchRetro({ serviceDate: v })}
+                minimumDate={fromISODate(check.service_from)}
+                maximumDate={fromISODate(check.service_to)}
+              />
+            </Field>
+            <Field label="Type" style={{ flex: 1 }}>
+              <Picker
+                value={retro.serviceType}
+                onChange={(v) => patchRetro({ serviceType: v as RetroDraft["serviceType"] })}
+                options={["Natural", "A.I."]}
+              />
+            </Field>
+          </FieldRow>
+          {retro.serviceType === "A.I." && serviceConsumes ? (
+            <StockItemFields
+              choices={strawChoices}
+              itemLabel="Semen straw (Item)"
+              icon="test-tube"
+              value={{ itemCode: retro.straw ?? "", uom: strawUom, warehouse: retro.strawWarehouse ?? "" }}
+              onChange={(v) => {
+                setStrawUom(v.uom);
+                patchRetro({ straw: v.itemCode, strawWarehouse: v.warehouse });
+              }}
+              qtyNeeded={1}
+            />
+          ) : null}
+          <Field
+            label={retro.serviceType === "A.I." ? "Bull / sire" : "Bull (optional)"}
+            help={retro.serviceType === "Natural" ? "Left blank, the bull in her herd that day is taken as the sire." : "Optional."}
+          >
+            <Input value={retro.sire ?? ""} onChangeText={(v) => patchRetro({ sire: v })} placeholder="Bull name or number" />
+          </Field>
+
+          {check.allow_diagnosis ? (
+            <>
+              <SectionTitle>2 · Pregnancy diagnosis (optional)</SectionTitle>
+              <Chips>
+                <Chip
+                  label="No diagnosis"
+                  active={!retro.withDiagnosis}
+                  onPress={() => patchRetro({ withDiagnosis: false })}
+                />
+                <Chip
+                  label="Confirmed by a diagnosis"
+                  active={retro.withDiagnosis}
+                  onPress={() =>
+                    patchRetro({
+                      withDiagnosis: true,
+                      diagnosisDate:
+                        retro.diagnosisDate && diagnosisFits(retro.diagnosisDate, retro.serviceDate, birthDate)
+                          ? retro.diagnosisDate
+                          : suggestedDiagnosisDate(retro.serviceDate, birthDate),
+                    })
+                  }
+                />
+              </Chips>
+              {retro.withDiagnosis ? (
+                <Field label="Diagnosis date" help="After the service and before the birth.">
+                  <DateField
+                    value={retro.diagnosisDate ?? ""}
+                    onChange={(v) => patchRetro({ diagnosisDate: v })}
+                    minimumDate={fromISODate(retro.serviceDate)}
+                    maximumDate={fromISODate(birthDate)}
+                  />
+                </Field>
+              ) : null}
+            </>
+          ) : null}
+
+          <SectionTitle>{`${check.allow_diagnosis ? "3" : "2"} · Her herd on ${retro.serviceDate}`}</SectionTitle>
+          <Field help="Recorded as a backdated move in her herd history; she stays where she is today.">
+            <Picker
+              value={retro.herd}
+              placeholder="Choose the herd"
+              onChange={(v) => {
+                setHerdTouched(true);
+                patchRetro({ herd: v });
+              }}
+              options={herds.map((h) => h.n)}
+            />
+          </Field>
+          <SectionTitle>{`${check.allow_diagnosis ? "4" : "3"} · The birth`}</SectionTitle>
+        </>
+      ) : null}
 
       {outcome === "Abortion" ? (
         <>
@@ -316,10 +507,20 @@ export default function Calving() {
       <OnlineOnlyNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit calving"}
-        disabled={offline || mutation.isPending || !dam}
+        disabled={offline || mutation.isPending || !dam || (needsRetro && !check?.retro_allowed)}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />
     </Screen>
   );
+}
+
+/** What the retro path back-recorded, in words for the alert. */
+function retroNote(r: any): string {
+  const made = r?.retro;
+  if (!made?.service) return "";
+  const bits = [`service ${made.service}`];
+  if (made.pregnancy_diagnosis) bits.push(`diagnosis ${made.pregnancy_diagnosis}`);
+  if (made.movements?.length) bits.push(`${made.movements.length} herd move(s) in her history`);
+  return `Back-recorded, marked Backdated: ${bits.join(", ")}.`;
 }

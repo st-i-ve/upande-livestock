@@ -5,7 +5,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { Field } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
-import { qtyAt, type StockChoice } from "@/src/frappe/eventItems";
+import { outOfStock, qtyAt, type StockChoice } from "@/src/frappe/eventItems";
 import { useBatchPlan } from "@/src/hooks/useBatchPlan";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -73,7 +73,13 @@ export function StockItemFields({
         />
       </Field>
       <Field label="Issue from store">
-        {stores.length ? (
+        {chosen && outOfStock(chosen) ? (
+          <Text style={{ fontSize: 12, color: c.warning }}>
+            {chosen.warehouse
+              ? `Out of stock. Saved with its issue from ${chosen.warehouse} as a draft, to be posted from the web Transactions page once the store has it.`
+              : "Out of stock, and no store is set for it. Ask the office to set the event type's Default Store."}
+          </Text>
+        ) : stores.length ? (
           <Picker
             value={storeText(stores.find((l) => l.warehouse === value.warehouse) ?? stores[0])}
             options={stores.map(storeText)}
@@ -159,7 +165,7 @@ function ChoicePicker({
         <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={s.header}>
-              <Text style={s.title}>Select item in stock</Text>
+              <Text style={s.title}>Select item</Text>
               <Pressable onPress={() => setOpen(false)} hitSlop={8}>
                 <MaterialCommunityIcons name="close" size={20} color={c.text} />
               </Pressable>
@@ -195,10 +201,16 @@ function ChoicePicker({
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={s.name} numberOfLines={1}>{item.item_name || item.value}</Text>
-                    <Text style={s.meta} numberOfLines={1}>
-                      {fmt(item.qty ?? 0)} {item.uom ?? ""} in {item.warehouse}
-                      {(item.locations?.length ?? 0) > 1 ? ` (+${item.locations!.length - 1} more)` : ""}
-                    </Text>
+                    {outOfStock(item) ? (
+                      <Text style={[s.meta, { color: c.warning }]} numberOfLines={1}>
+                        Out of stock · saved as a draft issue
+                      </Text>
+                    ) : (
+                      <Text style={s.meta} numberOfLines={1}>
+                        {fmt(item.qty ?? 0)} {item.uom ?? ""} in {item.warehouse}
+                        {(item.locations?.length ?? 0) > 1 ? ` (+${item.locations!.length - 1} more)` : ""}
+                      </Text>
+                    )}
                   </View>
                   {item.value === value ? <MaterialCommunityIcons name="check" size={18} color={c.text} /> : null}
                 </Pressable>

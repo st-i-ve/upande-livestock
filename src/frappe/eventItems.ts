@@ -17,7 +17,14 @@ export type StockChoice = {
   uom?: string;
   warehouse?: string;
   locations?: { warehouse: string; qty: number }[];
+  /** False for an item of the event's groups that no store holds. Still
+   *  pickable: the event is saved and its issue waits as a draft. */
+  in_stock?: boolean;
 };
+
+/** Is this choice held in no store? (Older servers sent only held items.) */
+export const outOfStock = (choice: StockChoice | undefined): boolean =>
+  !!choice && (choice.in_stock === false || !(choice.locations?.length ?? 0));
 
 export type ItemsByEvent = Record<string, StockChoice[]>;
 
@@ -36,8 +43,8 @@ export type IssueLine = {
  * HEADS-UP ONLY. The phone records what happened on the ground; the server
  * decides what the store can bear. An event recorded today with the store short
  * is saved with its Stock Entry left as a draft (posted later from the web
- * Transactions page); a backdated short issue is refused by the server with an
- * error. So this never blocks a save — it only lets the operator see, before
+ * Transactions page); a backdated short issue is saved the same way, as a
+ * draft placeholder dated the event's day. So this never blocks a save — it only lets the operator see, before
  * and while submitting, that the store looked short.
  *
  * Over-issue check against the quantities the picker already showed. Returns a

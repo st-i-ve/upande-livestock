@@ -4,6 +4,7 @@ import { listDocuments } from "./generic";
 import { discardCalfPhoto, uploadCalfPhoto } from "./calfPhoto";
 import { legacyCalf, type CalfInput } from "./calves";
 import type { FileAsset } from "./files";
+import type { RetroPayload } from "@/src/breeding/birthWindow";
 
 // Event types the `Livestock Event Type` master carries in upande_livestock.
 //
@@ -104,6 +105,9 @@ type EventSpecificInput =
       calfPhoto?: FileAsset;
       calfBreed?: string;
       calfHealthStatus?: "Healthy" | "Weak" | "Needs Attention" | "Critical";
+      /** The retro path: back-record the service (and its diagnosis and herd)
+       *  this birth needs, in the same request (src/breeding/birthWindow). */
+      retro?: RetroPayload;
     }
   | {
       eventType: "Vaccination" | "Deworming" | "Hoof Trimming" | "Dehorning";
@@ -226,7 +230,7 @@ const callOp = async (type: string, payload: Record<string, any>): Promise<any> 
   });
   const msg = res.data?.message;
   if (!msg) throw new OpsError(`${type} returned nothing.`);
-  if (msg.error) throw new OpsError(msg.error, msg.code);
+  if (msg.error) throw new OpsError(msg.error, msg.code, msg);
   return msg;
 };
 
@@ -378,6 +382,7 @@ export const createAnimalEvent = async (
         related_pregnancy: input.relatedPregnancy,
         remarks: withNote(input.remarks, ...coats),
         calves: rows,
+        retro: input.retro,
       });
       // The calving is recorded: the durable copy has done its job.
       for (const c of calves) if (c.photo) discardCalfPhoto(c.photo.uri);
