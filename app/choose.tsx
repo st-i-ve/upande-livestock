@@ -46,7 +46,9 @@ export default function Choose() {
       subtitle={step === "top" ? "You can switch later from Profile" : "Shoats are managed by herd numbers"}
       back={step === "shoats" || !!current}
     >
-      {step === "shoats" && !current ? (
+      {/* Always offered on the second step: someone already working with sheep or
+          goats lands here first and must be able to get back to Cattle. */}
+      {step === "shoats" ? (
         <Pressable onPress={() => setStep("top")} hitSlop={8} accessibilityRole="button">
           <Text style={s.link}>Back to animal type</Text>
         </Pressable>

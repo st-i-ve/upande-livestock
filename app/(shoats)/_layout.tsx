@@ -39,6 +39,9 @@ export default function ShoatsTabLayout() {
             elevation: 0,
           },
           tabBarItemStyle: { paddingTop: 0, paddingBottom: 0 },
+          // The navigator draws each icon in a small fixed box; a font glyph at
+          // the bar's size (the sheep) was clipped by it. Room for the glyph.
+          tabBarIconStyle: { width: ICON_SIZE + 9, height: ICON_SIZE + 5 },
         }}
       >
         <Tabs.Screen
