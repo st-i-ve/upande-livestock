@@ -82,10 +82,15 @@ export function TabSwipe({
           const { route: r, navigation: nav, hidden: h } = live.current;
           const target = adjacentTab(nav.getState().routes, r.name, g.dx < 0 ? 1 : -1, h);
           if (!target) return;
-          // Same path as a tap on the icon, so the Record tab's listener still
-          // brings its menu back to the front.
-          const ev = nav.emit({ type: "tabPress", target: target.key, canPreventDefault: true });
-          if (!ev.defaultPrevented) nav.navigate(target.name);
+          // A screen's `navigation` has no `emit` (only the tab bar's does): calling
+          // it threw "undefined is not a function" on every swipe. Emit where it
+          // exists, so the Record tab's tabPress listener still runs; otherwise
+          // navigate straight to the tab.
+          const emit = (nav as { emit?: (e: object) => { defaultPrevented?: boolean } }).emit;
+          const ev = typeof emit === "function"
+            ? emit.call(nav, { type: "tabPress", target: target.key, canPreventDefault: true })
+            : undefined;
+          if (!ev?.defaultPrevented) nav.navigate(target.name);
         },
       }),
     [],
