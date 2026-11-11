@@ -32,3 +32,10 @@ describe("atTabRoot", () => {
     expect(atTabRoot({ state: { index: 1 } })).toBe(false);
   });
 });
+
+describe("atTabRoot at depth", () => {
+  it("is false when a stack nested inside the tab has a screen pushed", () => {
+    expect(atTabRoot({ state: { index: 0, routes: [{ state: { index: 1 } }] } })).toBe(false);
+    expect(atTabRoot({ state: { index: 0, routes: [{ state: { index: 0 } }] } })).toBe(true);
+  });
+});

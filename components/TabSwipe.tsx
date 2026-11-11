@@ -9,7 +9,7 @@ const DOMINANCE = 2;
 const COMMIT_DX = 70;
 const FLICK_VX = 0.45;
 
-type TabRoute = { key: string; name: string; state?: { index?: number } };
+type TabRoute = { key: string; name: string; state?: NavState };
 type TabNav = {
   getState: () => { routes: TabRoute[] };
   emit: (e: { type: "tabPress"; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
@@ -37,8 +37,24 @@ export function adjacentTab<R extends { name: string }>(
   return visible[i + dir];
 }
 
-/** A tab sits on its root screen while nothing has been pushed onto its stack. */
-export const atTabRoot = (route: { state?: { index?: number } }) => (route.state?.index ?? 0) === 0;
+type NavState = { index?: number; routes?: { state?: NavState }[] };
+
+/**
+ * A tab sits on its root screen while nothing has been pushed onto its stack —
+ * at any depth: a stack inside the tab's stack must be at its first screen too.
+ */
+export const atTabRoot = (route: { state?: NavState }): boolean => {
+  let st: NavState | undefined = route.state;
+  while (st) {
+    if ((st.index ?? 0) !== 0) return false;
+    st = st.routes?.[0]?.state;
+  }
+  return true;
+};
+
+/** This tab's route as the navigator holds it NOW (the route a layout was handed can be stale). */
+const liveRoute = (nav: TabNav, key: string, fallback: TabRoute): TabRoute =>
+  nav.getState().routes.find((r) => r.key === key) ?? fallback;
 
 /**
  * Wraps one tab's screen (via the navigator's `screenLayout`) so a sideways
@@ -69,8 +85,9 @@ export function TabSwipe({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_e, g) => {
-          const { route: r } = live.current;
-          if (!atTabRoot(r)) return false;
+          const { route: r, navigation: nav } = live.current;
+          // Only once the user has come back up to the top of this tab's stack.
+          if (!atTabRoot(liveRoute(nav, r.key, r))) return false;
           if (TextInput.State.currentlyFocusedInput()) return false;
           return Math.abs(g.dx) > CLAIM_DX && Math.abs(g.dx) > DOMINANCE * Math.abs(g.dy);
         },
@@ -80,6 +97,7 @@ export function TabSwipe({
           const flick = Math.abs(g.dx) > COMMIT_DX / 2 && Math.abs(g.vx) > FLICK_VX && Math.sign(g.vx) === Math.sign(g.dx);
           if (!far && !flick) return;
           const { route: r, navigation: nav, hidden: h } = live.current;
+          if (!atTabRoot(liveRoute(nav, r.key, r))) return;
           const target = adjacentTab(nav.getState().routes, r.name, g.dx < 0 ? 1 : -1, h);
           if (!target) return;
           // A screen's `navigation` has no `emit` (only the tab bar's does): calling
