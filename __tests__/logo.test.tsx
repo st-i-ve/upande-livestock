@@ -1,0 +1,41 @@
+import fs from "fs";
+import path from "path";
+import React from "react";
+import TestRenderer, { act } from "react-test-renderer";
+
+import { LivestockLogo, TAIL_SWING } from "@/components/LivestockLogo";
+import { LOGO_COW } from "@/src/art/paths";
+
+jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"));
+jest.mock("react-native-reanimated", () => ({ ...require("react-native-reanimated/mock"), useReducedMotion: () => false }));
+
+const root = path.resolve(__dirname, "..");
+
+describe("Livestock logo", () => {
+  it("draws the traced cow, her tail on its own layer", () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      r = TestRenderer.create(<LivestockLogo size={120} animated />);
+    });
+    const ds = r.root.findAll((n) => typeof n.props.d === "string").map((n) => n.props.d);
+    expect(ds).toContain(LOGO_COW.body);
+    expect(ds).toContain(LOGO_COW.tail);
+    act(() => r.unmount());
+  });
+
+  it("swings the tail as the web does: out and back twice, settling at rest", () => {
+    expect(TAIL_SWING.map(([, d]) => d)).toEqual([0, 0, 7, -2, 5, -1, 0, 0]);
+    expect(TAIL_SWING[0][0]).toBe(0);
+    expect(TAIL_SWING[TAIL_SWING.length - 1][0]).toBe(1);
+  });
+
+  it("app.json's icon, adaptive icon and splash are the cow mark files, and they exist", () => {
+    const app = JSON.parse(fs.readFileSync(path.join(root, "app.json"), "utf8")).expo;
+    const splash = app.plugins.find((p: unknown) => Array.isArray(p) && p[0] === "expo-splash-screen")[1];
+    const files = [app.icon, app.android.adaptiveIcon.foregroundImage, app.android.adaptiveIcon.monochromeImage, splash.image];
+    for (const f of files) {
+      expect(f).toMatch(/livestock-/);
+      expect(fs.existsSync(path.join(root, f))).toBe(true);
+    }
+  });
+});

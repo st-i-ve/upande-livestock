@@ -4,7 +4,6 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
-  Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
@@ -30,6 +29,7 @@ import { TextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
+import { LivestockLogo } from "@/components/LivestockLogo";
 import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
@@ -230,17 +230,13 @@ export default function LoginScreen() {
                     <View style={s.logoBox}>
                       <View style={s.disc} />
                       {/* Behind the logo and out of layout, so the header never
-                          reflows and the mark itself never animates — the logo
+                          reflows and the ring never moves the mark (only the cow's tail swings) — the logo
                           stays crisp while the ring travels. pointerEvents none
                           keeps the long-press target on the Pressable. */}
                       {!hasInstance ? (
                         <Animated.View pointerEvents="none" style={[s.logoHalo, haloStyle]} />
                       ) : null}
-                      <Image
-                        source={require("../../assets/images/upande_logo_no_bg.png")}
-                        style={s.logo}
-                        resizeMode="contain"
-                      />
+                      <LivestockLogo size={LOGO} animated />
                     </View>
                   </Pressable>
 
@@ -349,7 +345,7 @@ export default function LoginScreen() {
 
 const RING = 220;
 const DISC = 220;
-const LOGO = 200;
+const LOGO = 220;
 const STATUS_GREEN = "#2ECC71";
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
@@ -382,7 +378,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderRadius: DISC / 2,
       backgroundColor: "#ffffff",
     },
-    logo: { width: LOGO, height: LOGO },
     title: {
       color: c.text,
       letterSpacing: 1,
