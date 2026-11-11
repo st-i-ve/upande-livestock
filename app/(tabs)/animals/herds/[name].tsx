@@ -20,7 +20,8 @@ export default function HerdDetail() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
-  // Read-only: rations and recipes are configured on the web.
+  // Read-only: rations are set in the web app's Ration Editor (and their past
+  // versions are in its Ration History).
   const herdQ = useHerds();
   const animalsQ = useAnimals();
 

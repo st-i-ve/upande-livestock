@@ -659,7 +659,7 @@ function ManualTab({
 
       <Field
         label="Start from"
-        help="The rows below reload from whichever recipe is picked here. Untuned edits are confirmed before they're replaced."
+        help="The rows below reload from whichever recipe is picked here. Untuned edits are confirmed before they're replaced. A change here is this run's mix only; a herd's ration is changed in the Ration Editor on the web."
       >
         <RecipePicker recipes={recipes} value={selectedBom} onChange={requestRecipeChange} />
       </Field>
