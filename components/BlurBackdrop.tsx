@@ -1,6 +1,6 @@
 import { requireOptionalNativeModule } from "expo";
 import React from "react";
-import { Platform, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, UIManager, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 /**
@@ -15,6 +15,13 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 const HAS_BLUR = Platform.OS !== "web" && requireOptionalNativeModule("ExpoBlur") != null;
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- only once its native side is known to exist
 const Blur: typeof import("expo-blur") | null = HAS_BLUR ? require("expo-blur") : null;
+const HAS_MASK = Platform.OS !== "web" && UIManager.hasViewManagerConfig?.("RNCMaskedView") === true;
+type MaskedProps = { style?: StyleProp<ViewStyle>; maskElement: React.ReactElement; children: React.ReactNode };
+// Its class types predate React 19's JSX types, so it is typed by its props here.
+const Masked: React.ComponentType<MaskedProps> | null = HAS_MASK
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- only once its native side is known to exist
+    require("@react-native-masked-view/masked-view").default
+  : null;
 
 /** The app's content, the view the backdrop blurs. */
 export const blurTarget = React.createRef<React.ComponentRef<typeof View>>();
@@ -28,46 +35,81 @@ export function BlurTargetRoot({ children, backgroundColor }: { children: React.
   );
 }
 
-/** Fine steps of blur, so their edges do not show: each a little stronger and shorter. */
+/** Bands of blur, for a binary that has the blur but not the masked view. */
 const STEPS = 16;
 const MAX_INTENSITY = 60;
+/** The mask's stops: an eased ramp (smoothstep), so the frost has no visible start or edge. */
+const RAMP = 14;
+
+/**
+ * Eased gradient stops from clear (top) to full (bottom) over the lower
+ * `reach` of the screen: [offset, opacity], ease-in-out, as
+ * react-native-easing-gradient does for the gist this follows.
+ */
+export function easedStops(reach: number, steps = RAMP): [number, number][] {
+  const out: [number, number][] = [[0, 0]];
+  for (let i = 0; i <= steps; i++) {
+    const x = i / steps;
+    out.push([1 - reach + reach * x, x * x * (3 - 2 * x)]);
+  }
+  return out;
+}
+
+function Ramp({ id, color, max, reach }: { id: string; color: string; max: number; reach: number }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          {easedStops(reach).map(([offset, a], i) => (
+            <Stop key={i} offset={offset} stopColor={color} stopOpacity={a * max} />
+          ))}
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
 
 /**
  * Frosted glass behind a sheet, as a gradient: the page is clear at the top
- * and frosts more and more towards the sheet at the bottom. Fine bands of
- * blur, each a touch stronger than the one under it, under a frosted white veil
- * (white in light mode, smoky in dark) that thickens the same way and
- * smooths the bands' edges. Without the blur module, the veil alone, darker.
+ * and frosts smoothly towards the sheet at the bottom. One full-strength blur
+ * of the page, shown through an eased gradient mask (a masked gradient blur,
+ * as steve228uk's GradientMaskedBlurHeader), under a light veil that thickens
+ * the same way: white in light mode, smoky in dark. Without the masked view,
+ * fine bands of blur instead; without the blur, the veil alone, darker.
  */
 export function FrostedBackdrop({ dark, reach = 0.9 }: { dark: boolean; reach?: number }) {
   const { height } = useWindowDimensions();
-  const span = height * reach;
+  const tint = dark ? "dark" : "light";
   const veil = Blur ? (dark ? "#0B0B0B" : "#FFFFFF") : "#000000";
-  const veilMax = Blur ? (dark ? 0.45 : 0.35) : 0.45;
+  const veilMax = Blur ? (dark ? 0.4 : 0.3) : 0.45;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {Blur
-        ? Array.from({ length: STEPS }, (_, k) => (
-            <Blur.BlurView
-              key={k}
-              blurTarget={blurTarget}
-              blurMethod="dimezisBlurViewSdk31Plus"
-              intensity={(MAX_INTENSITY * (k + 1)) / STEPS}
-              style={[s.band, { height: span * ((STEPS - k) / STEPS) }]}
-            />
-          ))
-        : null}
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-        <Defs>
-          <LinearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset={0} stopColor={veil} stopOpacity={0} />
-            <Stop offset={1 - reach} stopColor={veil} stopOpacity={0} />
-            <Stop offset={1 - reach / 2} stopColor={veil} stopOpacity={veilMax * 0.45} />
-            <Stop offset={1} stopColor={veil} stopOpacity={veilMax} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#veil)" />
-      </Svg>
+      {Blur && Masked ? (
+        <Masked
+          style={StyleSheet.absoluteFill}
+          maskElement={<Ramp id="mask" color="#000000" max={1} reach={reach} />}
+        >
+          <Blur.BlurView
+            blurTarget={blurTarget}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            intensity={100}
+            tint={tint}
+            style={StyleSheet.absoluteFill}
+          />
+        </Masked>
+      ) : Blur ? (
+        Array.from({ length: STEPS }, (_, k) => (
+          <Blur.BlurView
+            key={k}
+            blurTarget={blurTarget}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            intensity={(MAX_INTENSITY * (k + 1)) / STEPS}
+            style={[s.band, { height: height * reach * ((STEPS - k) / STEPS) }]}
+          />
+        ))
+      ) : null}
+      <Ramp id="veil" color={veil} max={veilMax} reach={reach} />
     </View>
   );
 }
