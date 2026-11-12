@@ -4,7 +4,7 @@
     "slug": "upande-livestock-mutara",
     "version": "1.2.0",
     "orientation": "portrait",
-    "icon": "./assets/images/livestock-icon.png",
+    "icon": "./assets/images/upande_logo_no_bg.png",
     "scheme": "upandelivestockmutara",
     "updates": {
       "enabled": true,
@@ -21,7 +21,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/livestock-adaptive-foreground.png",
+        "foregroundImage": "./assets/images/upande_logo.png",
         "monochromeImage": "./assets/images/livestock-adaptive-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -40,7 +40,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/livestock-splash.png",
+          "image": "./assets/images/upande_logo_no_bg.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
