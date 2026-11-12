@@ -34,3 +34,30 @@ export const LOGO_COW = {
   /** The grass's ground: left end, right end, bottom row (the grass sways about it). */
   grassFoot: [-45,515,322],
 } as const;
+
+/** The Upande arrow (design/logo/upande_arrow.svg): [fill, d] per path, drawn at `at` on the 689 disc. */
+export const UPANDE_ARROW = {
+  at: [169,165],
+  paths: [["#625d59","M0 0 H272 V85 H0 Z"],["#45433f","M272 0 H359 V364 H272 Z"],["#1a1917","M246 85 H272 V161 L246 187 Z"],["#45433f","M198 85 H246 V187 L69 364 H0 V283 Z"]],
+} as const satisfies { at: readonly number[]; paths: readonly (readonly [string, string])[] };
+
+/**
+ * The desk tile's keyframes (design/logo/livestock_motion.json, from build_livestock_logo.py ENTER and LOOP):
+ * [offset, value] stops per property. The enter tracks run over enterMs (the out is the same in reverse);
+ * tail (degrees) and sway (skewX degrees) over loopMs. ease is the CSS cubic-bezier, applied per segment.
+ */
+export const LOGO_MOTION = {
+  cycleMs: 4000,
+  enterMs: 720,
+  loopMs: 2560,
+  ease: [0.3,0.7,0.2,1],
+  arrowOrigin: [348.5,347],
+  arrowScale: [[0,1],[0.45,0],[1,0]],
+  arrowOpacity: [[0,1],[0.45,0],[1,0]],
+  sceneOpacity: [[0,0],[0.12,1],[1,1]],
+  grassReveal: [[0,0],[0.1,0],[0.5,1.1],[1,1.1]],
+  cowShift: [[0,-120],[0.25,-120],[0.92,0],[1,0]],
+  cowOpacity: [[0,0],[0.25,0],[0.45,1],[0.92,1],[1,1]],
+  tail: [[0,0],[0.1,0],[0.26,7],[0.42,-2],[0.58,5],[0.74,-1],[0.88,0],[1,0]],
+  sway: [[0,0],[0.1,0],[0.26,2],[0.42,-0.57],[0.58,1.43],[0.74,-0.29],[0.88,0],[1,0]],
+} as const;

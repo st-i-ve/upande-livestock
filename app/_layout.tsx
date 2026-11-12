@@ -34,6 +34,7 @@ import { startAnimalSync } from "@/src/db/sync";
 import { startRealtime } from "@/src/realtime/realtime";
 import { queryClient } from "@/src/services/queryClient";
 import { homeOf, isShoats, useAnimalType } from "@/src/shoats/animalType";
+import { useLoginExit } from "@/src/logo/loginLogo";
 import { useScheme, useThemeStore } from "@/src/theme/themeStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -71,6 +72,8 @@ function AuthGate() {
   // A user whose only livestock role is Livestock Nutritionist would be refused
   // every screen here; they get one screen pointing at the web's Ration Editor.
   const nutritionist = useAuthStore((s) => nutritionistOnly(s.roles));
+  // Just signed in: the login logo is playing back to the Upande mark; move on when it is done.
+  const loginHeld = useLoginExit((s) => s.holding);
 
   React.useEffect(() => {
     if (isLoading || !typeHydrated) return;
@@ -78,6 +81,8 @@ function AuthGate() {
     const inAuthGroup = top === "(auth)";
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
+    } else if (isAuthenticated && inAuthGroup && loginHeld) {
+      return;
     } else if (isAuthenticated && nutritionist) {
       if (top !== "nutritionist" && top !== "mobile-kit") router.replace("/nutritionist");
     } else if (isAuthenticated && top === "nutritionist") {
@@ -92,7 +97,7 @@ function AuthGate() {
       if (top === "(tabs)" && isShoats(animalType)) router.replace(homeOf(animalType));
       else if (top === "(shoats)" && animalType === "cattle") router.replace(homeOf(animalType));
     }
-  }, [isAuthenticated, isLoading, typeHydrated, animalType, segments, router, nutritionist]);
+  }, [isAuthenticated, isLoading, typeHydrated, animalType, segments, router, nutritionist, loginHeld]);
 
   return null;
 }

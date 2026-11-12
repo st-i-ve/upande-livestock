@@ -44,7 +44,7 @@ describe("Livestock logo", () => {
     expect(Math.max(...TAIL_SWING.map(([, d]) => Math.abs(d * GRASS_SWAY)))).toBeCloseTo(2);
   });
 
-  it("app.json's icon, adaptive icon and splash are the cow mark files, and they exist", () => {
+  it("app.json's icon, adaptive icon and splash are the livestock- files (the Upande mark, as the desk tile at rest), and they exist", () => {
     const app = JSON.parse(fs.readFileSync(path.join(root, "app.json"), "utf8")).expo;
     const splash = app.plugins.find((p: unknown) => Array.isArray(p) && p[0] === "expo-splash-screen")[1];
     const files = [app.icon, app.android.adaptiveIcon.foregroundImage, app.android.adaptiveIcon.monochromeImage, splash.image];

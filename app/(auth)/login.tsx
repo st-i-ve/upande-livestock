@@ -21,6 +21,7 @@ import Animated, {
   cancelAnimation,
   runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -36,6 +37,7 @@ import { useScheme } from "@/src/theme/themeStore";
 import { useAuthStore } from "@/src/auth/authStore";
 import { classifyError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
+import { sceneOf, useLoginExit, useLoginLogo } from "@/src/logo/loginLogo";
 
 // Login form fields never grow past 80% of the screen width so they stay
 // comfortable to read on tablets and large phones.
@@ -65,6 +67,12 @@ export default function LoginScreen() {
   const instanceUrl = useAuthStore((st) => st.instanceUrl);
   const storedEmail = useAuthStore((st) => st.email);
   const login = useAuthStore((st) => st.login);
+
+  // The logo, as the desk tile: the Upande mark, the cow scene played in as the screen
+  // appears, and after a login played back out to the Upande mark before the app moves on
+  // (AuthGate waits while useLoginExit holds). Reduce-motion: the Upande mark throughout.
+  const reduceMotion = useReducedMotion();
+  const { phase, send } = useLoginLogo(!!reduceMotion);
 
   // Editable mirror of the stored URL. Persists via the login flow.
   const [url, setUrl] = useState(instanceUrl);
@@ -167,9 +175,13 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
+    // Hold the next screen until the logo has played back to the Upande mark.
+    useLoginExit.getState().hold();
     try {
       await login(email.trim(), password, url.trim());
+      send("loggedIn");
     } catch (err) {
+      useLoginExit.getState().release();
       setError(classifyError(err).message);
     } finally {
       setLoading(false);
@@ -230,13 +242,18 @@ export default function LoginScreen() {
                     <View style={s.logoBox}>
                       <View style={s.disc} />
                       {/* Behind the logo and out of layout, so the header never
-                          reflows and the ring never moves the mark (only the cow's tail swings) — the logo
+                          reflows and the ring never moves the mark (only the logo's own scene moves) — the logo
                           stays crisp while the ring travels. pointerEvents none
                           keeps the long-press target on the Pressable. */}
                       {!hasInstance ? (
                         <Animated.View pointerEvents="none" style={[s.logoHalo, haloStyle]} />
                       ) : null}
-                      <LivestockLogo size={LOGO} animated />
+                      <LivestockLogo
+                        size={LOGO}
+                        scene={sceneOf(phase)}
+                        onEntered={() => send("entered")}
+                        onReturned={() => send("returned")}
+                      />
                     </View>
                   </Pressable>
 
