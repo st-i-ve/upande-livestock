@@ -233,8 +233,9 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     appbar: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      // The same as every tab's app bar, so the connection dot lines up here too.
+      paddingHorizontal: 12,
+      paddingVertical: 10,
       backgroundColor: c.bg,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,

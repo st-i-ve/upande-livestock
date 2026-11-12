@@ -28,6 +28,8 @@ export default function TabLayout() {
 
   return (
     <MorphIn>
+    {/* The connection dot, drawn once over the pages in one fixed place. */}
+    <FloatingOnlineDot>
     <Tabs
       // A sideways swipe on a tab's root screen moves to the next visible tab.
       screenLayout={({ route, navigation, children }) => (
@@ -112,8 +114,7 @@ export default function TabLayout() {
       />
     </Tabs>
     <ContinueRecording bottom={BAR_CONTENT_HEIGHT + insets.bottom + 12} />
-      {/* The connection dot, drawn once over the pages so a swipe never carries it off. */}
-      <FloatingOnlineDot />
+    </FloatingOnlineDot>
     </MorphIn>
   );
 }
