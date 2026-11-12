@@ -1,16 +1,16 @@
 import { requireOptionalNativeModule } from "expo";
 import React from "react";
-import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 /**
- * A backdrop that blurs what is behind a sheet, most where the sheet is and
- * less and less towards the top, instead of a flat black dim.
+ * Frosted glass for sheets: the page behind them frosting gradually towards
+ * the sheet instead of a flat black dim, and the sheet a translucent pane.
  *
  * On Android a blur can only blur views inside a BlurTargetView, and must not
  * sit inside it itself: the root layout wraps the app in BlurTargetRoot and
  * draws sheets that use this beside it, not in it. A binary without the blur
- * module (an APK older than this change) gets the soft gradient alone.
+ * module (an APK older than this change) gets a plain dim and solid sheet.
  */
 const HAS_BLUR = Platform.OS !== "web" && requireOptionalNativeModule("ExpoBlur") != null;
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- only once its native side is known to exist
@@ -28,14 +28,22 @@ export function BlurTargetRoot({ children, backgroundColor }: { children: React.
   );
 }
 
-/** Bands of blur, each a little stronger and shorter than the one under it. */
-const STEPS = 10;
-const MAX_INTENSITY = 70;
+/** Fine steps of blur, so their edges do not show: each a little stronger and shorter. */
+const STEPS = 16;
+const MAX_INTENSITY = 60;
 
-export function ProgressiveBlur({ dark, reach = 0.85 }: { dark: boolean; reach?: number }) {
+/**
+ * Frosted glass behind a sheet, as a gradient: the page is clear at the top
+ * and frosts more and more towards the sheet at the bottom. Fine bands of
+ * blur, each a touch stronger than the one under it, under a frosted white veil
+ * (white in light mode, smoky in dark) that thickens the same way and
+ * smooths the bands' edges. Without the blur module, the veil alone, darker.
+ */
+export function FrostedBackdrop({ dark, reach = 0.9 }: { dark: boolean; reach?: number }) {
   const { height } = useWindowDimensions();
-  const top = height * (1 - reach);
-  const shade = dark ? "#000000" : "#0A0A0A";
+  const span = height * reach;
+  const veil = Blur ? (dark ? "#0B0B0B" : "#FFFFFF") : "#000000";
+  const veilMax = Blur ? (dark ? 0.45 : 0.35) : 0.45;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {Blur
@@ -45,25 +53,73 @@ export function ProgressiveBlur({ dark, reach = 0.85 }: { dark: boolean; reach?:
               blurTarget={blurTarget}
               blurMethod="dimezisBlurViewSdk31Plus"
               intensity={(MAX_INTENSITY * (k + 1)) / STEPS}
-              tint={dark ? "dark" : "light"}
-              style={[s.band, { height: (height - top) * ((STEPS - k) / STEPS) }]}
+              style={[s.band, { height: span * ((STEPS - k) / STEPS) }]}
             />
           ))
         : null}
-      {/* A soft shade over it, darkest at the bottom: it smooths the bands' edges, and it is
-          the whole backdrop where there is no blur. */}
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
         <Defs>
-          <LinearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset={0} stopColor={shade} stopOpacity={0} />
-            <Stop offset={1 - reach} stopColor={shade} stopOpacity={0} />
-            <Stop offset={1} stopColor={shade} stopOpacity={Blur ? (dark ? 0.35 : 0.2) : 0.45} />
+          <LinearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset={0} stopColor={veil} stopOpacity={0} />
+            <Stop offset={1 - reach} stopColor={veil} stopOpacity={0} />
+            <Stop offset={1 - reach / 2} stopColor={veil} stopOpacity={veilMax * 0.45} />
+            <Stop offset={1} stopColor={veil} stopOpacity={veilMax} />
           </LinearGradient>
         </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#veil)" />
       </Svg>
     </View>
   );
 }
 
-const s = StyleSheet.create({ band: { position: "absolute", left: 0, right: 0, bottom: 0 } });
+/**
+ * A pane of frosted glass for the sheet itself: what is behind it blurred
+ * more strongly, a frosted white (or smoky, in dark mode) fill over it and a thin
+ * bright edge. Without the blur module, the plain page colour.
+ */
+export function GlassPanel({
+  dark,
+  solid,
+  style,
+  children,
+}: {
+  dark: boolean;
+  /** The page colour, used where there is no blur. */
+  solid: string;
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      style={[
+        style,
+        s.panel,
+        Blur
+          ? { borderColor: dark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.7)" }
+          : { backgroundColor: solid },
+      ]}
+    >
+      {Blur ? (
+        <>
+          <Blur.BlurView
+            blurTarget={blurTarget}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            intensity={90}
+            tint={dark ? "dark" : "light"}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: dark ? "rgba(22,22,22,0.62)" : "rgba(255,255,255,0.66)" }]}
+          />
+        </>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  panel: { overflow: "hidden" },
+  band: { position: "absolute", left: 0, right: 0, bottom: 0 },
+});

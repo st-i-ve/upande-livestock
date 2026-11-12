@@ -37,7 +37,7 @@ import { useSyncStore } from "@/src/sync/syncStore";
 import { useDotAnchor } from "@/src/sync/dotAnchor";
 import { useStatusSheet } from "@/src/sync/statusSheet";
 import { useScheme } from "@/src/theme/themeStore";
-import { ProgressiveBlur } from "@/components/BlurBackdrop";
+import { FrostedBackdrop, GlassPanel } from "@/components/BlurBackdrop";
 
 const DOT = 8;
 const HIT = 32;
@@ -234,7 +234,7 @@ export function StatusSheetHost() {
           style={StyleSheet.absoluteFill}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={hide} accessibilityLabel="Close">
-            <ProgressiveBlur dark={dark} />
+            <FrostedBackdrop dark={dark} />
           </Pressable>
         </Reanimated.View>
       ) : null}
@@ -270,8 +270,9 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
     void syncAnimalsSoon();
   };
 
+  const dark = useScheme() === "dark";
   return (
-    <View style={[st.sheet, { paddingBottom: 20 + insets.bottom }]}>
+    <GlassPanel dark={dark} solid={c.bg} style={[st.sheet, { paddingBottom: 20 + insets.bottom }]}>
       <View style={st.handle} />
       <View style={st.head}>
         <StatusLight state={state} />
@@ -298,7 +299,7 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
           />
         </View>
       </View>
-    </View>
+    </GlassPanel>
   );
 }
 
@@ -316,7 +317,6 @@ const s = StyleSheet.create({
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     sheet: {
-      backgroundColor: c.bg,
       borderTopLeftRadius: 22,
       borderTopRightRadius: 22,
       paddingHorizontal: 20,
