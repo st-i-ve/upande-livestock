@@ -3,7 +3,7 @@ import path from "path";
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 
-import { LivestockLogo, TAIL_SWING } from "@/components/LivestockLogo";
+import { GRASS_SWAY, LivestockLogo, TAIL_SWING } from "@/components/LivestockLogo";
 import { LOGO_COW } from "@/src/art/paths";
 
 jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"));
@@ -18,7 +18,7 @@ jest.mock("react-native-reanimated", () => ({ ...require("react-native-reanimate
 const root = path.resolve(__dirname, "..");
 
 describe("Livestock logo", () => {
-  it("draws the traced cow, her tail on its own layer", () => {
+  it("draws the traced cow in her traced grass, a few blades in front of her hooves", () => {
     let r!: TestRenderer.ReactTestRenderer;
     act(() => {
       r = TestRenderer.create(<LivestockLogo size={120} animated />);
@@ -26,6 +26,11 @@ describe("Livestock logo", () => {
     const ds = r.root.findAll((n) => typeof n.props.d === "string").map((n) => n.props.d);
     expect(ds).toContain(LOGO_COW.body);
     expect(ds).toContain(LOGO_COW.tail);
+    expect(ds).toContain(LOGO_COW.grass);
+    expect(ds).toContain(LOGO_COW.grassFront);
+    // back to front: grass, body, tail, front blades
+    expect(ds.indexOf(LOGO_COW.grass)).toBeLessThan(ds.indexOf(LOGO_COW.body));
+    expect(ds.indexOf(LOGO_COW.grassFront)).toBeGreaterThan(ds.indexOf(LOGO_COW.tail));
     act(() => r.unmount());
   });
 
@@ -33,6 +38,10 @@ describe("Livestock logo", () => {
     expect(TAIL_SWING.map(([, d]) => d)).toEqual([0, 0, 7, -2, 5, -1, 0, 0]);
     expect(TAIL_SWING[0][0]).toBe(0);
     expect(TAIL_SWING[TAIL_SWING.length - 1][0]).toBe(1);
+  });
+
+  it("sways the grass very slightly with the tail: at most 2 degrees", () => {
+    expect(Math.max(...TAIL_SWING.map(([, d]) => Math.abs(d * GRASS_SWAY)))).toBeCloseTo(2);
   });
 
   it("app.json's icon, adaptive icon and splash are the cow mark files, and they exist", () => {
