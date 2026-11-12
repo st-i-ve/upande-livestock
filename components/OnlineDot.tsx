@@ -1,8 +1,12 @@
 import { useIsFocused } from "expo-router";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, BackHandler, Pressable, StyleSheet, Text, View } from "react-native";
 import Reanimated, {
   Easing,
+  FadeIn,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -31,6 +35,9 @@ import {
 } from "@/src/sync/syncStatus";
 import { useSyncStore } from "@/src/sync/syncStore";
 import { useDotAnchor } from "@/src/sync/dotAnchor";
+import { useStatusSheet } from "@/src/sync/statusSheet";
+import { useScheme } from "@/src/theme/themeStore";
+import { ProgressiveBlur } from "@/components/BlurBackdrop";
 
 const DOT = 8;
 const HIT = 32;
@@ -119,12 +126,11 @@ export function OnlineDot() {
 
 function PlainOnlineDot() {
   const state = useDotState();
-  const [open, setOpen] = useState(false);
   return (
     <>
       <Pressable
         testID="online-dot"
-        onPress={() => setOpen(true)}
+        onPress={() => useStatusSheet.getState().show()}
         hitSlop={12}
         accessibilityRole="button"
         accessibilityLabel={`Connection: ${DOT_TITLE[state]}`}
@@ -132,7 +138,6 @@ function PlainOnlineDot() {
       >
         <StatusLight state={state} />
       </Pressable>
-      {open ? <StatusSheet state={state} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -163,7 +168,6 @@ export function FloatingOnlineDot({ children }: { children: React.ReactNode }) {
   const shownBy = useDotAnchor((x) => x.owner);
   const state = useDotState();
   const insets = useSafeAreaInsets();
-  const [open, setOpen] = useState(false);
   const shown = useSharedValue(0);
 
   useEffect(() => {
@@ -186,7 +190,7 @@ export function FloatingOnlineDot({ children }: { children: React.ReactNode }) {
       >
         <Pressable
           testID="online-dot"
-          onPress={() => setOpen(true)}
+          onPress={() => useStatusSheet.getState().show()}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel={`Connection: ${DOT_TITLE[state]}`}
@@ -195,8 +199,55 @@ export function FloatingOnlineDot({ children }: { children: React.ReactNode }) {
           <StatusLight state={state} />
         </Pressable>
       </Reanimated.View>
-      {open ? <StatusSheet state={state} onClose={() => setOpen(false)} /> : null}
     </FloatingContext.Provider>
+  );
+}
+
+/**
+ * The connection sheet, drawn once over the whole app (the root layout puts it
+ * beside the app's content, outside the blur target): the page behind it blurs,
+ * most behind the sheet and fading out towards the top, and the sheet slides up.
+ * A tap on the backdrop or the back button closes it.
+ */
+export function StatusSheetHost() {
+  const open = useStatusSheet((x) => x.open);
+  const hide = useStatusSheet((x) => x.hide);
+  const state = useDotState();
+  const dark = useScheme() === "dark";
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      hide();
+      return true;
+    });
+    return () => sub.remove();
+  }, [open, hide]);
+
+  return (
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {open ? (
+        <Reanimated.View
+          entering={reduce ? undefined : FadeIn.duration(260)}
+          exiting={reduce ? undefined : FadeOut.duration(220)}
+          style={StyleSheet.absoluteFill}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={hide} accessibilityLabel="Close">
+            <ProgressiveBlur dark={dark} />
+          </Pressable>
+        </Reanimated.View>
+      ) : null}
+      {open ? (
+        <Reanimated.View
+          entering={reduce ? undefined : SlideInDown.duration(300).easing(Easing.out(Easing.cubic))}
+          exiting={reduce ? undefined : SlideOutDown.duration(240).easing(Easing.in(Easing.cubic))}
+          style={s.sheetAt}
+        >
+          <StatusSheet state={state} onClose={hide} />
+        </Reanimated.View>
+      ) : null}
+    </View>
   );
 }
 
@@ -220,44 +271,41 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
   };
 
   return (
-    <Modal visible transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
-      <Pressable style={st.scrim} onPress={onClose}>
-        <Pressable style={[st.sheet, { paddingBottom: 20 + insets.bottom }]} onPress={() => {}}>
-          <View style={st.handle} />
-          <View style={st.head}>
-            <StatusLight state={state} />
-            <Text style={st.title}>{DOT_TITLE[state]}</Text>
-          </View>
-          <Text style={st.body}>{DOT_BODY[state]}</Text>
-          {parts.length ? <Text style={st.line}>{syncText(parts)}</Text> : null}
-          <Text style={st.line}>{lastSyncedText(syncedAt, now)}</Text>
-          {error && state !== "syncing" ? (
-            <Text style={[st.line, { color: c.danger }]} numberOfLines={2}>
-              Last try did not reach the farm
-            </Text>
-          ) : null}
-          <View style={st.actions}>
-            <View style={{ flex: 1 }}>
-              <Button label="Close" variant="outline" onPress={onClose} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                label={state === "syncing" ? "Syncing…" : "Sync now"}
-                icon="sync"
-                onPress={syncNow}
-                disabled={state === "offline" || state === "syncing"}
-              />
-            </View>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <View style={[st.sheet, { paddingBottom: 20 + insets.bottom }]}>
+      <View style={st.handle} />
+      <View style={st.head}>
+        <StatusLight state={state} />
+        <Text style={st.title}>{DOT_TITLE[state]}</Text>
+      </View>
+      <Text style={st.body}>{DOT_BODY[state]}</Text>
+      {parts.length ? <Text style={st.line}>{syncText(parts)}</Text> : null}
+      <Text style={st.line}>{lastSyncedText(syncedAt, now)}</Text>
+      {error && state !== "syncing" ? (
+        <Text style={[st.line, { color: c.danger }]} numberOfLines={2}>
+          Last try did not reach the farm
+        </Text>
+      ) : null}
+      <View style={st.actions}>
+        <View style={{ flex: 1 }}>
+          <Button label="Close" variant="outline" onPress={onClose} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button
+            label={state === "syncing" ? "Syncing…" : "Sync now"}
+            icon="sync"
+            onPress={syncNow}
+            disabled={state === "offline" || state === "syncing"}
+          />
+        </View>
+      </View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   floating: { position: "absolute" },
   slot: { alignSelf: "flex-start" },
+  sheetAt: { position: "absolute", left: 0, right: 0, bottom: 0 },
   hit: { width: HIT, height: HIT, alignItems: "center", justifyContent: "center" },
   lightBox: { width: 18, height: 18, alignItems: "center", justifyContent: "center" },
   light: { width: DOT, height: DOT, borderRadius: DOT / 2 },
@@ -267,7 +315,6 @@ const s = StyleSheet.create({
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
     sheet: {
       backgroundColor: c.bg,
       borderTopLeftRadius: 22,

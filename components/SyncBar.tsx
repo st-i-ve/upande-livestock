@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { StatusSheet, useDotState } from "@/components/OnlineDot";
+import { useStatusSheet } from "@/src/sync/statusSheet";
 import { FONT_FAMILY } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { syncFraction, syncText } from "@/src/sync/syncStatus";
@@ -196,8 +196,6 @@ function SummaryStrip() {
   const busy = parts.length > 0;
   const shown = useDebouncedBusy(busy);
   const summary = useSyncSummary();
-  const dot = useDotState();
-  const [sheet, setSheet] = useState(false);
   const [view, setView] = useState({ text: "", fraction: null as number | null });
 
   useEffect(() => {
@@ -273,7 +271,7 @@ function SummaryStrip() {
       <Animated.View style={[s.line, lineStyle]} pointerEvents={shown ? "none" : "auto"}>
         <Pressable
           testID="sync-summary"
-          onPress={() => setSheet(true)}
+          onPress={() => useStatusSheet.getState().show()}
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={`${summary}. Connection details`}
@@ -286,7 +284,6 @@ function SummaryStrip() {
           </Text>
         </Pressable>
       </Animated.View>
-      {sheet ? <StatusSheet state={dot} onClose={() => setSheet(false)} /> : null}
     </View>
   );
 }

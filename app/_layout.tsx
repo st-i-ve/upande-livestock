@@ -1,7 +1,9 @@
 import "@/src/ui/installAlert";
-import '../src/mobile-kit';
-import { MobileKitProvider } from '@upande/mobile-kit';
+// First: configures @upande/mobile-kit before anything uses it.
 import { applyKitTheme } from '../src/mobile-kit';
+import { MobileKitProvider } from '@upande/mobile-kit';
+import { BlurTargetRoot } from '@/components/BlurBackdrop';
+import { StatusSheetHost } from '@/components/OnlineDot';
 import "@/src/theme/patchText";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -212,6 +214,8 @@ export default function RootLayout() {
           <PaperProvider theme={getPaperTheme(scheme)} settings={paperSettings}>
             <ThemeProvider value={navTheme(dark)}>
               <AuthGate />
+              {/* The app's content, which a sheet's backdrop blurs (components/BlurBackdrop). */}
+              <BlurTargetRoot backgroundColor={palette.bg}>
               <Stack
                 screenOptions={{
                   headerShown: false,
@@ -226,11 +230,14 @@ export default function RootLayout() {
                 <Stack.Screen name="(shoats)" />
                 <Stack.Screen name="accessibility" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
               </Stack>
+              </BlurTargetRoot>
               <StatusBar style={dark ? "light" : "dark"} />
               {/* Every Alert.alert, drawn over everything (src/ui/alert.ts). */}
               <AppAlertHost />
               {/* Every date/time picker, as the app's own sheet (src/ui/datetimepicker.tsx). */}
               <DatePickerHost />
+              {/* The green dot's sheet, over everything, its backdrop blurring the page. */}
+              <StatusSheetHost />
             </ThemeProvider>
           </PaperProvider>
         </SafeAreaProvider>
