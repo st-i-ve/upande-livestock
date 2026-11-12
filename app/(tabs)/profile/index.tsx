@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -85,7 +86,9 @@ const runtimeLabel = runtimeVersion ? `Runtime ${runtimeVersion}` : "Runtime emb
 
 export default function Profile() {
   const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
+  // Small phones: a smaller avatar and less padding, so a long name has room.
+  const narrow = useWindowDimensions().width < 380;
+  const s = useMemo(() => makeStyles(c, narrow), [c, narrow]);
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
@@ -100,10 +103,11 @@ export default function Profile() {
 
   const [confirmLogout, setConfirmLogout] = useState(false);
 
-  const doLogout = async () => {
+  const doLogout = () => {
     setConfirmLogout(false);
-    await logout();
+    // Leave at once; the sign-out and the wipe finish behind the login page.
     router.replace("/(auth)/login");
+    void logout();
   };
 
   return (
@@ -119,8 +123,11 @@ export default function Profile() {
           <View style={s.avatar}>
             <Text style={s.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
           </View>
-          <View style={{ marginLeft: 20, flex: 1, justifyContent: "center" }}>
-            <Text style={s.name} numberOfLines={1}>{displayName}</Text>
+          <View style={s.userText}>
+            {/* A long name wraps to a second line and shrinks a little before it is cut. */}
+            <Text style={s.name} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {displayName}
+            </Text>
             {subtitle ? (
               <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
             ) : null}
@@ -227,7 +234,7 @@ export default function Profile() {
   );
 }
 
-const makeStyles = (c: ReturnType<typeof useColors>) =>
+const makeStyles = (c: ReturnType<typeof useColors>, narrow = false) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.bg },
     appbar: {
@@ -249,25 +256,26 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     userSection: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 24,
+      paddingHorizontal: narrow ? 16 : 24,
       paddingTop: 20,
       paddingBottom: 24,
     },
+    userText: { marginLeft: narrow ? 14 : 20, flex: 1, minWidth: 0, justifyContent: "center" },
     avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: narrow ? 60 : 80,
+      height: narrow ? 60 : 80,
+      borderRadius: narrow ? 30 : 40,
       backgroundColor: c.text,
       alignItems: "center",
       justifyContent: "center",
     },
     avatarText: {
       color: c.bg,
-      fontSize: 32,
+      fontSize: narrow ? 26 : 32,
       fontFamily: FONT_FAMILY.bold,
     },
     name: {
-      fontSize: 22,
+      fontSize: narrow ? 19 : 22,
       color: c.text,
       fontFamily: FONT_FAMILY.bold,
     },
