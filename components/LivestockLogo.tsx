@@ -54,8 +54,8 @@ const [SWAY_X, SWAY_Y] = toDisc((GRASS_X0 + GRASS_X1) / 2, GRASS_BOTTOM);
  * tile's; only the overall progress is stretched and eased.
  */
 export const PHONE_ENTER_DELAY_MS = 250;
-export const PHONE_ENTER_MS = 1600;
-export const PHONE_OUT_MS = 1300;
+export const PHONE_ENTER_MS = 1500;
+export const PHONE_OUT_MS = 1500;
 const PHONE_EASE = Easing.inOut(Easing.cubic);
 const CYCLE_MS = LOGO_MOTION.cycleMs;
 const LOOP_MS = LOGO_MOTION.loopMs;

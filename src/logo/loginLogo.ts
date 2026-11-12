@@ -46,7 +46,7 @@ export function sceneOf(phase: LogoPhase): "upande" | "in" | "cow" | "out" {
  * while `holding`). Released when the logo reaches `navigate`, on a failed login, when the login
  * screen goes, or by `HOLD_MAX_MS` at the latest, so a stuck animation can never keep anyone out.
  */
-// Covers the slower phone exit (PHONE_OUT_MS 1300 ms) with room to spare.
+// Covers the slower phone exit (PHONE_OUT_MS 1500 ms) with room to spare.
 export const HOLD_MAX_MS = 3500;
 export const useLoginExit = create<{ holding: boolean; hold: () => void; release: () => void }>((set) => {
   let timer: ReturnType<typeof setTimeout> | null = null;
