@@ -1,6 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useIsFocused } from "expo-router";
+import React, { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
+import Reanimated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
@@ -22,8 +30,10 @@ import {
   type DotState,
 } from "@/src/sync/syncStatus";
 import { useSyncStore } from "@/src/sync/syncStore";
+import { DotSceneContext, useDotAnchor } from "@/src/sync/dotAnchor";
 
 const DOT = 8;
+const HIT = 32;
 
 /** The phone's connection as one state: network, the live link, and any sync. */
 export function useDotState(): DotState {
@@ -80,8 +90,17 @@ export function StatusLight({ state }: { state: DotState }) {
  * Top right of each tab's first screen: green and glowing when online and live,
  * amber while syncing (glowing) or while the live link comes up (steady), red
  * offline. A tap opens a small sheet saying what it means, with "Sync now".
+ *
+ * Inside the tabs this is only an empty slot: the dot itself is drawn once,
+ * above every page, by FloatingOnlineDot, so it does not slide away with a
+ * swipe and its glow never restarts — it glides to the next page's slot.
  */
 export function OnlineDot() {
+  const scene = useContext(DotSceneContext);
+  return scene ? <DotSlot scene={scene} /> : <PlainOnlineDot />;
+}
+
+function PlainOnlineDot() {
   const state = useDotState();
   const [open, setOpen] = useState(false);
   return (
@@ -96,6 +115,96 @@ export function OnlineDot() {
       >
         <StatusLight state={state} />
       </Pressable>
+      {open ? <StatusSheet state={state} onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}
+
+function DotSlot({ scene }: { scene: React.RefObject<React.ComponentRef<typeof View> | null> }) {
+  const ref = useRef<React.ComponentRef<typeof View>>(null);
+  const id = useId();
+  const focused = useIsFocused();
+
+  const measure = useCallback(() => {
+    const node = ref.current;
+    const root = scene.current;
+    if (!node || !root) return;
+    node.measureLayout(
+      root,
+      (x, y, w, h) => useDotAnchor.getState().claim({ owner: id, x: x + w / 2, y: y + h / 2 }),
+      () => {},
+    );
+  }, [scene, id]);
+
+  useEffect(() => {
+    if (!focused) {
+      useDotAnchor.getState().release(id);
+      return undefined;
+    }
+    measure();
+    return () => useDotAnchor.getState().release(id);
+  }, [focused, measure, id]);
+
+  return <View ref={ref} style={s.hit} onLayout={focused ? measure : undefined} />;
+}
+
+const GLIDE = { duration: 380, easing: Easing.inOut(Easing.cubic) };
+const FADE = { duration: 260, easing: Easing.inOut(Easing.cubic) };
+
+/**
+ * The one dot, drawn over the tab pages (put it in a tabs layout). It sits on
+ * the focused page's slot, glides when the next page's slot is elsewhere, and
+ * fades out on pages without one (a pushed animal page, a record form).
+ */
+export function FloatingOnlineDot() {
+  const anchor = useDotAnchor((x) => x.anchor);
+  const state = useDotState();
+  const reduceMotion = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const shown = useSharedValue(0);
+
+  useEffect(() => {
+    if (!anchor) {
+      // A beat before hiding: on a swipe the old page can let go just before
+      // the new one takes it, and the dot should not blink out between them.
+      shown.value = withDelay(180, withTiming(0, FADE));
+      return;
+    }
+    if (reduceMotion || shown.value < 0.05) {
+      x.value = anchor.x;
+      y.value = anchor.y;
+    } else {
+      x.value = withTiming(anchor.x, GLIDE);
+      y.value = withTiming(anchor.y, GLIDE);
+    }
+    shown.value = withTiming(1, FADE);
+  }, [anchor, reduceMotion, shown, x, y]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: shown.value,
+    transform: [
+      { translateX: x.value - HIT / 2 },
+      { translateY: y.value - HIT / 2 },
+      { scale: 0.6 + 0.4 * shown.value },
+    ],
+  }));
+
+  return (
+    <>
+      <Reanimated.View style={[s.floating, style]} pointerEvents={anchor ? "box-none" : "none"}>
+        <Pressable
+          testID="online-dot"
+          onPress={() => setOpen(true)}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={`Connection: ${DOT_TITLE[state]}`}
+          style={s.hit}
+        >
+          <StatusLight state={state} />
+        </Pressable>
+      </Reanimated.View>
       {open ? <StatusSheet state={state} onClose={() => setOpen(false)} /> : null}
     </>
   );
@@ -157,7 +266,8 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
 }
 
 const s = StyleSheet.create({
-  hit: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  floating: { position: "absolute", left: 0, top: 0 },
+  hit: { width: HIT, height: HIT, alignItems: "center", justifyContent: "center" },
   lightBox: { width: 18, height: 18, alignItems: "center", justifyContent: "center" },
   light: { width: DOT, height: DOT, borderRadius: DOT / 2 },
   ring: { position: "absolute" },

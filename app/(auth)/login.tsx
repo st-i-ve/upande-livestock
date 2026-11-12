@@ -30,7 +30,7 @@ import { TextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
-import { LivestockLogo } from "@/components/LivestockLogo";
+import { LivestockLogo, PHONE_OUT_MS } from "@/components/LivestockLogo";
 import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
@@ -181,7 +181,7 @@ export default function LoginScreen() {
       await login(email.trim(), password, url.trim());
       send("loggedIn");
     } catch (err) {
-      useLoginExit.getState().release();
+      useLoginExit.getState().release(false);
       setError(classifyError(err).message);
     } finally {
       setLoading(false);
@@ -209,6 +209,17 @@ export default function LoginScreen() {
   // mode has no backing disc to hide a fill behind, so a solid halo would wash
   // across the mark. An expanding outline reads as a pulse against either
   // background and stays inside the black-and-white palette.
+  // The form leaves as the logo returns: eased out over the logo's own exit.
+  const leavingForm = phase === "returning" || phase === "upande" || phase === "navigate";
+  const formOut = useSharedValue(0);
+  useEffect(() => {
+    formOut.value = withTiming(leavingForm ? 1 : 0, { duration: PHONE_OUT_MS, easing: Easing.inOut(Easing.cubic) });
+  }, [leavingForm, formOut]);
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: 1 - formOut.value,
+    transform: [{ translateY: 14 * formOut.value }, { scale: 1 - 0.03 * formOut.value }],
+  }));
+
   const haloStyle = useAnimatedStyle(() => ({
     opacity: 0.55 * (1 - pulse.value),
     transform: [{ scale: 0.85 + pulse.value * 0.4 }],
@@ -270,6 +281,9 @@ export default function LoginScreen() {
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
 
+                {/* After a login the form dissolves while the logo plays back to the Upande mark,
+                    and the next screen grows out of it (MorphIn). */}
+                <Animated.View style={formStyle} pointerEvents={leavingForm ? "none" : "auto"}>
                 <Animated.View
                   pointerEvents={urlRevealed ? "auto" : "none"}
                   style={[s.urlWrap, urlStyle]}
@@ -351,6 +365,7 @@ export default function LoginScreen() {
                 ) : null}
 
                 <Button label="Login" onPress={handleLogin} loading={loading} />
+                </Animated.View>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>

@@ -1,6 +1,8 @@
 import React, { useMemo, useRef } from "react";
 import { PanResponder, StyleSheet, TextInput, View } from "react-native";
 
+import { DotSceneContext } from "@/src/sync/dotAnchor";
+
 /** How far a finger must travel sideways before the swipe takes the touch. */
 const CLAIM_DX = 22;
 /** Sideways must beat up-and-down by this much, so a scroll of a list never turns into a swipe. */
@@ -79,6 +81,8 @@ export function TabSwipe({
   children: React.ReactNode;
 }) {
   const live = useRef({ route, navigation, hidden });
+  // The connection dot's slot measures itself against this view.
+  const scene = useRef<React.ComponentRef<typeof View>>(null);
   live.current = { route, navigation, hidden };
 
   const responder = useMemo(
@@ -115,8 +119,8 @@ export function TabSwipe({
   );
 
   return (
-    <View style={s.fill} {...responder.panHandlers}>
-      {children}
+    <View ref={scene} style={s.fill} {...responder.panHandlers}>
+      <DotSceneContext.Provider value={scene}>{children}</DotSceneContext.Provider>
     </View>
   );
 }

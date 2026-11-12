@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import React, { useMemo } from "react";
+import { MorphIn } from "@/components/MorphIn";
 import { Linking, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "@/components/Button";
@@ -24,25 +25,27 @@ export default function Nutritionist() {
   const logout = useAuthStore((st) => st.logout);
 
   return (
-    <Screen title="Upande Livestock" subtitle={fullname || undefined}>
-      <View style={s.center}>
-        <LivestockLogo size={140} />
-        <Text style={s.title}>Your work is in the web app</Text>
-        <Text style={s.body}>
-          You are signed in as a Livestock Nutritionist. Rations are balanced in the Ration Editor and
-          the feed library is kept there too, on the web. This app is for recording animals and
-          feeding herds, which your role does not do.
-        </Text>
-        <Text style={s.body}>
-          If you should also record on the farm, ask a Livestock Manager to give you a farm role.
-        </Text>
-      </View>
-      <Button label="Open the Ration Editor" onPress={() => Linking.openURL(rationEditorUrl(instanceUrl))} />
-      <View style={{ height: 10 }} />
-      <Button label="Settings" variant="outline" onPress={() => router.push("/mobile-kit/settings")} />
-      <View style={{ height: 10 }} />
-      <Button label="Log out" variant="link" onPress={() => logout()} />
-    </Screen>
+    <MorphIn>
+      <Screen title="Upande Livestock" subtitle={fullname || undefined}>
+        <View style={s.center}>
+          <LivestockLogo size={140} />
+          <Text style={s.title}>Your work is in the web app</Text>
+          <Text style={s.body}>
+            You are signed in as a Livestock Nutritionist. Rations are balanced in the Ration Editor and
+            the feed library is kept there too, on the web. This app is for recording animals and
+            feeding herds, which your role does not do.
+          </Text>
+          <Text style={s.body}>
+            If you should also record on the farm, ask a Livestock Manager to give you a farm role.
+          </Text>
+        </View>
+        <Button label="Open the Ration Editor" onPress={() => Linking.openURL(rationEditorUrl(instanceUrl))} />
+        <View style={{ height: 10 }} />
+        <Button label="Settings" variant="outline" onPress={() => router.push("/mobile-kit/settings")} />
+        <View style={{ height: 10 }} />
+        <Button label="Log out" variant="link" onPress={() => logout()} />
+      </Screen>
+    </MorphIn>
   );
 }
 

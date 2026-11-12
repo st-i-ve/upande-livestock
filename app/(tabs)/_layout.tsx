@@ -9,6 +9,8 @@ import { CowIcon } from "@/components/CowIcon";
 import { RecordTabButton } from "@/components/RecordTabButton";
 import { TabSwipe } from "@/components/TabSwipe";
 import { ContinueRecording } from "@/components/ContinueRecording";
+import { FloatingOnlineDot } from "@/components/OnlineDot";
+import { MorphIn } from "@/components/MorphIn";
 import { useRecordDrafts } from "@/src/record/draft";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
@@ -25,7 +27,7 @@ export default function TabLayout() {
   const hidden = canRecord ? [] : ["record"];
 
   return (
-    <>
+    <MorphIn>
     <Tabs
       // A sideways swipe on a tab's root screen moves to the next visible tab.
       screenLayout={({ route, navigation, children }) => (
@@ -110,6 +112,8 @@ export default function TabLayout() {
       />
     </Tabs>
     <ContinueRecording bottom={BAR_CONTENT_HEIGHT + insets.bottom + 12} />
-    </>
+      {/* The connection dot, drawn once over the pages so a swipe never carries it off. */}
+      <FloatingOnlineDot />
+    </MorphIn>
   );
 }

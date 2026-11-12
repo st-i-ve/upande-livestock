@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { MorphIn } from "@/components/MorphIn";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { SilhouetteArt } from "@/components/AnimalSilhouette";
@@ -48,53 +49,55 @@ export default function Choose() {
   const selected = (id: string) => id === current || (id === "shoats" && (current === "sheep" || current === "goats"));
 
   return (
-    <Screen
-      title={step === "top" ? "What are you working with?" : "Sheep or goats?"}
-      subtitle={step === "top" ? "You can switch later from Profile" : "Shoats are managed by herd numbers"}
-      back={step === "shoats" || !!current}
-    >
-      {/* Always offered on the second step: someone already working with sheep or
-          goats lands here first and must be able to get back to Cattle. */}
-      {step === "shoats" ? (
-        <Pressable
-          onPress={() => setStep("top")}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Back to animal type"
-          style={({ pressed }) => [s.backBtn, pressed && { backgroundColor: c.bgMuted }]}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={18} color={c.text} />
-          <Text style={s.backLabel}>Back to animal type</Text>
-        </Pressable>
-      ) : null}
-      {options.map((o) => (
-        <Pressable
-          key={o.id}
-          testID={`choose-${o.id}`}
-          accessibilityRole="button"
-          accessibilityLabel={o.label}
-          onPress={() => pick(o.id)}
-          style={({ pressed }) => [s.card, selected(o.id) && s.cardOn, pressed && { backgroundColor: c.bgMuted }]}
-        >
-          <View style={s.art} testID={`choose-art-${o.id}`}>
-            {o.art.map((pose) => (
-              <SilhouetteArt
-                key={pose}
-                pose={pose}
-                color={c.text}
-                width={o.art.length > 1 ? ART_W / 2 : ART_W}
-                height={o.art.length > 1 ? ART_H * 0.8 : ART_H}
-              />
-            ))}
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.label}>{o.label}</Text>
-            <Text style={s.blurb}>{o.blurb}</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={c.textSubtle} />
-        </Pressable>
-      ))}
-    </Screen>
+    <MorphIn>
+      <Screen
+        title={step === "top" ? "What are you working with?" : "Sheep or goats?"}
+        subtitle={step === "top" ? "You can switch later from Profile" : "Shoats are managed by herd numbers"}
+        back={step === "shoats" || !!current}
+      >
+        {/* Always offered on the second step: someone already working with sheep or
+            goats lands here first and must be able to get back to Cattle. */}
+        {step === "shoats" ? (
+          <Pressable
+            onPress={() => setStep("top")}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back to animal type"
+            style={({ pressed }) => [s.backBtn, pressed && { backgroundColor: c.bgMuted }]}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={18} color={c.text} />
+            <Text style={s.backLabel}>Back to animal type</Text>
+          </Pressable>
+        ) : null}
+        {options.map((o) => (
+          <Pressable
+            key={o.id}
+            testID={`choose-${o.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={o.label}
+            onPress={() => pick(o.id)}
+            style={({ pressed }) => [s.card, selected(o.id) && s.cardOn, pressed && { backgroundColor: c.bgMuted }]}
+          >
+            <View style={s.art} testID={`choose-art-${o.id}`}>
+              {o.art.map((pose) => (
+                <SilhouetteArt
+                  key={pose}
+                  pose={pose}
+                  color={c.text}
+                  width={o.art.length > 1 ? ART_W / 2 : ART_W}
+                  height={o.art.length > 1 ? ART_H * 0.8 : ART_H}
+                />
+              ))}
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={s.label}>{o.label}</Text>
+              <Text style={s.blurb}>{o.blurb}</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={22} color={c.textSubtle} />
+          </Pressable>
+        ))}
+      </Screen>
+    </MorphIn>
   );
 }
 

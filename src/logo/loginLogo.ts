@@ -48,7 +48,14 @@ export function sceneOf(phase: LogoPhase): "upande" | "in" | "cow" | "out" {
  */
 // Covers the slower phone exit (PHONE_OUT_MS 1500 ms) with room to spare.
 export const HOLD_MAX_MS = 3500;
-export const useLoginExit = create<{ holding: boolean; hold: () => void; release: () => void }>((set) => {
+export const useLoginExit = create<{
+  holding: boolean;
+  /** A login just went through: the next screen morphs in (MorphIn takes it once). */
+  arriving: boolean;
+  hold: () => void;
+  release: (arrived?: boolean) => void;
+  takeArrival: () => boolean;
+}>((set, get) => {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const clear = () => {
     if (timer) clearTimeout(timer);
@@ -56,17 +63,25 @@ export const useLoginExit = create<{ holding: boolean; hold: () => void; release
   };
   return {
     holding: false,
+    arriving: false,
     hold: () => {
       clear();
       timer = setTimeout(() => {
         timer = null;
-        set({ holding: false });
+        set({ holding: false, arriving: true });
       }, HOLD_MAX_MS);
       set({ holding: true });
     },
-    release: () => {
+    // `arrived` true: the login went through; false: it failed. Left out (the
+    // login screen going away), the arrival is left as it is.
+    release: (arrived) => {
       clear();
-      set({ holding: false });
+      set(arrived === undefined ? { holding: false } : { holding: false, arriving: arrived });
+    },
+    takeArrival: () => {
+      if (!get().arriving) return false;
+      set({ arriving: false });
+      return true;
     },
   };
 });
@@ -82,7 +97,7 @@ export function useLoginLogo(reduceMotion: boolean) {
   }, []);
   useEffect(() => {
     if (phase === "upande") dispatch("settled");
-    if (phase === "navigate") useLoginExit.getState().release();
+    if (phase === "navigate") useLoginExit.getState().release(true);
   }, [phase]);
   useEffect(() => () => useLoginExit.getState().release(), []);
   const send = useCallback((e: LogoEvent) => dispatch(e), []);
