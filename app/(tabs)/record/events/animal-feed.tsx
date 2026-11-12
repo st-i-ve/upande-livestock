@@ -32,6 +32,7 @@ import { useFinishRecording } from "@/src/hooks/useRecordContext";
 import type { HerdRecipe } from "@/src/frappe/herdRecipes";
 import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
+import { savedTitle, stockOutcomeText } from "@/src/frappe/eventItems";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 
 const kg = (n: number) => `${Number(n || 0).toLocaleString()} kg`;
@@ -312,9 +313,14 @@ function SystemTab({
       });
       await Promise.all([info.refetch(), day.refetch()]);
       Alert.alert(
-        `${r.feed_mode} feeding mixed`,
-        `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
-          `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
+        savedTitle(`${r.feed_mode} feeding`, [r], "mixed"),
+        [
+          `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
+            `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
+          stockOutcomeText([r]),
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
       );
       finish("Animal feeding");
     } catch (err) {
@@ -591,9 +597,14 @@ function ManualTab({
         baseBom: selectedBom || undefined,
       });
       Alert.alert(
-        `${r.feed_mode} feeding mixed`,
-        `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
-          `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
+        savedTitle(`${r.feed_mode} feeding`, [r], "mixed"),
+        [
+          `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
+            `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
+          stockOutcomeText([r]),
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
       );
       finish("Animal feeding");
     } catch (e) {

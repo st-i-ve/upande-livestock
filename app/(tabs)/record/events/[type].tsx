@@ -21,7 +21,7 @@ import {
   previewRound,
   type SkippedAnimal,
 } from "@/src/frappe/animalEvent";
-import { findShortage, stockOutcomeText, stockWarningsOf, type StockChoice } from "@/src/frappe/eventItems";
+import { savedTitle, stockOutcomeText, stockWarningsOf, type StockChoice } from "@/src/frappe/eventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
@@ -75,7 +75,6 @@ export default function GenericEvent() {
   const [drugs, setDrugs] = useState<DrugRow[]>([]);
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
 
   // The drugs come from the event type's own stock rule (items_by_event). A type
   // the farm has not set to issue stock shows no drug section at all.
@@ -131,27 +130,10 @@ export default function GenericEvent() {
 
   const handleSubmit = async () => {
     setError(null);
-    setWarning(null);
 
     if (selected.length === 0) return setError("Pick at least one animal.");
     if (roundAnimals.length === 0) return setError("None of the selected animals can have this recorded.");
     if (!operator) return setError(missingMessage);
-
-    if (takesDrugs && filledDrugRows.length > 0) {
-      // A heads-up, never a block: the server decides what the store can bear
-      // (today's short round is saved with a draft issue; a backdated one is
-      // refused with its own message). The rows are per animal, so what leaves
-      // the store is qty x headcount.
-      const shortage = await findShortage(
-        stockChoices,
-        filledDrugRows.map((d) => ({
-          itemCode: d.itemCode.trim(),
-          warehouse: d.sourceWarehouse,
-          qtyNeeded: Number(d.qty) * roundAnimals.length,
-        })),
-      );
-      if (shortage) setWarning(shortage);
-    }
 
     const eventDate = isBackdating ? backdateDate : serverToday;
     const note = remarks.trim() || undefined;
@@ -245,7 +227,7 @@ export default function GenericEvent() {
       );
     }
     Alert.alert(
-      stockNote ? `${spec.title} saved — stock issue pending` : `${spec.title} recorded`,
+      savedTitle(spec.title, replies),
       [spec.isRound ? eventParts.join("\n") : eventParts.join(" · "), ...notes].filter(Boolean).join("\n\n"),
     );
     finish(spec.title);
@@ -314,7 +296,6 @@ export default function GenericEvent() {
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Optional" />
       </Field>
 
-      {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <OnlineOnlyNotice />

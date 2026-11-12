@@ -15,7 +15,7 @@ import { Screen } from "@/components/Screen";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
 import { VetPicker } from "@/components/VetPicker";
-import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
+import { outOfStock, savedTitle, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
 import { useBackdate } from "@/src/hooks/useBackdate";
@@ -44,7 +44,6 @@ export default function Service() {
   const [sire, setSire] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
 
   const mutation = useCreateAnimalEvent();
   // Whether a service issues a straw is the Service event type's own rule
@@ -56,22 +55,17 @@ export default function Service() {
 
   const handleSubmit = async () => {
     setError(null);
-    setWarning(null);
     if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to service.");
     // For A.I. with a semen straw, we issue it from a store — need the source.
     const willIssueSemen = consumes && type === "A.I." && !!straw;
-    if (willIssueSemen && !semenWarehouse) {
+    // A straw the stores hold none of has no store to name: the server saves
+    // the service and leaves the issue as a draft.
+    const strawChoice = semenChoices?.find((x) => x.value === straw);
+    if (willIssueSemen && !semenWarehouse && !outOfStock(strawChoice)) {
       return setError("Pick the store the semen straws come from.");
     }
-    // Heads-up only, never a block: the server saves a short issue as a draft.
-    // One straw per cow is issued from the store.
-    if (willIssueSemen) {
-      const shortage = await findShortage(semenChoices, [
-        { itemCode: straw, warehouse: semenWarehouse, qtyNeeded: selected.length },
-      ]);
-      if (shortage) setWarning(shortage);
-    }
+    // The "store can't cover it" notice sits under the picker, before saving.
 
     let succeeded = 0;
     const replies: any[] = [];
@@ -109,7 +103,7 @@ export default function Service() {
       parts.push(`${succeeded} straw(s) issued from ${semenWarehouse}`);
     }
     Alert.alert(
-      stockNote ? "Service saved — stock issue pending" : "Service recorded",
+      savedTitle("Service", replies),
       [parts.join(" · "), stockNote].filter(Boolean).join("\n\n"),
     );
     finish("Service");
@@ -175,7 +169,6 @@ export default function Service() {
         <Textarea value={remarks} onChangeText={setRemarks} placeholder="Heat signs, technician notes..." />
       </Field>
 
-      {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <OnlineOnlyNotice />

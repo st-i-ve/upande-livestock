@@ -5,7 +5,8 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { Field } from "@/components/Field";
 import { Picker } from "@/components/Picker";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
-import { qtyAt, type StockChoice } from "@/src/frappe/eventItems";
+import { Banner } from "@/components/Banner";
+import { choiceMeta, lineNotice, outOfStock, qtyAt, sortChoices, type StockChoice } from "@/src/frappe/eventItems";
 import { useBatchPlan } from "@/src/hooks/useBatchPlan";
 import { useColors } from "@/src/hooks/useColors";
 
@@ -16,9 +17,11 @@ const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
 /**
  * Item + store + what is in it, for any event line that issues stock.
  *
- * Same contract as the web StockPicker: `choices` are the event type's
- * in-stock items (`items_by_event`), each carrying the store holding the most
- * of it and every store holding any. Picking an item picks its store; the store
+ * Same contract as the web StockPicker: `choices` are the event type's items
+ * (`items_by_event`), the in-stock ones first, each carrying the store holding
+ * the most of it and every store holding any. An item no store holds is listed
+ * after them, marked, and can still be picked: the record is saved and its stock
+ * issue waits as a draft on Transactions. An info notice says so before saving. Picking an item picks its store; the store
  * can be moved to another that genuinely has the item. With no choices the event
  * type has no stock set up (or the list did not load): the phone offers nothing
  * to pick, because the stores are not readable by field staff and which items an
@@ -48,6 +51,7 @@ export function StockItemFields({
   const avail = chosen ? (qtyAt(chosen, value.warehouse) ?? 0) : undefined;
 
   const stores = chosen?.locations ?? [];
+  const notice = lineNotice(choices, { itemCode: value.itemCode, warehouse: value.warehouse, qtyNeeded });
   const storeText = (l: { warehouse: string; qty: number }) =>
     `${l.warehouse} · ${fmt(l.qty)} ${chosen?.uom ?? value.uom}`.trim();
 
@@ -73,7 +77,11 @@ export function StockItemFields({
         />
       </Field>
       <Field label="Issue from store">
-        {stores.length ? (
+        {chosen && outOfStock(chosen) ? (
+          <Text style={{ fontSize: 12, color: c.textSubtle }}>
+            None in store, so there is no store to choose.
+          </Text>
+        ) : stores.length ? (
           <Picker
             value={storeText(stores.find((l) => l.warehouse === value.warehouse) ?? stores[0])}
             options={stores.map(storeText)}
@@ -103,16 +111,17 @@ export function StockItemFields({
           />
         </Field>
       ) : null}
+      {notice ? <Banner tone="info">{notice}</Banner> : null}
       {value.itemCode && value.warehouse && avail != null ? (
         <Text
           style={{
             fontSize: 11,
             marginBottom: 8,
-            color: qtyNeeded != null && qtyNeeded > avail ? c.danger : c.textMuted,
+            color: qtyNeeded != null && qtyNeeded > avail ? c.warning : c.textMuted,
           }}
         >
           {`Available in ${value.warehouse}: ${fmt(avail)}${value.uom ? " " + value.uom : ""}${
-            qtyNeeded != null && qtyNeeded > avail ? " — not enough" : ""
+            qtyNeeded != null && qtyNeeded > avail ? " (not enough)" : ""
           }`}
         </Text>
       ) : null}
@@ -138,9 +147,10 @@ function ChoicePicker({
   const current = choices.find((x) => x.value === value);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const sorted = sortChoices(choices);
     return q
-      ? choices.filter((x) => `${x.item_name ?? ""} ${x.value}`.toLowerCase().includes(q))
-      : choices;
+      ? sorted.filter((x) => `${x.item_name ?? ""} ${x.value}`.toLowerCase().includes(q))
+      : sorted;
   }, [choices, query]);
 
   return (
@@ -159,7 +169,7 @@ function ChoicePicker({
         <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={s.header}>
-              <Text style={s.title}>Select item in stock</Text>
+              <Text style={s.title}>Select item</Text>
               <Pressable onPress={() => setOpen(false)} hitSlop={8}>
                 <MaterialCommunityIcons name="close" size={20} color={c.text} />
               </Pressable>
@@ -195,9 +205,8 @@ function ChoicePicker({
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={s.name} numberOfLines={1}>{item.item_name || item.value}</Text>
-                    <Text style={s.meta} numberOfLines={1}>
-                      {fmt(item.qty ?? 0)} {item.uom ?? ""} in {item.warehouse}
-                      {(item.locations?.length ?? 0) > 1 ? ` (+${item.locations!.length - 1} more)` : ""}
+                    <Text style={[s.meta, outOfStock(item) && { color: c.warning }]} numberOfLines={1}>
+                      {choiceMeta(item)}
                     </Text>
                   </View>
                   {item.value === value ? <MaterialCommunityIcons name="check" size={18} color={c.text} /> : null}

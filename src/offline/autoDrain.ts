@@ -1,5 +1,7 @@
 import NetInfo from "@react-native-community/netinfo";
-import { AppState, AppStateStatus } from "react-native";
+import { Alert, AppState, AppStateStatus } from "react-native";
+
+import { stockOutcomeText } from "@/src/frappe/eventItems";
 
 import { queryClient } from "@/src/services/queryClient";
 
@@ -16,6 +18,10 @@ const drainIfWorth = async () => {
   runningDrain = true;
   try {
     const res = await drainQueue();
+    // A record taken offline whose stock issue the server left as a draft: say so,
+    // the sync must not swallow it.
+    const drafts = stockOutcomeText(res.replies);
+    if (drafts) Alert.alert("Synced: stock issue is a draft", drafts);
     if (res.succeeded > 0) {
       // Anything successful invalidates the broad reads — the user's mock
       // suspense banners flip to "synced" automatically.

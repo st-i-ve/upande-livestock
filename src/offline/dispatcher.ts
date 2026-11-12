@@ -97,6 +97,8 @@ const tooOldMessage = (item: PendingMutation, message: string): string =>
 let draining = false;
 
 export type DrainResult = {
+  /** Replies of the records that synced, so a stock draft one made can be told. */
+  replies: any[];
   succeeded: number;
   remaining: number;
   errors: { id: string; message: string }[];
@@ -109,15 +111,17 @@ export type DrainResult = {
  * what to do via the Pending screen.
  */
 export const drainQueue = async (): Promise<DrainResult> => {
-  if (draining) return { succeeded: 0, remaining: (await loadQueue()).length, errors: [] };
+  if (draining) return { replies: [], succeeded: 0, remaining: (await loadQueue()).length, errors: [] };
   draining = true;
   let succeeded = 0;
+  const replies: any[] = [];
   const errors: DrainResult["errors"] = [];
   try {
     let queue: PendingMutation[] = await loadQueue();
     for (const item of queue) {
       try {
-        await HANDLERS[item.type](item.payload);
+        const reply = await HANDLERS[item.type](item.payload);
+        replies.push(reply);
         await remove(item.id);
         succeeded += 1;
       } catch (err) {
@@ -135,7 +139,7 @@ export const drainQueue = async (): Promise<DrainResult> => {
       }
     }
     queue = await loadQueue();
-    return { succeeded, remaining: queue.length, errors };
+    return { replies, succeeded, remaining: queue.length, errors };
   } finally {
     draining = false;
   }

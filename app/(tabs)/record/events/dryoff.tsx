@@ -21,7 +21,7 @@ import { useVetChoice } from "@/src/hooks/useVets";
 import type { AnimalDrugIssueInput } from "@/src/frappe/animalEvent";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
-import { findShortage, stockOutcomeText, stockWarningsOf } from "@/src/frappe/eventItems";
+import { savedTitle, stockOutcomeText, stockWarningsOf } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
@@ -62,7 +62,6 @@ export default function Dryoff() {
   const toHerd = toHerdPick || dryHerd;
   const [dctRows, setDctRows] = useState<DCTRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
 
   // Default destination: a dry-flagged herd if one exists (per Livestock Settings).
   const addDct = () =>
@@ -86,7 +85,6 @@ export default function Dryoff() {
 
   const handleSubmit = async () => {
     setError(null);
-    setWarning(null);
     if (!operator) return setError(missingMessage);
     if (selected.length === 0) return setError("Pick at least one cow to dry off.");
     if (!toHerd) return setError("Pick a destination herd.");
@@ -100,18 +98,6 @@ export default function Dryoff() {
         sourceWarehouse: d.sourceWarehouse || undefined,
         withdrawalDays: d.withdrawalDays ? Number(d.withdrawalDays) : undefined,
       }));
-    // Heads-up only. The server saves a short issue as a draft (today) or
-    // refuses it with its own message (backdated); the phone never blocks.
-    const shortage = await findShortage(
-      stockChoices,
-      drugIssues.map((d) => ({
-        itemCode: d.itemCode,
-        warehouse: d.sourceWarehouse as string,
-        qtyNeeded: d.qty * selected.length,
-      })),
-    );
-    if (shortage) setWarning(shortage);
-
 
     let succeeded = 0;
     const replies: any[] = [];
@@ -144,7 +130,7 @@ export default function Dryoff() {
     for (const k of skipped) parts.push(`${k.name}: ${k.reason}`);
     const stockNote = stockOutcomeText(replies);
     Alert.alert(
-      stockNote ? "Drying off saved — stock issue pending" : "Drying off recorded",
+      savedTitle("Drying off", replies),
       [parts.join("\n"), stockNote, ...stockWarningsOf(replies)].filter(Boolean).join("\n\n"),
     );
     finish("Drying off");
@@ -242,7 +228,6 @@ export default function Dryoff() {
         </>
       ) : null}
 
-      {warning ? <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <OnlineOnlyNotice />

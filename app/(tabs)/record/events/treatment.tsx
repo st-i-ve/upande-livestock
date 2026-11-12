@@ -19,7 +19,7 @@ import { VetPicker } from "@/components/VetPicker";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields, type StockPick } from "@/components/StockItemFields";
 import { RADIUS, font } from "@/constants/theme";
-import { findShortage, stockOutcomeText } from "@/src/frappe/eventItems";
+import { savedTitle, stockOutcomeText } from "@/src/frappe/eventItems";
 import { addAnimalPhoto } from "@/src/frappe/animalPhotos";
 import type { FileAsset } from "@/src/frappe/files";
 import { getAnimalCase } from "@/src/frappe/treatment";
@@ -111,7 +111,6 @@ export default function Treatment() {
   const [photo, setPhoto] = useState<FileAsset | null>(null);
   const [doses, setDoses] = useState<Dose[]>(() => [blankDose(1)]);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
 
   const patch = (id: number, p: Partial<Dose>) =>
     setDoses((rows) => rows.map((r) => (r.id === id ? { ...r, ...p } : r)));
@@ -124,7 +123,6 @@ export default function Treatment() {
 
   const submit = async () => {
     setError(null);
-    setWarning(null);
     if (!operator) return setError(missingMessage);
     if (!animal) return setError("Pick the animal.");
     if (standingQ.isLoading) return setError("Looking her file up — try again in a moment.");
@@ -134,16 +132,6 @@ export default function Treatment() {
     );
     if (!given.length) return setError(consumes ? "Pick a drug and a quantity." : "Say what she was given.");
     if (fresh && !complaint.trim()) return setError("A new file needs a complaint on the front of it.");
-
-    const shortage = !consumes ? null : await findShortage(
-      stock,
-      given.map((d) => ({
-        itemCode: d.pick.itemCode,
-        warehouse: d.pick.warehouse,
-        qtyNeeded: Number(d.qty),
-      })),
-    );
-    if (shortage) setWarning(shortage);
 
     try {
       const r = await mutation.mutateAsync({
@@ -193,7 +181,7 @@ export default function Treatment() {
           photoNote = `The treatment is recorded but the photo was not added: ${extractFrappeError(pe)}`;
         }
       }
-      Alert.alert("Treatment recorded", [said, stockNote, feeNote, photoNote].filter(Boolean).join("\n\n"));
+      Alert.alert(savedTitle("Treatment", [d]), [said, stockNote, feeNote, photoNote].filter(Boolean).join("\n\n"));
       finish("Treatment");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -366,9 +354,6 @@ export default function Treatment() {
         />
       ) : null}
 
-      {warning ? (
-        <Banner tone="warning">{warning} It will still be saved; the store issue waits as a draft.</Banner>
-      ) : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
       <OnlineOnlyNotice />
       <Button
