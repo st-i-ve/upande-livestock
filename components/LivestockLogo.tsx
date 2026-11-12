@@ -47,6 +47,16 @@ const [PIVOT_X, PIVOT_Y] = toDisc(LOGO_COW.tailHead[0], LOGO_COW.tailHead[1]);
 const [GRASS_X0, GRASS_X1, GRASS_BOTTOM] = LOGO_COW.grassFoot;
 const [SWAY_X, SWAY_Y] = toDisc((GRASS_X0 + GRASS_X1) / 2, GRASS_BOTTOM);
 
+/**
+ * The phone plays the tile's scene slower than the desk hover (720 ms, linear overall) — on the login
+ * screen it is the first thing seen and the hand-off to the app, and at desk speed it popped in and
+ * out. The farm's rule: ease in, ease out. The per-property keyframes (and their own easing) are the
+ * tile's; only the overall progress is stretched and eased.
+ */
+export const PHONE_ENTER_DELAY_MS = 250;
+export const PHONE_ENTER_MS = 1600;
+export const PHONE_OUT_MS = 1300;
+const PHONE_EASE = Easing.inOut(Easing.cubic);
 const CYCLE_MS = LOGO_MOTION.cycleMs;
 const LOOP_MS = LOGO_MOTION.loopMs;
 /** [offset in the loop, degrees]; positive swings the switch out, away from her (the desk's LOOP). */
@@ -192,11 +202,14 @@ function TileLogo({
     if (scene === "upande") p.value = 0;
     else if (scene === "cow") p.value = 1;
     else if (scene === "in") {
-      p.value = withTiming(1, { duration: M.enterMs * (1 - p.value), easing: Easing.linear }, (done) => {
-        if (done) runOnJS(entered)();
-      });
+      p.value = withDelay(
+        PHONE_ENTER_DELAY_MS,
+        withTiming(1, { duration: PHONE_ENTER_MS * (1 - p.value), easing: PHONE_EASE }, (done) => {
+          if (done) runOnJS(entered)();
+        }),
+      );
     } else {
-      p.value = withTiming(0, { duration: M.enterMs * p.value, easing: Easing.linear }, (done) => {
+      p.value = withTiming(0, { duration: PHONE_OUT_MS * p.value, easing: PHONE_EASE }, (done) => {
         if (done) runOnJS(returned)();
       });
     }
