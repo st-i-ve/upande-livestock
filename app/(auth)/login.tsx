@@ -249,7 +249,7 @@ export default function LoginScreen() {
             >
               <View style={s.content}>
                 <View style={s.header}>
-                  <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
+                  <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl} onPress={() => send("replay")}>
                     <View style={s.logoBox}>
                       <View style={s.disc} />
                       {/* Behind the logo and out of layout, so the header never

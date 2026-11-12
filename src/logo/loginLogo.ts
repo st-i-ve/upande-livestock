@@ -1,31 +1,42 @@
 import { useCallback, useEffect, useReducer } from "react";
 import { create } from "zustand";
 
+import { LOGO_MOTION } from "@/src/art/paths";
+
 /**
- * The login logo, as the desk tile behaves on hover: it rests as the Upande mark, plays the
- * Livestock scene in when the login screen appears and settles on the cow (her tail swinging);
- * after a successful login it plays back out to the Upande mark, and only then does the app move
- * on to the next screen. With reduce-motion it is the Upande mark throughout and a login moves on
- * at once.
+ * The login logo, as SCP's: it rests as the Upande mark; when the login screen appears it plays
+ * the Livestock scene in (a short pause, then 1.5 s eased in and out), her tail swings for
+ * PREVIEW_ROUNDS rounds, and the scene eases back out to the Upande mark, where it rests. A tap
+ * on the logo plays the preview again. After a successful login, a scene still showing is played
+ * out to the Upande mark first, and only then does the app move on; resting on the mark, the app
+ * moves on at once. With reduce-motion it is the Upande mark throughout.
  *
- *   idle ──appear──▶ playing ──entered──▶ cow ──loggedIn──▶ returning ──returned──▶ upande ──▶ navigate
- *
- * A login that lands while the scene is still coming in turns it round from where it is.
+ *   idle ─appear─▶ playing ─entered─▶ cow ─previewDone─▶ leaving ─returned─▶ rest ─replay─▶ playing
+ *   playing / cow / leaving ─loggedIn─▶ returning ─returned─▶ upande ─settled─▶ navigate
+ *   idle / rest ─loggedIn─▶ navigate
  */
-export type LogoPhase = "idle" | "playing" | "cow" | "returning" | "upande" | "navigate";
-export type LogoEvent = "appear" | "entered" | "loggedIn" | "returned" | "settled";
+export type LogoPhase = "idle" | "playing" | "cow" | "leaving" | "rest" | "returning" | "upande" | "navigate";
+export type LogoEvent = "appear" | "entered" | "previewDone" | "replay" | "loggedIn" | "returned" | "settled";
+
+/** How many rounds of her tail the preview shows before it goes back to the Upande mark. */
+export const PREVIEW_ROUNDS = 2;
 
 export function nextPhase(phase: LogoPhase, event: LogoEvent, reduceMotion: boolean): LogoPhase {
   switch (event) {
     case "appear":
       return phase === "idle" && !reduceMotion ? "playing" : phase;
+    case "replay":
+      return (phase === "rest" || phase === "idle") && !reduceMotion ? "playing" : phase;
     case "entered":
       return phase === "playing" ? "cow" : phase;
+    case "previewDone":
+      return phase === "cow" ? "leaving" : phase;
     case "loggedIn":
-      if (phase === "playing" || phase === "cow") return reduceMotion ? "navigate" : "returning";
-      if (phase === "idle" || phase === "upande") return "navigate";
+      if (phase === "playing" || phase === "cow" || phase === "leaving") return reduceMotion ? "navigate" : "returning";
+      if (phase === "idle" || phase === "rest" || phase === "upande") return "navigate";
       return phase;
     case "returned":
+      if (phase === "leaving") return "rest";
       return phase === "returning" ? "upande" : phase;
     case "settled":
       return phase === "upande" ? "navigate" : phase;
@@ -37,7 +48,7 @@ export function nextPhase(phase: LogoPhase, event: LogoEvent, reduceMotion: bool
 export function sceneOf(phase: LogoPhase): "upande" | "in" | "cow" | "out" {
   if (phase === "playing") return "in";
   if (phase === "cow") return "cow";
-  if (phase === "returning") return "out";
+  if (phase === "leaving" || phase === "returning") return "out";
   return "upande";
 }
 
@@ -95,6 +106,12 @@ export function useLoginLogo(reduceMotion: boolean) {
   useEffect(() => {
     dispatch("appear");
   }, []);
+  // The preview: after PREVIEW_ROUNDS rounds of her tail the scene goes back to the mark.
+  useEffect(() => {
+    if (phase !== "cow") return undefined;
+    const id = setTimeout(() => dispatch("previewDone"), PREVIEW_ROUNDS * LOGO_MOTION.cycleMs);
+    return () => clearTimeout(id);
+  }, [phase]);
   useEffect(() => {
     if (phase === "upande") dispatch("settled");
     if (phase === "navigate") useLoginExit.getState().release(true);

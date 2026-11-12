@@ -22,6 +22,22 @@ describe("login logo phases", () => {
     expect(seen).toEqual(["idle", "playing", "cow", "returning", "upande", "navigate"]);
   });
 
+  it("previews the scene, goes back to the Upande mark, and a tap plays it again", () => {
+    const seen: LogoPhase[] = ["idle"];
+    for (const e of ["appear", "entered", "previewDone", "returned", "replay"] as const) {
+      seen.push(nextPhase(seen[seen.length - 1], e, false));
+    }
+    expect(seen).toEqual(["idle", "playing", "cow", "leaving", "rest", "playing"]);
+    // a tap while it is already playing does nothing
+    expect(nextPhase("cow", "replay", false)).toBe("cow");
+  });
+
+  it("a login after the preview moves on at once; during it, the scene plays out first", () => {
+    expect(nextPhase("rest", "loggedIn", false)).toBe("navigate");
+    expect(nextPhase("leaving", "loggedIn", false)).toBe("returning");
+    expect(nextPhase("returning", "returned", false)).toBe("upande");
+  });
+
   it("a login while the scene is still coming in turns it round", () => {
     expect(nextPhase("playing", "loggedIn", false)).toBe("returning");
     // the in finishing late does not undo the turn
@@ -35,8 +51,8 @@ describe("login logo phases", () => {
   });
 
   it("draws the Upande mark at rest, the scene in, the cow, and the scene out", () => {
-    expect((["idle", "playing", "cow", "returning", "upande", "navigate"] as const).map(sceneOf)).toEqual([
-      "upande", "in", "cow", "out", "upande", "upande",
+    expect((["idle", "playing", "cow", "leaving", "rest", "returning", "upande", "navigate"] as const).map(sceneOf)).toEqual([
+      "upande", "in", "cow", "out", "upande", "out", "upande", "upande",
     ]);
   });
 });
