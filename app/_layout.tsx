@@ -1,6 +1,7 @@
 import "@/src/ui/installAlert";
 import '../src/mobile-kit';
 import { MobileKitProvider } from '@upande/mobile-kit';
+import { applyKitTheme } from '../src/mobile-kit';
 import "@/src/theme/patchText";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -108,6 +109,8 @@ const paperSettings = {
 
 export default function RootLayout() {
   const scheme = useScheme();
+  // The kit (connection banner, its Settings) follows our theme, light or dark.
+  applyKitTheme(scheme);
   const dark = scheme === "dark";
   const palette = dark ? DARK : LIGHT;
 

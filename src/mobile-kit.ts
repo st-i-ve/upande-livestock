@@ -7,8 +7,71 @@
  * sign-out, the biometric switch and the device register are not connected to
  * the real session.
  */
-import { configureMobileKit } from '@upande/mobile-kit';
+import { configureMobileKit, getConfig, type KitTheme, type KitUi } from '@upande/mobile-kit';
+import React from 'react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+import { Button } from '@/components/Button';
+import { DARK, FONT_FAMILY, LIGHT, type Palette } from '@/constants/theme';
+import { useNetworkStatus } from '@/src/hooks/useNetworkStatus';
+import { showAppAlert } from '@/src/ui/alert';
 import { useAuthStore } from './auth/authStore';
+
+/**
+ * Everything the kit draws (the connection banner, its Settings and Devices
+ * pages, its dialogs) goes through this app's theme, as the Android dialogs
+ * do: our palette, Poppins, and light or dark as the phone is set
+ * (applyKitTheme, from the root layout).
+ */
+export function kitTheme(p: Palette): KitTheme {
+  return {
+    primary: p.primary,
+    text: p.text,
+    textSecondary: p.textMuted,
+    textMuted: p.textSubtle,
+    textOnPrimary: p.bg,
+    surface: p.bg,
+    surfaceAlt: p.bgMuted,
+    background: p.bgSubtle,
+    border: p.borderSubtle,
+    danger: p.danger,
+    success: p.success,
+    warning: p.warning,
+    fontRegular: FONT_FAMILY.regular,
+    fontMedium: FONT_FAMILY.medium,
+    fontSemiBold: FONT_FAMILY.semibold,
+    fontBold: FONT_FAMILY.bold,
+  };
+}
+
+/** The kit reads its theme as it draws, so switching it in place re-themes whatever it draws next. */
+export function applyKitTheme(scheme: 'light' | 'dark'): void {
+  Object.assign(getConfig().theme, kitTheme(scheme === 'dark' ? DARK : LIGHT));
+}
+
+type KitButtonProps = React.ComponentProps<NonNullable<KitUi['Button']>>;
+type Glyph = keyof typeof MaterialCommunityIcons.glyphMap;
+
+/** The kit's buttons as ours (its "ghost" is our link). */
+function KitButton({ label, onPress, variant, loading, disabled, iconLeft, style }: KitButtonProps) {
+  const icon = iconLeft && iconLeft in MaterialCommunityIcons.glyphMap ? (iconLeft as Glyph) : undefined;
+  return React.createElement(Button, {
+    label,
+    onPress,
+    variant: variant === 'ghost' ? 'link' : variant ?? 'primary',
+    loading,
+    disabled,
+    icon,
+    style,
+  });
+}
+
+const ui: KitUi = {
+  // The kit's dialogs are our alert card (pill buttons), never the system dialog.
+  showDialog: (title, message, buttons) => showAppAlert(title, message, buttons),
+  useOnline: () => useNetworkStatus() !== false,
+  Button: KitButton,
+};
 
 configureMobileKit({
   appName: 'Upande Livestock', // the "Mobile App" record on the server
@@ -57,5 +120,6 @@ configureMobileKit({
   //
   // Still on the kit's stand-ins (uncomment to wire them):
   // storage,    // { get, set, remove }; default AsyncStorage, else memory
-  // theme: { primary: '#...' },
+  theme: kitTheme(LIGHT),
+  ui,
 });
