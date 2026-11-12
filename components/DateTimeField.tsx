@@ -1,10 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 
 import { RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
+// The app's own themed calendar, with the native picker's API (src/ui/datetimepicker.tsx).
+import DateTimePicker from "@/src/ui/datetimepicker";
 
 /** ISO `YYYY-MM-DD` in the device's own timezone. `toISOString()` is UTC and
  *  rolls backwards east of Greenwich: Kenya is UTC+3, so anything recorded
@@ -45,9 +46,11 @@ export function DateField({
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [open, setOpen] = useState(false);
+  // Fixed while the sheet is open, so a re-render does not move it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const start = useMemo(() => (value ? fromISODate(value) : (minimumDate ?? new Date())), [value, open]);
 
-  // Android calls onDismiss on cancel and hands back no date; iOS keeps the
-  // spinner mounted, so it closes on the first committed value either way.
+  // OK hands back the day; Cancel, back or a tap outside calls onDismiss.
   const handle = (_event: unknown, picked: Date) => {
     setOpen(false);
     onChange(toISODate(picked));
@@ -57,6 +60,8 @@ export function DateField({
     <>
       <Pressable
         onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={value ? `Date, ${LABEL.format(fromISODate(value))}. Change` : (placeholder ?? "Pick a date")}
         style={({ pressed }) => [s.box, pressed && { backgroundColor: c.bgMuted }]}
       >
         <Text style={[s.value, !value && { color: c.textSubtle }]}>{value ? LABEL.format(fromISODate(value)) : (placeholder ?? "Pick a date")}</Text>
@@ -64,15 +69,12 @@ export function DateField({
       </Pressable>
       {open ? (
         <DateTimePicker
-          value={value ? fromISODate(value) : (minimumDate ?? new Date())}
+          value={start}
           mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
           maximumDate={maximumDate}
           minimumDate={minimumDate}
           onValueChange={handle}
           onDismiss={() => setOpen(false)}
-          themeVariant={c.bg === "#FFFFFF" ? "light" : "dark"}
-          accentColor={c.text}
         />
       ) : null}
     </>

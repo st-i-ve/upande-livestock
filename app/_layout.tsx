@@ -25,6 +25,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import { AppAlertHost } from "@/components/AppAlertHost";
+import { DatePickerHost } from "@/components/DatePickerHost";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
@@ -220,6 +221,8 @@ export default function RootLayout() {
               <StatusBar style={dark ? "light" : "dark"} />
               {/* Every Alert.alert, drawn over everything (src/ui/alert.ts). */}
               <AppAlertHost />
+              {/* Every date/time picker, as the app's own sheet (src/ui/datetimepicker.tsx). */}
+              <DatePickerHost />
             </ThemeProvider>
           </PaperProvider>
         </SafeAreaProvider>
