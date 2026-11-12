@@ -4,6 +4,7 @@ import { applyKitTheme } from '../src/mobile-kit';
 import { MobileKitProvider } from '@upande/mobile-kit';
 import { BlurTargetRoot } from '@/components/BlurBackdrop';
 import { StatusSheetHost } from '@/components/OnlineDot';
+import { checkKitServer, loadKitServer, useKitServer } from '@/src/kit/kitServer';
 import "@/src/theme/patchText";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -113,6 +114,15 @@ export default function RootLayout() {
   const scheme = useScheme();
   // The kit (connection banner, its Settings) follows our theme, light or dark.
   applyKitTheme(scheme);
+  // Upande Mobile: held off until the signed-in site has it (src/kit/kitServer.ts).
+  // Subscribed so the kit's provider is drawn again when it switches on.
+  useKitServer((k) => k.ready);
+  const kitSignedIn = useAuthStore((st) => st.isAuthenticated);
+  const site = useAuthStore((st) => st.instanceUrl);
+  React.useEffect(() => {
+    const url = site?.trim() || null;
+    void loadKitServer(url).then(() => (kitSignedIn ? checkKitServer(url) : undefined));
+  }, [kitSignedIn, site]);
   const dark = scheme === "dark";
   const palette = dark ? DARK : LIGHT;
 

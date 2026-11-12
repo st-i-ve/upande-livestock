@@ -16,6 +16,7 @@ import { DARK, FONT_FAMILY, LIGHT, type Palette } from '@/constants/theme';
 import { useNetworkStatus } from '@/src/hooks/useNetworkStatus';
 import { showAppAlert } from '@/src/ui/alert';
 import { useAuthStore } from './auth/authStore';
+import { kitApi } from './kit/kitServer';
 
 /**
  * Everything the kit draws (the connection banner, its Settings and Devices
@@ -122,4 +123,10 @@ configureMobileKit({
   // storage,    // { get, set, remove }; default AsyncStorage, else memory
   theme: kitTheme(LIGHT),
   ui,
+  // Through the app's own signed-in client, and never to Upande Mobile until the
+  // site has it (src/kit/kitServer.ts): monitoring, support and push start off.
+  api: kitApi,
+  monitor: { enabled: false },
+  support: false,
+  push: false,
 });
