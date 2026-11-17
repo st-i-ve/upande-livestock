@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/Button";
 import { useSyncParts } from "@/src/sync/useSyncParts";
 import { FONT_FAMILY } from "@/constants/theme";
-import { syncAnimalsSoon } from "@/src/db/sync";
+import { syncAnimals } from "@/src/db/sync";
 import { useColors } from "@/src/hooks/useColors";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useLiveStore } from "@/src/realtime/liveStore";
@@ -267,7 +267,8 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
 
   const syncNow = () => {
     retryRealtime();
-    void syncAnimalsSoon();
+    // Asked for: now, with the bar.
+    void syncAnimals();
   };
 
   const dark = useScheme() === "dark";

@@ -107,7 +107,7 @@ function catchUp() {
 
 function setPolling(on: boolean) {
   if (on && !pollTimer) {
-    pollTimer = setInterval(() => void syncAnimals(), POLL_MS);
+    pollTimer = setInterval(() => void syncAnimals({ quiet: true }), POLL_MS);
   } else if (!on && pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
