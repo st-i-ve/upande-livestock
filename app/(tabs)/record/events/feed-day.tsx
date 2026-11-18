@@ -21,6 +21,7 @@ import { appetiteLabel, dayIsOpen, fmtKg, signedKg, signedPct, statusTone } from
 import type { HerdDay } from "@/src/frappe/feedActuals";
 import { useAmendFeedDay, useAnimalIntake, useFeedDayProgram, useManufactureActuals, useResetFeedDay } from "@/src/hooks/useFeedActuals";
 import { useColors } from "@/src/hooks/useColors";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { useOperator } from "@/src/hooks/useOperator";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 
@@ -29,7 +30,22 @@ import { extractFrappeError, todayISO } from "@/src/services/api";
  * fed, with Amend (change the kg of any component actually fed), Mix actuals
  * (books the stock; stays a draft when stock is short) and per-animal intake.
  */
-export default function FeedDay() {
+/** The screen, or why it is off: Settings -> Feed types can switch the day sheet off for the phone. */
+export default function FeedDayGate() {
+  const feedTypes = useFeedTypes();
+  if (!feedTypes.day_sheet) {
+    return (
+      <Screen title="Feeding day" back>
+        <Banner tone="warning">
+          The feeding day sheet is switched off for the phone. Turn it on in Livestock Settings, under Feeding, Feed types.
+        </Banner>
+      </Screen>
+    );
+  }
+  return <FeedDay />;
+}
+
+function FeedDay() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const offline = useOffline();

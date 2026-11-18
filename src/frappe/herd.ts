@@ -1,5 +1,6 @@
 import type { Herd } from "@/types";
 import { mapDisabledEvents } from "@/src/beef/events";
+import { mapFeedTypes, type FeedTypes } from "@/src/beef/feedTypes";
 import { getClient } from "@/src/services/api";
 
 /**
@@ -63,6 +64,8 @@ export type Bootstrap = {
   settings: BeefSettings;
   /** Livestock Event Types the farm switched off; [] from a server that does not send it. */
   disabledEvents: string[];
+  /** The feeding modes shown on the phone; the defaults from a server that does not send them. */
+  feedTypes: FeedTypes;
 };
 
 export const getBootstrap = async (): Promise<Bootstrap> => {
@@ -74,6 +77,7 @@ export const getBootstrap = async (): Promise<Bootstrap> => {
     herds: ((msg.herds ?? []) as any[]).map(mapHerd),
     settings: mapBeefSettings(msg.settings),
     disabledEvents: mapDisabledEvents(msg.disabled_events),
+    feedTypes: mapFeedTypes(msg.feed_types),
   };
 };
 

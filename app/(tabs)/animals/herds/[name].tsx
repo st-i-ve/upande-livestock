@@ -14,12 +14,15 @@ import { extractFrappeError } from "@/src/services/api";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { isRouteEnabled } from "@/src/beef/events";
+import { isFeedRouteOn } from "@/src/beef/feedTypes";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 import { useHerds } from "@/src/hooks/useHerds";
 
 export default function HerdDetail() {
   const { canRecord } = useCanRecord();
   const disabledEvents = useDisabledEvents();
+  const feedTypes = useFeedTypes();
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
@@ -102,7 +105,7 @@ export default function HerdDetail() {
         <Empty text="No animals in this herd" />
       )}
 
-      {canRecord && isRouteEnabled("animal-feed", disabledEvents) ? (
+      {canRecord && isRouteEnabled("animal-feed", disabledEvents) && isFeedRouteOn("animal-feed", feedTypes) ? (
         <>
           <SectionTitle>Quick actions</SectionTitle>
           <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />

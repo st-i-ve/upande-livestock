@@ -9,9 +9,11 @@ import { font } from "@/constants/theme";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { visibleSections } from "@/src/beef/events";
+import { visibleFeedSections } from "@/src/beef/feedTypes";
 import { RECORD_SECTIONS } from "@/src/beef/records";
 import { useColors } from "@/src/hooks/useColors";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { useOffline } from "@/components/OnlineOnlyNotice";
 
 export default function Record() {
@@ -20,7 +22,12 @@ export default function Record() {
   const offline = useOffline();
   // Events the farm switched off (Settings -> Events) are not offered.
   const disabled = useDisabledEvents();
-  const sections = useMemo(() => visibleSections(RECORD_SECTIONS, disabled), [disabled]);
+  // Feeding modes switched off (Settings -> Feed types) are not offered either.
+  const feedTypes = useFeedTypes();
+  const sections = useMemo(
+    () => visibleFeedSections(visibleSections(RECORD_SECTIONS, disabled), feedTypes),
+    [disabled, feedTypes],
+  );
   return (
     <Screen title="Livestock events" subtitle="Pick what you observed or did">
       {offline ? (

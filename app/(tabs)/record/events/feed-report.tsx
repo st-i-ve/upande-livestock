@@ -17,13 +17,29 @@ import { appetiteLabel, fmtKg, signedKg, signedPct } from "@/src/feed/daySheet";
 import type { ReportAnimal } from "@/src/frappe/feedActuals";
 import { useDailyFeedReport } from "@/src/hooks/useFeedActuals";
 import { useColors } from "@/src/hooks/useColors";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 
 type Show = "all" | "below" | "above";
 
 /** The daily feed report: what each herd was fed, and every animal's intake
  *  against plan, below or above, beside its last weight and daily gain. */
-export default function FeedReport() {
+/** The screen, or why it is off: Settings -> Feed types can switch the day sheet off for the phone. */
+export default function FeedReportGate() {
+  const feedTypes = useFeedTypes();
+  if (!feedTypes.day_sheet) {
+    return (
+      <Screen title="Daily feed report" back>
+        <Banner tone="warning">
+          The feeding day sheet is switched off for the phone. Turn it on in Livestock Settings, under Feeding, Feed types.
+        </Banner>
+      </Screen>
+    );
+  }
+  return <FeedReport />;
+}
+
+function FeedReport() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const [date, setDate] = useState(todayISO());

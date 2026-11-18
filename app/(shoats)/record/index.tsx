@@ -11,6 +11,8 @@ import { font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { LABEL, useAnimalType } from "@/src/shoats/animalType";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { isFeedRouteOn } from "@/src/beef/feedTypes";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { SHOAT_RECORD_ITEMS, visibleShoatItems } from "@/src/shoats/records";
 
 export default function ShoatRecord() {
@@ -20,7 +22,12 @@ export default function ShoatRecord() {
   const type = useAnimalType((st) => st.type);
   // Events the farm switched off (Settings -> Events) are not offered.
   const disabled = useDisabledEvents();
-  const items = useMemo(() => visibleShoatItems(SHOAT_RECORD_ITEMS, disabled), [disabled]);
+  // The shoat Feeding screen is the System run: it goes when System feeding is off on the phone.
+  const feedTypes = useFeedTypes();
+  const items = useMemo(
+    () => visibleShoatItems(SHOAT_RECORD_ITEMS, disabled).filter((it) => isFeedRouteOn(it.href, feedTypes)),
+    [disabled, feedTypes],
+  );
   return (
     <Screen title="Shoat events" subtitle={`${type ? LABEL[type] : "Shoats"} · by number, never per animal`}>
       {offline ? (

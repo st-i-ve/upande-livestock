@@ -12,6 +12,8 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { Timeline } from "@/components/Timeline";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { isFeedRouteOn } from "@/src/beef/feedTypes";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { extractFrappeError } from "@/src/services/api";
 import { useShoatHerd } from "@/src/shoats/hooks";
 import { kg, ledgerSummary } from "@/src/shoats/logic";
@@ -21,7 +23,8 @@ export default function ShoatHerdPage() {
   const { canRecord } = useCanRecord();
   // Events the farm switched off (Settings -> Events) get no button.
   const disabled = useDisabledEvents();
-  const on = (leaf: string) => shoatEntryOn(leaf, disabled);
+  const feedTypes = useFeedTypes();
+  const on = (leaf: string) => shoatEntryOn(leaf, disabled) && isFeedRouteOn(leaf, feedTypes);
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
   const { data: h, isLoading, isRefetching, error, refetch } = useShoatHerd(herdName);
