@@ -1,13 +1,13 @@
 {
-  "id": "0cd72479-17f7-48fd-9520-0ead35893d9f",
-  "createdAt": "2026-11-18T05:49:29.445Z",
+  "id": "73cf27d3-f634-46de-919b-9d7f9cfa3e3a",
+  "createdAt": "2026-11-18T06:41:19.414Z",
   "runtimeVersion": "1.5",
   "launchAsset": {
-    "hash": "LkOy5MJxoIS4LRVuK3c_KY9XlVazWq0w5uAIUcYtv-U",
-    "key": "entry-f15a622dc92126efaaad5fc1a8e896eb",
+    "hash": "ZUlBPKoClLQtI0k5hjRqZQ-58ySolDxJzOKmWr9WRdU",
+    "key": "entry-205fcd9551ff344ea269017683159416",
     "contentType": "application/javascript",
     "fileExtension": ".hbc",
-    "url": "https://st-i-ve.github.io/upande-livestock/ota/android/1.5/_expo/static/js/android/entry-f15a622dc92126efaaad5fc1a8e896eb.hbc"
+    "url": "https://st-i-ve.github.io/upande-livestock/ota/android/1.5/_expo/static/js/android/entry-205fcd9551ff344ea269017683159416.hbc"
   },
   "assets": [
     {
@@ -478,7 +478,7 @@
     "expoClient": {
       "name": "Upande Livestock",
       "slug": "upande-livestock-mutara",
-      "version": "1.5.1",
+      "version": "1.5.2",
       "orientation": "portrait",
       "icon": "./assets/images/upande_logo_no_bg.png",
       "scheme": "upandelivestockmutara",
@@ -507,7 +507,7 @@
           "android.permission.RECORD_AUDIO",
           "android.permission.REQUEST_INSTALL_PACKAGES"
         ],
-        "versionCode": 5501
+        "versionCode": 5502
       },
       "web": {
         "output": "static",
@@ -622,7 +622,7 @@
               "app.json (native fields)": "1f47ffc4ad87"
             }
           },
-          "apkTag": "v1.5.0"
+          "apkTag": "v1.5.2"
         },
         "runtimeSdk": 58
       },
@@ -634,7 +634,7 @@
         "web"
       ]
     },
-    "appVersion": "1.5.1",
-    "publishedAt": "2026-11-18T05:49:29.478Z"
+    "appVersion": "1.5.2",
+    "publishedAt": "2026-11-18T06:41:19.445Z"
   }
 }
