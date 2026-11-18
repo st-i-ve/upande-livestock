@@ -1,7 +1,8 @@
 /**
  * Which ways of feeding the farm shows on the phone (Livestock Settings,
  * Feeding, Feed types; the bootstrap bundle's `feed_types`). Pure, so it is
- * tested without a phone.
+ * tested without a phone. Off on the phone means hidden here, not refused:
+ * the server refuses a mode only when it is off on the desk too.
  *
  *   system     the automatic run from the recipe (Animal feeding, System)
  *   manual     Manual configuration (Animal feeding, Manual configuration)
