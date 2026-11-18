@@ -21,6 +21,8 @@ export const EVENT_FOR_ROUTE: Record<string, string> = {
   dehorning: "Dehorning",
   hoof: "Hoof Trimming",
   "animal-feed": "Feeding",
+  "feed-day": "Feeding",
+  "feed-report": "Feeding",
 };
 
 /** The event type an href or route slug records, or null (stock and other non-event screens). */

@@ -44,6 +44,8 @@ export const RECORD_SECTIONS: RecordSection[] = [
       { icon: "content-cut", label: "Dehorning", href: "/(tabs)/record/events/dehorning" },
       { icon: "tools", label: "Hoof trimming", href: "/(tabs)/record/events/hoof" },
       { icon: "grain", label: "Animal feeding", href: "/(tabs)/record/events/animal-feed" },
+      { icon: "clipboard-text-outline", label: "Feeding day: plan and amend", href: "/(tabs)/record/events/feed-day" },
+      { icon: "chart-box-outline", label: "Daily feed report", href: "/(tabs)/record/events/feed-report" },
     ],
   },
   {
