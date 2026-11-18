@@ -2,7 +2,7 @@
   "expo": {
     "name": "Upande Livestock",
     "slug": "upande-livestock-mutara",
-    "version": "1.5.1",
+    "version": "1.5.2",
     "orientation": "portrait",
     "icon": "./assets/images/upande_logo_no_bg.png",
     "scheme": "upandelivestockmutara",
@@ -29,7 +29,7 @@
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ],
-      "versionCode": 5501
+      "versionCode": 5502
     },
     "web": {
       "output": "static",
@@ -140,7 +140,7 @@
             "app.json (native fields)": "1f47ffc4ad87"
           }
         },
-        "apkTag": "v1.5.0"
+        "apkTag": "v1.5.2"
       },
       "runtimeSdk": 58
     },
