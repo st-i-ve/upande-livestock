@@ -1,16 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { getHerds } from "@/src/frappe/herd";
+import { getBootstrap } from "@/src/frappe/herd";
 import { storage } from "@/src/services/storage";
 import type { Herd } from "@/types";
 
-export const useHerds = () =>
+/** One bootstrap call feeds the herd list and the feed types. */
+export const useBootstrap = () =>
   useQuery({
     queryKey: ["herds"],
-    queryFn: getHerds,
+    queryFn: getBootstrap,
     staleTime: 5 * 60_000,
   });
+
+export const useHerds = () => {
+  const q = useBootstrap();
+  return { ...q, data: q.data?.herds };
+};
 
 const HERD_FACTS_KEY = "herd_facts";
 

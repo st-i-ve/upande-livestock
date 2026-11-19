@@ -10,41 +10,15 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useAuthStore } from "@/src/auth/authStore";
 import { canSeeQuality } from "@/src/auth/roles";
+import { visibleFeedSections } from "@/src/feed/feedTypes";
 import { useColors } from "@/src/hooks/useColors";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
+import { RECORD_SECTIONS } from "@/src/recordSections";
 import { useOffline } from "@/components/OnlineOnlyNotice";
-
-type Item = { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; href: string };
 
 const MILKING = "/(tabs)/record/events/milk";
 
 const QUALITY = "/(tabs)/quality";
-
-const SECTIONS: { title: string; items: Item[] }[] = [
-  { title: "Daily routine", items: [
-    { icon: "water", label: "Milk recording", href: "/(tabs)/record/events/milk" },
-    { icon: "grain", label: "Animal feeding (TMR)", href: "/(tabs)/record/events/animal-feed" },
-  ]},
-  { title: "Health & breeding", items: [
-    { icon: "magnify", label: "Check up", href: "/(tabs)/record/events/diagnosis" },
-    { icon: "medical-bag", label: "Treatment (health file)", href: "/(tabs)/record/events/treatment" },
-    { icon: "needle", label: "Vaccination", href: "/(tabs)/record/events/vaccination" },
-    { icon: "bug", label: "Deworming", href: "/(tabs)/record/events/deworming" },
-    { icon: "fire", label: "Heat detection", href: "/(tabs)/record/events/heat" },
-    { icon: "heart", label: "Service / AI", href: "/(tabs)/record/events/service" },
-    { icon: "clipboard-check", label: "Pregnancy diagnosis", href: "/(tabs)/record/events/pd" },
-    { icon: "baby-bottle-outline", label: "Calving", href: "/(tabs)/record/events/calving" },
-  ]},
-  { title: "Husbandry", items: [
-    { icon: "scale", label: "Weight recording", href: "/(tabs)/record/events/weight" },
-    { icon: "arrow-left-right", label: "Movement", href: "/(tabs)/record/events/movement" },
-    { icon: "content-cut", label: "Dehorning", href: "/(tabs)/record/events/dehorning" },
-    { icon: "tools", label: "Hoof trimming", href: "/(tabs)/record/events/hoof" },
-    { icon: "water-off", label: "Drying off", href: "/(tabs)/record/events/dryoff" },
-  ]},
-  { title: "Stores", items: [
-    { icon: "warehouse", label: "Stock (read only)", href: "/(tabs)/record/stock" },
-  ]},
-];
 
 export default function Record() {
   const c = useColors();
@@ -52,13 +26,16 @@ export default function Record() {
   const offline = useOffline();
   // Managers, and anyone who also holds the lab role, may open the Quality view.
   const quality = canSeeQuality(useAuthStore((st) => st.roles));
+  // Feeding modes switched off (Livestock Settings, Feed types) are not offered.
+  const feedTypes = useFeedTypes();
+  const base = useMemo(() => visibleFeedSections(RECORD_SECTIONS, feedTypes), [feedTypes]);
   const sections = quality
     ? [
-        ...SECTIONS.slice(0, -1),
+        ...base.slice(0, -1),
         { title: "Lab", items: [{ icon: "flask-outline" as const, label: "Quality", href: QUALITY }] },
-        SECTIONS[SECTIONS.length - 1],
+        base[base.length - 1],
       ]
-    : SECTIONS;
+    : base;
   return (
     <Screen title="Livestock events" subtitle="Pick what you observed or did">
       {offline ? (

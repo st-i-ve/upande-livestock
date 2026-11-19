@@ -1,4 +1,5 @@
 import type { Herd } from "@/types";
+import { mapFeedTypes, type FeedTypes } from "@/src/feed/feedTypes";
 import { getClient } from "@/src/services/api";
 
 /**
@@ -29,10 +30,21 @@ export const mapHerd = (row: Record<string, any>): Herd => ({
   isInCalf: !!row.is_in_calf,
 });
 
-export const getHerds = async (): Promise<Herd[]> => {
+export type Bootstrap = {
+  herds: Herd[];
+  /** The feeding modes shown on the phone; today's screens from a server that does not send them. */
+  feedTypes: FeedTypes;
+};
+
+export const getBootstrap = async (): Promise<Bootstrap> => {
   const client = await getClient();
   const res = await client.post(BOOTSTRAP, {});
   const msg = res.data?.message;
   if (!msg || msg.error) throw new Error(msg?.error || "Could not load herds.");
-  return ((msg.herds ?? []) as any[]).map(mapHerd);
+  return {
+    herds: ((msg.herds ?? []) as any[]).map(mapHerd),
+    feedTypes: mapFeedTypes(msg.feed_types),
+  };
 };
+
+export const getHerds = async (): Promise<Herd[]> => (await getBootstrap()).herds;

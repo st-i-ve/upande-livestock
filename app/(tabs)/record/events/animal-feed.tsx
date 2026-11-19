@@ -21,6 +21,8 @@ import { Switch } from "@/components/Switch";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
+import { feedingTabs } from "@/src/feed/feedTypes";
 import { useFeedDayStatus } from "@/src/hooks/useFeedDayStatus";
 import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
 import { useHerdRecipes } from "@/src/hooks/useHerdRecipes";
@@ -72,7 +74,11 @@ export default function AnimalFeed() {
   const feedable = useMemo(() => herds.filter((h) => h.hasBom), [herds]);
   const [herdPick, setHerdName] = useState<string>("");
   const herdName = herdPick || feedable[0]?.n || "";
-  const [mode, setMode] = useState<Mode>("system");
+  // Which tabs Livestock Settings -> Feed types leaves on for the phone.
+  const feedTypes = useFeedTypes();
+  const tabs = feedingTabs(feedTypes);
+  const [picked, setMode] = useState<Mode>("system");
+  const mode: Mode = tabs.includes(picked) ? picked : (tabs[0] ?? "system");
   const recipes = useHerdRecipes(herdName);
 
   // Which recipe is currently picked — shared between the System and Manual
@@ -111,16 +117,22 @@ export default function AnimalFeed() {
         <Picker value={herdName} onChange={setHerdName} options={feedable.map((h) => h.n)} />
       </Field>
 
-      <Chips>
-        <Chip label="System" active={mode === "system"} onPress={() => setMode("system")} />
-        <Chip
-          label="Manual configuration"
-          active={mode === "manual"}
-          onPress={() => setMode("manual")}
-        />
-      </Chips>
+      {tabs.length > 1 ? (
+        <Chips>
+          <Chip label="System" active={mode === "system"} onPress={() => setMode("system")} />
+          <Chip
+            label="Manual configuration"
+            active={mode === "manual"}
+            onPress={() => setMode("manual")}
+          />
+        </Chips>
+      ) : null}
 
-      {mode === "manual" ? (
+      {tabs.length === 0 ? (
+        <Banner tone="warning">
+          No way of feeding is switched on for the phone. Turn one on in Livestock Settings, under Feeding, Feed types.
+        </Banner>
+      ) : mode === "manual" ? (
         <ManualTab
           herd={herdName}
           recipes={recipes.data?.recipes ?? []}

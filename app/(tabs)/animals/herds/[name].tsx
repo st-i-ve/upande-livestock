@@ -13,10 +13,13 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { extractFrappeError } from "@/src/services/api";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useAnimals } from "@/src/hooks/useAnimals";
+import { isFeedRouteOn } from "@/src/feed/feedTypes";
+import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { useHerds } from "@/src/hooks/useHerds";
 
 export default function HerdDetail() {
   const { canRecord } = useCanRecord();
+  const feedTypes = useFeedTypes();
   const { name } = useLocalSearchParams<{ name: string }>();
   const herdName = decodeURIComponent(name || "");
 
@@ -94,7 +97,9 @@ export default function HerdDetail() {
       {canRecord ? (
         <>
           <SectionTitle>Quick actions</SectionTitle>
-          <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />
+          {isFeedRouteOn("animal-feed", feedTypes) ? (
+            <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />
+          ) : null}
           <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/animals/act/milk")} />
         </>
       ) : null}
