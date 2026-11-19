@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { RECORD_SECTIONS } from "../../recordSections.ts";
 import { feedingTabs, isFeedRouteOn, mapFeedTypes, visibleFeedSections } from "../feedTypes.ts";
 
-const labels = (sections: ReadonlyArray<{ items: { label: string }[] }>) => sections.flatMap((s) => s.items.map((i) => i.label));
+const labels = (sections: readonly { items: { label: string }[] }[]) => sections.flatMap((s) => s.items.map((i) => i.label));
 
 const DAY = "Feeding day: plan and amend";
 const REPORT = "Daily feed report";
