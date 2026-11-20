@@ -27,6 +27,9 @@ import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
+import { calvingOutcomes, type CalvingOutcome } from "@/src/events/disabled";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 
 type CalfRow = {
   key: number;
@@ -64,7 +67,10 @@ export default function Calving() {
   const { today: serverToday } = useBackdatingWindow();
   const offline = useOffline();
   const [dam, setDam] = useState<Animal | null>(null);
-  const [outcome, setOutcome] = useState<"Live Birth" | "Still Birth" | "Abortion">("Live Birth");
+  const [picked, setOutcome] = useState<CalvingOutcome>("Live Birth");
+  // Abortion is its own event type: offered only while the farm has it switched on.
+  const outcomes = calvingOutcomes(useDisabledEvents());
+  const outcome: CalvingOutcome = outcomes.includes(picked) ? picked : "Live Birth";
   const [abortionCause, setAbortionCause] = useState<
     "Infectious" | "Nutritional" | "Traumatic" | "Congenital" | "Unknown" | "Other"
   >("Unknown");
@@ -94,6 +100,25 @@ export default function Calving() {
 
   const mutation = useCreateAnimalEvent();
 
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const calvingFilled =
+    !!dam || outcome !== "Live Birth" || !!coatNote.trim() || calves.length > 1 ||
+    calves.some((c) => !!(c.burnName.trim() || c.birthWt.trim() || c.coat.trim() || c.photo));
+  const { clear: clearDraft } = useRecordDraft({
+    title: outcome === "Abortion" ? "Abortion" : "Calving",
+    state: { dam, outcome, abortionCause, coatNote, calves, toHerdPick, day: isBackdating ? backdateDate : "" },
+    filled: calvingFilled,
+    restore: (d) => {
+      if (isBackdating && d.day) setBackdateDate(d.day);
+      setDam(d.dam);
+      setOutcome(d.outcome);
+      setAbortionCause(d.abortionCause);
+      setCoatNote(d.coatNote);
+      setCalves(d.calves);
+      setToHerd(d.toHerdPick);
+    },
+  });
+
   const handleSubmit = async () => {
     setError(null);
     if (!operator) return setError(missingMessage);
@@ -120,6 +145,7 @@ export default function Calving() {
           "Abortion recorded",
           `${dam.name}'s pregnancy is closed. She becomes servable again once the waiting period is up.`,
         );
+        clearDraft();
         router.replace("/(tabs)/record/success?name=Abortion");
       } catch (err) {
         setError(extractFrappeError(err));
@@ -169,11 +195,13 @@ export default function Calving() {
           "Calving recorded",
           `${dam.name} calved ${born.length === 1 ? "one calf" : `${born.length} calves`}:\n${lines}${photoLine}`,
         );
+        clearDraft();
         router.replace("/(tabs)/record/success?name=Calving");
         return;
       }
 
       Alert.alert("Calving recorded", `${dam.name} marked as calved (${outcome}).`);
+      clearDraft();
       router.replace("/(tabs)/record/success?name=Calving");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -216,7 +244,7 @@ export default function Calving() {
           <Picker
             value={outcome}
             onChange={(v) => setOutcome(v as typeof outcome)}
-            options={["Live Birth", "Still Birth", "Abortion"]}
+            options={outcomes}
           />
         </Field>
       </FieldRow>

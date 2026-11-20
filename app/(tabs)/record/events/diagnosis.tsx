@@ -20,6 +20,7 @@ import { useHealthOptions } from "@/src/hooks/useHealthOptions";
 import { useOperator } from "@/src/hooks/useOperator";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
@@ -68,6 +69,32 @@ export default function CheckUp() {
   const [followUp, setFollowUp] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const texts = { reason, temp, hr, resp, bcs, lameness, appearance, hydration, disease, differential, action, followUp, notes };
+  useRecordDraft({
+    title: "Check up",
+    state: { animal, vet, day: isBackdating ? backdateDate : "", ...texts },
+    filled: (!!animal && animal.id !== preset?.id) || Object.values(texts).some((v) => !!v.trim()),
+    restore: (d) => {
+      setAnimal(d.animal);
+      setVet(d.vet);
+      if (isBackdating && d.day) setBackdateDate(d.day);
+      setReason(d.reason);
+      setTemp(d.temp);
+      setHr(d.hr);
+      setResp(d.resp);
+      setBcs(d.bcs);
+      setLameness(d.lameness);
+      setAppearance(d.appearance);
+      setHydration(d.hydration);
+      setDisease(d.disease);
+      setDifferential(d.differential);
+      setAction(d.action);
+      setFollowUp(d.followUp);
+      setNotes(d.notes);
+    },
+  });
 
   const today = new Date();
 

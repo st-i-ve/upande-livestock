@@ -1,4 +1,3 @@
-import { useSegments } from "expo-router";
 import React, { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,7 +6,6 @@ import { FONT_FAMILY } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
   NOT_EMPLOYEE_MESSAGE,
-  NOT_EMPLOYEE_MILKING_MESSAGE,
   useCanRecord,
 } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
@@ -25,7 +23,6 @@ export function RecordGate({ children }: { children: React.ReactNode }) {
   const { canRecord } = useCanRecord();
   const isEmployee = useAuthStore((st) => st.isEmployee);
   const refresh = useAuthStore((st) => st.refreshEmployeeStatus);
-  const segments = useSegments() as string[];
   const [tried, setTried] = React.useState(false);
   const [skip, setSkip] = React.useState(false);
 
@@ -34,12 +31,11 @@ export function RecordGate({ children }: { children: React.ReactNode }) {
   }, [isEmployee, refresh]);
 
   if (isEmployee === false || !canRecord) {
-    const milking = segments.includes("milk");
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.box}>
           <Text style={s.title}>View only</Text>
-          <Text style={s.text}>{milking ? NOT_EMPLOYEE_MILKING_MESSAGE : NOT_EMPLOYEE_MESSAGE}</Text>
+          <Text style={s.text}>{NOT_EMPLOYEE_MESSAGE}</Text>
         </View>
       </SafeAreaView>
     );

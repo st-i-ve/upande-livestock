@@ -22,6 +22,7 @@ import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import type { Animal } from "@/types";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useCreateAnimalEvent } from "@/src/hooks/mutations";
@@ -71,6 +72,25 @@ export default function Movement() {
   // an alphabetically-first herd that was almost never the right one.
   const [toHerdTouched, setToHerdTouched] = useState(false);
   const toHerd = toHerdTouched ? toHerdPick : suggested || herds[0]?.n || "";
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Movement",
+    state: { selected, toHerdPick, toHerdTouched, reason, otherReason, day: isBackdating ? backdateDate : "" },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      toHerdTouched ||
+      reason !== "Routine age-out" ||
+      !!otherReason.trim(),
+    restore: (d) => {
+      setSelected(d.selected);
+      setToHerd(d.toHerdPick);
+      setToHerdTouched(d.toHerdTouched);
+      setReason(d.reason);
+      setOtherReason(d.otherReason);
+      if (isBackdating && d.day) setBackdateDate(d.day);
+    },
+  });
 
   const mutation = useCreateAnimalEvent();
   const removeOne = (id: string) => setSelected((prev) => prev.filter((a) => a.id !== id));
