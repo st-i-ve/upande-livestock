@@ -56,6 +56,10 @@ export function AnimalDetail({ id }: { id: string }) {
         stream: online.data?.stream ?? local.data.stream ?? null,
       }
     : (online.data ?? null);
+  // Her picture is the phone's own row when there is one: a picture the farm
+  // removed is blank there, and a profile kept from before must not bring it back.
+  const heroImage = local.data ? local.data.image || null : (online.data?.image || profile?.photo || null);
+  const heroThumb = local.data ? local.data.thumb || null : (online.data?.thumb || profile?.thumb || null);
   // The stored stage answers offline; the live profile, when there is one, wins.
   const stage = profile?.stage ?? local.data?.stage ?? null;
   const isLoading = local.isLoading && online.isLoading;
@@ -167,13 +171,13 @@ export function AnimalDetail({ id }: { id: string }) {
         accessibilityLabel="Open her photos"
         disabled={!gallery.length}
         onPress={() => {
-          const mine = a.image ?? profile?.photo;
+          const mine = heroImage;
           const i = mine ? gallery.findIndex((p) => p.url === mine) : -1;
           setViewing(i >= 0 ? i : 0);
         }}
         style={s.hero}
       >
-        <AnimalImage image={a.image ?? profile?.photo} animal={{ ...a, stage }} style={s.heroPhoto} />
+        <AnimalImage full image={heroImage} thumb={heroThumb} animal={{ ...a, stage }} style={s.heroPhoto} />
         {/* Soft dark scrims top and bottom, so white labels read on any photo
             and on the silhouette card in either theme. */}
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none" preserveAspectRatio="none" viewBox="0 0 100 100">
@@ -265,7 +269,7 @@ export function AnimalDetail({ id }: { id: string }) {
       <FamilyTree
         family={family}
         loading={familyQ.isLoading}
-        me={{ id: a.id, name: a.name, sex: a.sex, dob: a.dob, stage, image: a.image ?? profile?.photo, thumb: a.thumb ?? profile?.thumb }}
+        me={{ id: a.id, name: a.name, sex: a.sex, dob: a.dob, stage, image: heroImage, thumb: heroThumb }}
       />
 
       <StandingSection id={id} male={male} />

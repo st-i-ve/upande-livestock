@@ -17,12 +17,18 @@ import { STORAGE_KEYS, storage } from "@/src/services/storage";
 export function AnimalImage({
   image,
   thumb,
+  full,
   style,
   animal,
 }: {
   image?: string | null;
   /** The small version, for rows and pickers; the full `image` is used when absent or if it fails. */
   thumb?: string | null;
+  /**
+   * Show the full picture, with the thumbnail as the placeholder while it loads
+   * (blurred thumb, then the sharp full one): for the portrait and the zoom views.
+   */
+  full?: boolean;
   style?: StyleProp<ViewStyle>;
   /** Her number, sex, age and stage, to pick the silhouette when she has no photo. */
   animal?: (Omit<SilhouetteSubject, "id"> & { id?: string | null }) | null;
@@ -33,15 +39,29 @@ export function AnimalImage({
   const base = useAuthStore((s) => s.instanceUrl);
   const [cookie, setCookie] = useState<string | null>(null);
   const [thumbFailed, setThumbFailed] = useState(false);
-  const shown = thumb && !thumbFailed ? thumb : image;
+  const [fullFailed, setFullFailed] = useState(false);
+  // A blank path (the farm removed her picture) is no picture: the silhouette shows.
+  const imageUrl = image || null;
+  const thumbUrl = thumb && !thumbFailed ? thumb : null;
+  useEffect(() => {
+    setThumbFailed(false);
+    setFullFailed(false);
+  }, [image, thumb]);
+  // Rows ask for the thumbnail; the full picture only when asked for, or when there is no thumbnail.
+  const shown = full ? (fullFailed ? thumbUrl : imageUrl) : (thumbUrl ?? imageUrl);
   const abs = (u: string) => (u.startsWith("/") ? `${base.replace(/\/+$/, "")}${u}` : u);
   const isPrivate = !!shown && shown.startsWith("/private/");
   const uri = shown ? abs(shown) : null;
   useEffect(() => {
-    if (!isPrivate) return;
+    if (!isPrivate && !(thumbUrl ?? "").startsWith("/private/")) return;
     storage.getItem(STORAGE_KEYS.COOKIE).then(setCookie);
-  }, [isPrivate]);
-  const ready = !!uri && (!isPrivate || cookie);
+  }, [isPrivate, thumbUrl]);
+  const ready = !!uri && (!isPrivate || cookie) && !(fullFailed && !full && !thumbUrl);
+  const headersFor = (u: string) => (u.startsWith("/private/") && cookie ? { Cookie: cookie } : undefined);
+  const placeholder =
+    full && thumbUrl && thumbUrl !== shown && (!thumbUrl.startsWith("/private/") || cookie)
+      ? { uri: abs(thumbUrl), headers: headersFor(thumbUrl) }
+      : undefined;
 
   return (
     <View
@@ -53,13 +73,18 @@ export function AnimalImage({
       {ready ? (
         <Image
           source={{ uri: uri!, headers: isPrivate && cookie ? { Cookie: cookie } : undefined }}
-          cachePolicy="disk"
+          placeholder={placeholder}
+          placeholderContentFit="cover"
+          cachePolicy="memory-disk"
+          priority={full ? "high" : "low"}
           recyclingKey={uri!}
           contentFit="cover"
-          transition={120}
+          transition={full ? 250 : 120}
           onError={(e) => {
             console.warn("[img] failed", uri, e?.error);
-            if (thumb && !thumbFailed) setThumbFailed(true);
+            if (full) setFullFailed(true);
+            else if (thumbUrl) setThumbFailed(true);
+            else setFullFailed(true);
           }}
           style={{ width: "100%", height: "100%" }}
         />

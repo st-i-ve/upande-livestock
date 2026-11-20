@@ -29,6 +29,7 @@ import { useHerds } from "@/src/hooks/useHerds";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 
 type DCTRow = {
   id: number;
@@ -62,6 +63,19 @@ export default function Dryoff() {
   const toHerd = toHerdPick || dryHerd;
   const [dctRows, setDctRows] = useState<DCTRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Drying off",
+    state: { selected, toHerdPick, dctRows, vet },
+    filled: selected.some((a) => a.id !== preset?.id) || !!toHerdPick || dctRows.length > 0,
+    restore: (x) => {
+      setSelected(x.selected);
+      setToHerd(x.toHerdPick);
+      setDctRows(x.dctRows);
+      setVet(x.vet);
+    },
+  });
 
   // Default destination: a dry-flagged herd if one exists (per Livestock Settings).
   const addDct = () =>

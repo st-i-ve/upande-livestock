@@ -34,6 +34,7 @@ import {
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 import { useRecordQualityTest } from "@/src/hooks/mutations";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { extractFrappeError, todayISO } from "@/src/services/api";
 
 const SAMPLE_TYPES = ["Bottle sample", "Tanker", "Can"];
@@ -83,6 +84,18 @@ export default function MilkQuality() {
   const set = (k: keyof QualityForm) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
   const checks = useMemo(() => previewChecks(form, limits), [form, limits]);
   const overall = previewOverall(checks);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  const blank = useMemo(() => emptyForm(form.sample_date), [form.sample_date]);
+  useRecordDraft({
+    title: "Milk quality",
+    state: { form, photo },
+    filled: photo !== null || JSON.stringify({ ...form, buyer: "" }) !== JSON.stringify({ ...blank, buyer: "" }),
+    restore: (x) => {
+      setForm(x.form);
+      setPhoto(x.photo);
+    },
+  });
 
   if (!canSeeQuality(roles)) {
     return (

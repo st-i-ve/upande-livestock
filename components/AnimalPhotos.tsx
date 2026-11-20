@@ -50,13 +50,17 @@ function useSource(path: string | null | undefined) {
 
 function Pic({ photo, thumb, style }: { photo: AnimalPhoto; thumb?: boolean; style: any }) {
   const src = useSource(thumb ? photo.thumb || photo.url : photo.url);
+  // Opened full size: the strip's thumbnail (already on the phone) shows while the full one loads.
+  const holder = useSource(!thumb && photo.thumb && photo.thumb !== photo.url ? photo.thumb : null);
   const c = useColors();
   return (
     <View style={[{ backgroundColor: c.bgMuted, overflow: "hidden" }, style]}>
       {src ? (
         <Image
           source={src}
-          cachePolicy="disk"
+          placeholder={holder ?? undefined}
+          placeholderContentFit={thumb ? "cover" : "contain"}
+          cachePolicy="memory-disk"
           recyclingKey={src.uri}
           contentFit={thumb ? "cover" : "contain"}
           transition={120}

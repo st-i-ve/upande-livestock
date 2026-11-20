@@ -113,8 +113,9 @@ export default function TabLayout() {
           // from the Record menu (the route stays, the button does not).
           href: qualityOnly ? undefined : null,
           title: "Quality",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "flask" : "flask-outline"} size={ICON_SIZE} color={color as string} />
+          tabBarIcon: ({ color }) => (
+            // Solid like the other tabs' icons, at the same 28 as Profile.
+            <MaterialCommunityIcons name="flask" size={28} color={color as string} />
           ),
         }}
       />
@@ -127,8 +128,9 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color as string} />
+          tabBarIcon: ({ color }) => (
+            // As on Mutara's bar: the solid account icon at 28, selected or not.
+            <MaterialCommunityIcons name="account" size={28} color={color as string} />
           ),
         }}
       />

@@ -15,6 +15,7 @@ import { useOffline } from "@/components/OnlineOnlyNotice";
 import { useEligibility } from "@/src/hooks/useEligibility";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useFinishRecording } from "@/src/hooks/useRecordContext";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { extractFrappeError } from "@/src/services/api";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
@@ -49,6 +50,19 @@ export default function Milk() {
   const [totalKg, setTotalKg] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Milk recording",
+    state: { herd, time, totalKg, remarks },
+    filled: !!herd || !!totalKg.trim() || !!remarks.trim(),
+    restore: (x) => {
+      setHerd(x.herd);
+      setTime(x.time);
+      setTotalKg(x.totalKg);
+      setRemarks(x.remarks);
+    },
+  });
 
   const kg = Number(totalKg) || 0;
   const canSubmit = !!herd && kg > 0 && !mutation.isPending;

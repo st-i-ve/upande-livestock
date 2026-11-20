@@ -1,5 +1,6 @@
 import type { Animal } from "@/types";
 
+import { storedValue } from "./imageFields";
 import { getDb } from "./index";
 
 /** One row of `animals_since`, as the server sends it. */
@@ -58,7 +59,9 @@ export async function applySync(
     try {
       let written = 0;
       for (const a of animals) {
-        await upsert.executeAsync(COLS.map((c) => a[c] ?? null));
+        // A blank image or thumb is NULL: the farm removed her picture, and the
+        // row is replaced, so no stale path survives for the phone to show.
+        await upsert.executeAsync(COLS.map((c) => storedValue(c, a[c])) as never);
         written += 1;
         if (onProgress && (written % PROGRESS_EVERY === 0 || written === animals.length)) onProgress(written);
       }
