@@ -9,6 +9,8 @@ export type ServerAnimal = {
   animal_name: string | null;
   sex: string | null;
   breed: string | null;
+  /** Feedlot | Breeding, for a male whose stream is decided. */
+  stream?: string | null;
   dob: string | null;
   herd: string | null;
   status: string | null;
@@ -21,14 +23,16 @@ export type ServerAnimal = {
   sire: string | null;
   parity: number | null;
   last_weight_kg: number | null;
+  /** ISO date of her latest submitted weighing. */
+  last_weight_date?: string | null;
   modified: string | null;
 };
 
 type Row = Omit<ServerAnimal, "dob"> & { dob: string | null };
 
 const COLS = [
-  "name", "tag", "animal_name", "sex", "breed", "dob", "herd", "status", "stage",
-  "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "modified",
+  "name", "tag", "animal_name", "sex", "breed", "stream", "dob", "herd", "status", "stage",
+  "repro_status", "image", "thumb", "dam", "sire", "parity", "last_weight_kg", "last_weight_date", "modified",
 ] as const;
 
 /**
@@ -36,10 +40,14 @@ const COLS = [
  * first (a full sync), so a login as another user or on another site never keeps
  * the previous herd.
  */
+const PROGRESS_EVERY = 25;
+
 export async function applySync(
   animals: ServerAnimal[],
   removed: string[],
   replace: boolean,
+  /** Rows written so far, every PROGRESS_EVERY rows and at the end. */
+  onProgress?: (written: number) => void,
 ): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
@@ -48,8 +56,11 @@ export async function applySync(
       `INSERT OR REPLACE INTO animals (${COLS.join(",")}) VALUES (${COLS.map(() => "?").join(",")})`,
     );
     try {
+      let written = 0;
       for (const a of animals) {
         await upsert.executeAsync(COLS.map((c) => a[c] ?? null));
+        written += 1;
+        if (onProgress && (written % PROGRESS_EVERY === 0 || written === animals.length)) onProgress(written);
       }
     } finally {
       await upsert.finalizeAsync();
@@ -72,10 +83,12 @@ const toAnimal = (r: Row): Animal => ({
   parity: r.parity ?? 0,
   lastWt: r.last_weight_kg ?? 0,
   milkSafe: null,
+  lastWtDate: r.last_weight_date ?? null,
   inTreatment: 0,
   pregnant: String(r.repro_status ?? "").toLowerCase().includes("pregnant") ? 1 : 0,
   tag: r.tag,
   breed: r.breed,
+  stream: r.stream ?? null,
   image: r.image,
   thumb: r.thumb,
   dam: r.dam,
@@ -112,4 +125,24 @@ export async function countAnimals(): Promise<number> {
   const db = await getDb();
   const r = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM animals");
   return r?.n ?? 0;
+}
+
+/**
+ * A weighing just saved on this phone, written to the local row straight away
+ * so the recently-weighed warning knows of it before the next sync brings it.
+ * Only moves the date forward: a backdated weighing older than what the row has
+ * leaves it alone.
+ */
+export async function markWeighed(weights: { id: string; kg: number }[], date: string): Promise<void> {
+  if (!weights.length) return;
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    for (const w of weights) {
+      await db.runAsync(
+        `UPDATE animals SET last_weight_kg = ?, last_weight_date = ?
+          WHERE name = ? AND (last_weight_date IS NULL OR last_weight_date <= ?)`,
+        w.kg, date, w.id, date,
+      );
+    }
+  });
 }
