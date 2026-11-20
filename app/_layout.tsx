@@ -66,6 +66,9 @@ function navTheme(dark: boolean) {
 // exists — there is no tabs index route to land on.
 export const unstable_settings = { anchor: "(auth)" };
 
+/** The only tab areas the lab role (Livestock Quality alone) may be in. */
+const LAB_AREAS: string[] = ["quality", "profile"];
+
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
@@ -85,6 +88,11 @@ function AuthGate() {
     } else if (isAuthenticated && inAuthGroup) {
       // The lab role has one view; everyone else lands on the animals.
       router.replace(qualityOnly ? "/(tabs)/quality" : "/(tabs)/animals");
+    } else if (isAuthenticated && qualityOnly && segments[0] !== "lab" && segments[0] !== "accessibility" &&
+      !(segments[0] === "(tabs)" && LAB_AREAS.includes((segments as string[])[1]))) {
+      // The lab role never sees the animals, the Record menu or any other tab:
+      // anything outside Quality and Profile (a deep link, a stale route) goes back to Quality.
+      router.replace("/(tabs)/quality");
     }
   }, [isAuthenticated, isLoading, segments, router, qualityOnly, loginHeld]);
 
@@ -221,6 +229,7 @@ export default function RootLayout() {
               >
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="lab" />
                 <Stack.Screen name="accessibility" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
               </Stack>
               </BlurTargetRoot>

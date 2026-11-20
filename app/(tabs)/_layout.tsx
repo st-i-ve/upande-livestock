@@ -125,11 +125,6 @@ export default function TabLayout() {
         options={{ href: null, title: "Waiting to send" }}
       />
       <Tabs.Screen
-        // Reached from the Quality tab and the Record menu; never a tab of its own.
-        name="milk-quality"
-        options={{ href: null, title: "Milk quality" }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
