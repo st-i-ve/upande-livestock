@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
-import { cachedEmployeeStatus, fetchEmployeeStatus } from "@/src/frappe/employee";
 import { isQualityOnly } from "@/src/auth/roles";
+import { cachedEmployeeStatus, fetchEmployeeStatus } from "@/src/frappe/employee";
 import { setNotEmployeeHandler } from "@/src/frappe/opsError";
 import { clearLocalData, syncAnimals } from "@/src/db/sync";
 import { api, setUnauthorizedHandler } from "@/src/services/api";
@@ -38,6 +38,9 @@ interface AuthState {
 }
 
 const STORAGE_KEY_EMPLOYEE = "operator_employee";
+
+/** The last logout: its server sign-out and wipe, still running behind the login page. */
+let pendingLogout: Promise<void> = Promise.resolve();
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
@@ -103,6 +106,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: async (email, password, url) => {
+    // A logout still cleaning up behind the login page finishes first.
+    await pendingLogout;
     const target = (url || get().instanceUrl || "").trim();
     if (!target) {
       throw new Error("Enter a Frappe instance URL before signing in.");
@@ -135,17 +140,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       roles,
     });
     // The whole herd, once, so the phone works offline from here on. Not
-    // awaited: a slow sync must not hold up signing in. A user whose only role is
-    // Livestock Quality may not read animals, so there is nothing to sync.
+    // awaited: a slow sync must not hold up signing in.
     if (!isQualityOnly(roles)) void syncAnimals({ full: true });
   },
 
   logout: async () => {
-    await api.logout();
+    // Out at once: the screens leave for the login page now, and the sign-out on
+    // the server and the wipe of this phone's data finish behind it, instead of
+    // the Profile page sitting there (its name emptying) until they are done.
+    // A new login waits for them (see `login`), so it never meets a half-wiped phone.
     queryClient.clear();
-    await clearLocalData().catch((e) => console.warn("[auth] clearing local data failed", e));
-    await storage.removeItem(STORAGE_KEY_EMPLOYEE);
-    await storage.removeItem(STORAGE_KEYS.EMPLOYEE_STATUS);
     set({
       isAuthenticated: false,
       email: null,
@@ -154,6 +158,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isEmployee: null,
       roles: null,
     });
+    const cleanup = (async () => {
+      await api.logout().catch((e: unknown) => console.warn("[auth] server sign-out failed", e));
+      await clearLocalData().catch((e) => console.warn("[auth] clearing local data failed", e));
+      await storage.removeItem(STORAGE_KEY_EMPLOYEE);
+      await storage.removeItem(STORAGE_KEYS.EMPLOYEE_STATUS);
+    })();
+    pendingLogout = cleanup.catch(() => {});
+    await pendingLogout;
   },
 
   setInstanceUrl: async (url) => {
