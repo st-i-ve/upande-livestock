@@ -22,6 +22,7 @@ export const EVENT_FOR_ROUTE: Record<string, string> = {
   deworming: "Deworming",
   dehorning: "Dehorning",
   hoof: "Hoof Trimming",
+  feeding: "Feeding",
   "animal-feed": "Feeding",
   "feed-day": "Feeding",
   "feed-report": "Feeding",

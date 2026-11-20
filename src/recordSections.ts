@@ -33,8 +33,7 @@ export const RECORD_SECTIONS: { title: string; items: RecordItem[] }[] = [
   // The Quality section is placed here by the Record screen for the roles that may record it.
   { title: "Daily routine", items: [
     ev("Milking", "/(tabs)/record/events/milk", "Milk recording"),
-    { icon: "grain", label: "Animal feeding (TMR)", href: "/(tabs)/record/events/animal-feed" },
-    { icon: "clipboard-text-outline", label: "Feeding day: plan and amend", href: "/(tabs)/record/events/feed-day" },
+    ev("Feeding", "/(tabs)/record/events/feeding"),
     { icon: "chart-box-outline", label: "Daily feed report", href: "/(tabs)/record/events/feed-report" },
   ]},
   { title: "Husbandry", items: ordered([

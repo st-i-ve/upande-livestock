@@ -30,6 +30,7 @@ export const mapFeedTypes = (raw: unknown): FeedTypes => {
 /** The feeding screens: route slug -> the modes any of which makes it worth opening. */
 const MODES_FOR_ROUTE: Record<string, (keyof FeedTypes)[]> = {
   // Animal feeding holds the System and Manual configuration tabs.
+  "feeding": ["system", "manual", "day_sheet"],
   "animal-feed": ["system", "manual"],
   "feed-day": ["day_sheet"],
   "feed-report": ["day_sheet"],

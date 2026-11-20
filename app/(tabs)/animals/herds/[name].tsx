@@ -104,7 +104,7 @@ export default function HerdDetail() {
         <>
           <SectionTitle>Quick actions</SectionTitle>
           {isRouteEnabled("animal-feed", disabledEvents) && isFeedRouteOn("animal-feed", feedTypes) && routeAllowed("animal-feed", can) ? (
-            <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />
+            <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/record/events/feeding?tab=system")} />
           ) : null}
           {isRouteEnabled("milk", disabledEvents) && routeAllowed("milk", can) ? (
           <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/animals/act/milk")} />

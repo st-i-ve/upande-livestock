@@ -51,6 +51,7 @@ const EVENT: Need = { create: ["Livestock Event"] };
  */
 export const ROUTE_NEEDS: Record<string, Need> = {
   milk: { read: ["Milk Recording"], create: ["Milk Recording"] },
+  feeding: { any: [{ flag: "stock" }, { create: "Livestock Feed Actual" }] },
   "animal-feed": { flag: "stock" },
   "feed-day": { read: ["Herds"], any: [{ flag: "stock" }, { create: "Livestock Feed Actual" }] },
   "feed-report": { read: ["Herds", "Animal"] },
