@@ -37,12 +37,11 @@ permissions:
 
 jobs:
   release:
-    uses: mark-judah/upande-mobile-kit/.github/workflows/release.yml@49294e873342fbe253f56246e91c0b254c708da2
+    uses: mark-judah/upande-mobile-kit/.github/workflows/release.yml@v0.18.1
     with:
-      app-name: "Upande Livestock"
-      apk-name: upande_livestock
+      app-name: "Upande Livestock Kaitet"
+      apk-name: upande_livestock_kaitet
       bump: ${{ inputs.bump || 'auto' }}
       set_version: ${{ inputs.set_version || '' }}
       build_apk: ${{ inputs.build_apk || false }}
-      release-repo: upandeltd/upande-livestock-kaitet-releases
     secrets: inherit

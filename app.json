@@ -10,7 +10,7 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://kaitet.132.145.18.63.nip.io/api/method/upande_mobile.api.ota.manifest?app=Upande%20Livestock"
+      "url": "https://kaitet-group.upande.com/api/method/upande_mobile.api.ota.manifest?app=Upande%20Livestock"
     },
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
@@ -79,7 +79,7 @@
       "eas": {
         "projectId": "0640a515-d7f3-4710-a550-8cf6b8934b7e"
       },
-      "otaBaseUrl": "https://upandeltd.github.io/upande-livestock-kaitet-releases/ota",
+      "otaBaseUrl": "https://st-i-ve.github.io/upande-livestock/ota",
       "mobileKit": {
         "_help": "All of the kit's settings for this app live here. Edit the lists under \"release\"; the kit manages nativeBaseline and apkTag itself.",
         "sites": {
