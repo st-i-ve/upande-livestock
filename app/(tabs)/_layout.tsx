@@ -1,59 +1,53 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import type { BottomTabBarButtonProps } from "expo-router/js-tabs";
 import { Tabs, router } from "expo-router";
-import React, { useMemo } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import React from "react";
+import { StyleSheet } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ContinueRecording } from "@/components/ContinueRecording";
 import { CowIcon } from "@/components/CowIcon";
-import { LiveToast } from "@/components/LiveToast";
+import { FloatingOnlineDot } from "@/components/OnlineDot";
+import { RecordTabButton } from "@/components/RecordTabButton";
+import { TabSwipe } from "@/components/TabSwipe";
 import { isQualityOnly } from "@/src/auth/roles";
 import { useAuthStore } from "@/src/auth/authStore";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
+import { useRecordDrafts } from "@/src/record/draft";
 
 const ICON_SIZE = 31;
 const BAR_CONTENT_HEIGHT = 58;
-const CIRCLE_DIAMETER = 50;
-const CIRCLE_LIFT = 10;
-
-type RecordTabButtonProps = Pick<BottomTabBarButtonProps, "onPress" | "onLongPress" | "accessibilityState">;
-
-function RecordTabButton(props: RecordTabButtonProps) {
-  const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
-  const selected = props.accessibilityState?.selected;
-  return (
-    <Pressable
-      onPress={props.onPress}
-      onLongPress={props.onLongPress}
-      accessibilityRole="button"
-      accessibilityLabel="Log a livestock event"
-      accessibilityState={{ selected }}
-      android_ripple={undefined}
-      style={s.recordCell}
-    >
-      <View style={[s.recordCircle, selected && s.recordCircleSelected]}>
-        <MaterialCommunityIcons name="plus" size={26} color={c.bg} />
-      </View>
-    </Pressable>
-  );
-}
 
 export default function TabLayout() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { canRecord } = useCanRecord();
+  const reduceMotion = useReducedMotion();
   // Lab role: the Quality view and Profile only. The other tabs are hidden (and
   // their routes gated, so a deep link meets a polite message, not a form).
   const qualityOnly = isQualityOnly(useAuthStore((s) => s.roles));
+  // Swiping skips tabs that are hidden (no Employee: no Record; lab role: only Quality and Profile).
+  const hidden = qualityOnly ? ["animals", "record"] : canRecord ? ["quality"] : ["record", "quality"];
 
   return (
     <>
+    {/* The connection dot, drawn once over the pages in one fixed place. */}
+    <FloatingOnlineDot>
     <Tabs
+      // A sideways swipe on a tab's root screen moves to the next visible tab.
+      screenLayout={({ route, navigation, children }) => (
+        <TabSwipe route={route} navigation={navigation as never} hidden={hidden}>
+          {children}
+        </TabSwipe>
+      )}
+      // A record form left with input in it is kept for "Continue recording".
+      screenListeners={({ route }) => ({ blur: () => useRecordDrafts.getState().markPending(route.name) })}
       screenOptions={{
         headerShown: false,
-        animation: "shift",
+        // Coming back to a tab shows its top screen, not the one left deep in its stack.
+        popToTopOnBlur: true,
+        animation: reduceMotion ? "none" : "shift",
         sceneStyle: { backgroundColor: c.bg },
         tabBarShowLabel: false,
         tabBarActiveTintColor: c.text,
@@ -94,18 +88,23 @@ export default function TabLayout() {
             }
           },
         }}
-        options={{
-          // No Employee, no recording: the tab is not there at all.
-          href: canRecord && !qualityOnly ? undefined : null,
-          tabBarLabel: () => null,
-          tabBarButton: (props) => (
-            <RecordTabButton
-              onPress={props.onPress}
-              onLongPress={props.onLongPress}
-              accessibilityState={props.accessibilityState}
-            />
-          ),
-        }}
+        options={
+          // No Employee, no recording: the tab is not there at all. `href: null`
+          // and a custom `tabBarButton` must never be set together (expo-router
+          // throws while laying out the tabs), so the hidden tab carries `href` alone.
+          canRecord && !qualityOnly
+            ? {
+                tabBarLabel: () => null,
+                tabBarButton: (props) => (
+                  <RecordTabButton
+                    onPress={props.onPress}
+                    onLongPress={props.onLongPress}
+                    accessibilityState={props.accessibilityState}
+                  />
+                ),
+              }
+            : { href: null }
+        }
       />
       <Tabs.Screen
         name="quality"
@@ -129,27 +128,8 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
-    <LiveToast />
+    <ContinueRecording bottom={BAR_CONTENT_HEIGHT + insets.bottom + 12} />
+    </FloatingOnlineDot>
     </>
   );
 }
-
-const makeStyles = (c: ReturnType<typeof useColors>) =>
-  StyleSheet.create({
-    recordCell: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    recordCircle: {
-      position: "absolute",
-      top: -CIRCLE_LIFT,
-      width: CIRCLE_DIAMETER,
-      height: CIRCLE_DIAMETER,
-      borderRadius: CIRCLE_DIAMETER / 2,
-      backgroundColor: c.text,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    recordCircleSelected: {},
-  });
