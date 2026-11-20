@@ -118,20 +118,11 @@ export default function MilkQuality() {
     const problem = formProblem(form);
     if (problem) return setError(problem);
     try {
-      const r = await mutation.mutateAsync({
+      await mutation.mutateAsync({
         fields: payloadFrom({ ...form, buyer }),
         slipPhoto: photo,
       });
-      if (r.queued) {
-        setDone("Saved on this phone. It is sent when you are back online.");
-      } else {
-        const d = r.data as { name: string; overall_result: string; failed_tests: string };
-        setDone(
-          d.overall_result === "Fail"
-            ? `Recorded ${d.name}. The milk failed: ${d.failed_tests}.`
-            : `Recorded ${d.name}. Overall: ${d.overall_result}.`,
-        );
-      }
+      setDone("Saved on this phone. It is sent when there is signal.");
       setForm(emptyForm(form.sample_date, buyer));
       setPhoto(null);
     } catch (e) {

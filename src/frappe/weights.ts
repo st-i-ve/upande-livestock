@@ -15,6 +15,8 @@ export type WeightSettings = {
 export type WeighingMode = "each" | "platform" | "alike";
 
 export type WeightSession = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   method: string;
   operator?: string | null;
   /** ISO date; omitted means today on the server. Only sent when backdating. */
@@ -56,6 +58,7 @@ export const recordWeights = async (s: WeightSession): Promise<WeightOutcome> =>
   const client = await getClient();
   const res = await client.post(`${NS}.record_weights.record_weights`, {
     payload: {
+      client_ref: s.clientRef || undefined,
       method: s.method,
       measured_by: s.operator || undefined,
       event_date: s.eventDate || undefined,

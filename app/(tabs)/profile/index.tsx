@@ -142,10 +142,11 @@ export default function Profile() {
 
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
-          {/* The offline queue holds milkings only; this row only reports it. */}
+          {/* Every recording is saved on the phone first; this lists what is still to send. */}
           <Row
             icon="cloud-upload-outline"
-            label={online === false ? "Offline · milkings waiting to sync" : "Milkings waiting to sync"}
+            onPress={() => router.push("/(tabs)/pending" as any)}
+            label={online === false ? "Offline · recordings waiting to send" : "Recordings waiting to send"}
             right={<Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>}
           />
           <Row

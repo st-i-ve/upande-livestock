@@ -9,6 +9,7 @@ import { Chip, Chips } from "@/components/Chips";
 import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
 import { Loader } from "@/components/Loader";
+import { useRecordMilkQuality } from "@/src/hooks/mutations";
 import { useOffline } from "@/components/OnlineOnlyNotice";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
@@ -20,7 +21,6 @@ import {
   formatMetric,
   getFeedQuality,
   getQualityOptions,
-  recordMilkQuality,
   type HerdFeedQuality,
   type Metric,
   type PendingRecording,
@@ -51,7 +51,7 @@ export default function Quality() {
     <Screen title="Quality" subtitle="Milk quality and feed" back={!qualityOnly}>
       {offline ? (
         <Banner tone="warning" icon="wifi-off">
-          Needs a connection — quality figures are read from and filed to the server live.
+          No connection. Figures you enter are kept on this phone and sent when you are back online; the lists below need a connection.
         </Banner>
       ) : null}
       <View style={s.segments}>
@@ -67,6 +67,7 @@ export default function Quality() {
 }
 
 function MilkQuality({ offline }: { offline: boolean }) {
+  const saveQuality = useRecordMilkQuality();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const qc = useQueryClient();
@@ -109,18 +110,14 @@ function MilkQuality({ offline }: { offline: boolean }) {
     }
     setSaving(true);
     try {
-      const r = await recordMilkQuality({
+      await saveQuality.mutateAsync({
         recording: active.name,
         bulk_scc: scc ? Number(scc) : undefined,
         fat_percent: fat ? Number(fat) : undefined,
         protein_percent: protein ? Number(protein) : undefined,
         lab_test_date: testedOn,
       });
-      setDone(
-        r.over_ceiling
-          ? `Filed against ${r.name}. The cell count is above the farm's ceiling — worth a look at the herd.`
-          : `Filed against ${r.name}.`,
-      );
+      setDone(`Saved on this phone against ${active.name}. It is sent when there is signal.`);
       setScc("");
       setFat("");
       setProtein("");
@@ -258,7 +255,7 @@ function MilkQuality({ offline }: { offline: boolean }) {
               {error ? <Banner tone="danger">{error}</Banner> : null}
               {done ? <Banner tone="success">{done}</Banner> : null}
               {mayFile ? (
-                <Button label={saving ? "Filing…" : "File the result"} onPress={save} loading={saving} disabled={offline} />
+                <Button label={saving ? "Filing…" : "File the result"} onPress={save} loading={saving} />
               ) : (
                 <Text style={s.hint}>You may read these but not file them.</Text>
               )}

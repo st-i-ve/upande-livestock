@@ -12,7 +12,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Field } from "@/components/Field";
 import { KV } from "@/components/KV";
 import { Loader } from "@/components/Loader";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Pill } from "@/components/Pill";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
@@ -48,7 +48,8 @@ export default function FeedDayGate() {
 function FeedDay() {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const offline = useOffline();
+  // Saving never needs signal: the write is kept on the phone and sent later.
+  const offline = false;
   const [date, setDate] = useState(todayISO());
   const q = useFeedDayProgram(date);
   const [amending, setAmending] = useState<HerdDay | null>(null);
@@ -67,7 +68,7 @@ function FeedDay() {
       { herd: amending.herd, date, kgByItem: changes, remarks },
       {
         onSuccess: () => {
-          setNotice(`${amending.herdName}: amount fed saved.`);
+          setNotice(`${amending.herdName}: amount fed saved on this phone.`);
           setAmending(null);
         },
         onError: (e) => setAmendError(extractFrappeError(e)),
@@ -96,12 +97,8 @@ function FeedDay() {
     mix.mutate(
       { herd: d.herd, date, employee: operator },
       {
-        onSuccess: (r) =>
-          setNotice(
-            r.status === "Waiting for stock"
-              ? `${d.herdName}: stock is short, saved as a draft dated ${date}.${r.waitingFor.length ? ` Short: ${r.waitingFor.join(", ")}.` : ""}`
-              : `${d.herdName}: feed mixed and issued.`,
-          ),
+        onSuccess: () =>
+          setNotice(`${d.herdName}: saved on this phone. It is mixed and issued when it reaches the server.`),
         onError: (e) => setNotice(extractFrappeError(e)),
       },
     );
@@ -120,7 +117,7 @@ function FeedDay() {
         </Pressable>
       }
     >
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Field label="Day">
         <DateField value={date} onChange={setDate} maximumDate={fromISODate(todayISO())} />
       </Field>

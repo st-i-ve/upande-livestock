@@ -22,7 +22,6 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { RADIUS, font } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
 import {
-  addAnimalPhoto,
   fileUri,
   pickAnimalPhoto,
   type AnimalPhoto,
@@ -30,8 +29,9 @@ import {
 } from "@/src/frappe/animalPhotos";
 import { getAnimalCase } from "@/src/frappe/treatment";
 import { useQuery } from "@tanstack/react-query";
-import { useAnimalGallery, useRefreshGallery } from "@/src/hooks/useAnimalGallery";
+import { useAnimalGallery } from "@/src/hooks/useAnimalGallery";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
+import { useAddAnimalPhoto } from "@/src/hooks/mutations";
 import { useColors } from "@/src/hooks/useColors";
 import { extractFrappeError } from "@/src/services/api";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
@@ -270,7 +270,7 @@ function AddSheet({
 }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const refresh = useRefreshGallery();
+  const addPhoto = useAddAnimalPhoto();
   const caseQ = useQuery({
     queryKey: ["animal-case", id],
     queryFn: () => getAnimalCase(id),
@@ -300,8 +300,8 @@ function AddSheet({
     if (r.status === "failed") return Alert.alert("Photo not added", r.message);
     setBusy(true);
     try {
-      await addAnimalPhoto({ animal: id, asset: r.asset, context: p.key, ref: p.ref });
-      await refresh(id);
+      // Kept on the phone and sent when there is signal.
+      await addPhoto.mutateAsync({ animal: id, asset: r.asset, context: p.key, ref: p.ref });
       onClose();
     } catch (e) {
       if (alive.current) setNote(extractFrappeError(e));

@@ -33,6 +33,8 @@ export type AnimalEventType =
   | "Abortion";
 
 type CommonInput = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   animal: string;       // Animal name (e.g. "TESTBC-001/26")
   currentHerd: string;  // herd at the time of the event; the server reads it
                         // off the Animal, so this is for labelling only
@@ -208,10 +210,10 @@ export const getRecentEvents = async (params?: {
 const RECORD_EVENT = "upande_livestock.serverscripts.mobile.record_animal_event";
 
 /** POST an event to the mobile entry point and unwrap its `{ok, ...}` reply. */
-const callOp = async (type: string, payload: Record<string, any>): Promise<any> => {
+const callOp = async (type: string, payload: Record<string, any>, clientRef?: string): Promise<any> => {
   const client = await getClient();
   const res = await client.post(`/api/method/${RECORD_EVENT}.record_animal_event`, {
-    payload: { type, ...payload },
+    payload: { type, ...payload, client_ref: clientRef || undefined },
   });
   const msg = res.data?.message;
   if (!msg) throw new OpsError(`${type} returned nothing.`);
@@ -276,6 +278,7 @@ const withNote = (remarks: string | undefined, ...notes: (string | undefined)[])
 export const createAnimalEvent = async (
   input: AnimalEventInput,
 ): Promise<any> => {
+  const op = (type: string, payload: Record<string, any>) => callOp(type, payload, input.clientRef);
   const common = {
     animal: input.animal,
     event_date: input.eventDate || todayISO(),
@@ -286,10 +289,10 @@ export const createAnimalEvent = async (
 
   switch (input.eventType) {
     case "Movement":
-      return callOp("Movement", { ...common, new_herd: input.toHerd });
+      return op("Movement", { ...common, new_herd: input.toHerd });
 
     case "Service":
-      return callOp("Service", {
+      return op("Service", {
         ...common,
         service_type: input.serviceType,
         service_date: common.event_date,
@@ -304,7 +307,7 @@ export const createAnimalEvent = async (
       });
 
     case "Pregnancy Diagnosis":
-      return callOp("Pregnancy Diagnosis", {
+      return op("Pregnancy Diagnosis", {
         ...common,
         diagnosis_date: common.event_date,
         diagnosis_result: input.diagnosisResult,
@@ -352,7 +355,7 @@ export const createAnimalEvent = async (
       }
       const coats = calves
         .map((c, i) => (c.coatColour?.trim() ? `${calves.length > 1 ? `Calf ${i + 1} ` : ""}Coat: ${c.coatColour.trim()}` : undefined));
-      const reply = await callOp(input.eventType, {
+      const reply = await op(input.eventType, {
         dam: input.animal,
         event_date: common.event_date,
         operator: input.operator,
@@ -367,7 +370,7 @@ export const createAnimalEvent = async (
     }
 
     case "Drying Off":
-      return callOp("Drying Off", {
+      return op("Drying Off", {
         ...common,
         new_herd: input.toHerd,
         drugs: mapDrugRows(input.drugIssues),
@@ -381,7 +384,7 @@ export const createAnimalEvent = async (
       // and posts a single issue out of the drug store, stamped with the named
       // Stock Entry Type ("Vaccination", "Deworming") rather than the bare
       // "Material Issue".
-      return callOp(input.eventType, {
+      return op(input.eventType, {
         event_date: common.event_date,
         operator: input.operator,
         vet: input.vet || undefined,
@@ -394,10 +397,10 @@ export const createAnimalEvent = async (
       });
 
     case "Heat Detection":
-      return callOp("Heat Detection", common);
+      return op("Heat Detection", common);
 
     case "Abortion":
-      return callOp("Abortion", {
+      return op("Abortion", {
         ...common,
         abortion_cause: input.abortionCause,
         abortion_notes: input.abortionNotes,

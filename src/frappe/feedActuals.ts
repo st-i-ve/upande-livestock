@@ -127,6 +127,7 @@ export const amendFeedDay = async (
   date: string,
   kgByItem: Record<string, number>,
   remarks?: string,
+  clientRef?: string,
 ): Promise<HerdDay> => {
   const components = Object.entries(kgByItem).map(([item_code, actual_kg]) => ({ item_code, actual_kg }));
   const m = await call("feed_actuals.amend_feed_day", {
@@ -134,18 +135,19 @@ export const amendFeedDay = async (
     date,
     components: JSON.stringify(components),
     remarks: remarks || undefined,
+    client_ref: clientRef,
   });
   return mapHerdDay(m);
 };
 
 /** Put the day back at the recipe (drops its amendment). Refused once mixed. */
-export const resetFeedDay = async (herd: string, date: string): Promise<HerdDay> => {
-  const m = await call("feed_actuals.reset_feed_day", { herd, date });
+export const resetFeedDay = async (herd: string, date: string, clientRef?: string): Promise<HerdDay> => {
+  const m = await call("feed_actuals.reset_feed_day", { herd, date, client_ref: clientRef });
   return mapHerdDay(m);
 };
 
-export const manufactureFeedActuals = async (herd: string, date: string, employee?: string | null): Promise<HerdDay> => {
-  const m = await call("feed_actuals.manufacture_feed_actuals", { herd, date, employee: employee || undefined });
+export const manufactureFeedActuals = async (herd: string, date: string, employee?: string | null, clientRef?: string): Promise<HerdDay> => {
+  const m = await call("feed_actuals.manufacture_feed_actuals", { herd, date, employee: employee || undefined, client_ref: clientRef });
   return mapHerdDay({ ...m, waiting_for: m.waiting_for });
 };
 

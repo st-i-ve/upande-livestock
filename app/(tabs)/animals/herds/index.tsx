@@ -11,12 +11,15 @@ import { Loader } from "@/components/Loader";
 import { Row } from "@/components/Row";
 import { Screen } from "@/components/Screen";
 import { useAuthStore } from "@/src/auth/authStore";
-import { applyHerdMoves, computePendingHerdMoves } from "@/src/frappe/herdTransitions";
+import { computePendingHerdMoves } from "@/src/frappe/herdTransitions";
+import { useApplyHerdMoves } from "@/src/hooks/mutations";
+import { todayISO } from "@/src/services/api";
 import { useHerds } from "@/src/hooks/useHerds";
 import { useLivestockSettings } from "@/src/hooks/useLivestockSettings";
 import { extractFrappeError } from "@/src/services/api";
 
 export default function HerdsList() {
+  const applyMoves = useApplyHerdMoves();
   const { data: herds = [], isLoading, isRefetching, error, refetch } = useHerds();
   const { data: settings } = useLivestockSettings();
   const operator = useAuthStore((s) => s.employeeName);
@@ -53,7 +56,7 @@ export default function HerdsList() {
 
     Alert.alert(
       `Move ${moves.length} animal${moves.length === 1 ? "" : "s"}?`,
-      `${preview}${more}\n\nThis submits one Movement event per animal.`,
+      `${preview}${more}\n\nThis saves one Movement per animal on this phone and sends it when there is signal.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -62,12 +65,12 @@ export default function HerdsList() {
           onPress: async () => {
             setRunning(true);
             try {
-              const results = await applyHerdMoves(moves, operator);
+              const results = await applyMoves.mutateAsync({ moves, operator, eventDate: todayISO() });
               const ok = results.filter((r) => r.ok).length;
               const failed = results.length - ok;
               Alert.alert(
                 "Ladder moves complete",
-                `${ok} moved${failed ? ` · ${failed} failed` : ""}.`,
+                `${ok} saved on this phone${failed ? ` · ${failed} failed` : ""}. They are sent when there is signal.`,
               );
               refetch();
             } finally {

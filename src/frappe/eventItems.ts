@@ -134,7 +134,7 @@ export const stockOutcomeText = (replies: any[]): string => {
 };
 
 /** The title for a save's confirmation: says so when a stock issue is a draft. */
-export const savedTitle = (base: string, replies: any[], done = "recorded"): string =>
+export const savedTitle = (base: string, replies: any[], done = "saved"): string =>
   stockDraftsIn(replies).length ? `${base} saved: stock issue is a draft` : `${base} ${done}`;
 
 /** What the server said aloud about stock (`stock_warnings`, see common/envelope.run),

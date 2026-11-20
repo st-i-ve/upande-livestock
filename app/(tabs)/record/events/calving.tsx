@@ -6,7 +6,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
@@ -15,7 +15,6 @@ import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { CalfPhotoField } from "@/components/CalfPhotoField";
-import { syncAnimals } from "@/src/db/sync";
 import type { CalfInput } from "@/src/frappe/calves";
 import type { FileAsset } from "@/src/frappe/files";
 import { useAnimals } from "@/src/hooks/useAnimals";
@@ -65,7 +64,6 @@ export default function Calving() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const [dam, setDam] = useState<Animal | null>(null);
   const [picked, setOutcome] = useState<CalvingOutcome>("Live Birth");
   // Abortion is its own event type: offered only while the farm has it switched on.
@@ -142,7 +140,7 @@ export default function Calving() {
           abortionNotes: coatNote || undefined,
         });
         Alert.alert(
-          "Abortion recorded",
+          "Abortion saved",
           `${dam.name}'s pregnancy is closed. She becomes servable again once the waiting period is up.`,
         );
         clearDraft();
@@ -179,28 +177,16 @@ export default function Calving() {
             : [{ sex: calves[0]?.sex ?? "Female", isStillborn: true }],
       });
 
-      // The server numbered each calf (A heifers, B bulls). Show them, then pull
-      // them into the phone's own animal store now rather than at the next tick.
-      const born: { animal: string; tag?: string; herd?: string }[] = r?.calves ?? [];
-      void syncAnimals();
-      if (outcome === "Live Birth" && born.length) {
-        const photoLine =
-          r?.photo === "attached"
-            ? "\nPhoto saved on the calf's record."
-            : r?.photo === "failed"
-              ? "\nA photo could not be uploaded, so that calf has none yet. Add it from the animal's page."
-              : "";
-        const lines = born.map((c) => `${c.animal} in ${c.herd || "—"}`).join("\n");
-        Alert.alert(
-          "Calving recorded",
-          `${dam.name} calved ${born.length === 1 ? "one calf" : `${born.length} calves`}:\n${lines}${photoLine}`,
-        );
-        clearDraft();
-        router.replace("/(tabs)/record/success?name=Calving");
-        return;
-      }
-
-      Alert.alert("Calving recorded", `${dam.name} marked as calved (${outcome}).`);
+      // Saved on the phone; the server numbers the calves (A heifers, B bulls) when it
+      // gets the calving, and they reach this phone with the next animals sync.
+      void r;
+      const nCalves = outcome === "Live Birth" ? calves.length : 0;
+      Alert.alert(
+        "Calving saved",
+        nCalves
+          ? `${dam.name} calved ${nCalves === 1 ? "one calf" : `${nCalves} calves`}. Kept on this phone and sent when there is signal; the calves get their book numbers then.`
+          : `${dam.name} marked as calved (${outcome}). Kept on this phone and sent when there is signal.`,
+      );
       clearDraft();
       router.replace("/(tabs)/record/success?name=Calving");
     } catch (err) {
@@ -353,10 +339,10 @@ export default function Calving() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit calving"}
-        disabled={offline || mutation.isPending || !dam}
+        disabled={mutation.isPending || !dam}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

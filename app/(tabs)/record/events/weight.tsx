@@ -13,7 +13,8 @@ import { Chip, Chips } from "@/components/Chips";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { useRecordWeights } from "@/src/hooks/mutations";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
@@ -23,7 +24,6 @@ import { markWeighed } from "@/src/db/animals";
 import { syncAnimals } from "@/src/db/sync";
 import {
   getWeightSettings,
-  recordWeights,
   type WeighingMode,
   type WeightOutcome,
 } from "@/src/frappe/weights";
@@ -47,9 +47,9 @@ const MODES: { mode: WeighingMode; title: string; blurb: string }[] = [
 ];
 
 export default function WeightSession() {
+  const recordWeightsMutation = useRecordWeights();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
-  const offline = useOffline();
   const qc = useQueryClient();
   const { operator, missingMessage } = useOperator();
   const settings = useQuery({ queryKey: ["weight-settings"], queryFn: getWeightSettings, staleTime: 30_000 });
@@ -157,7 +157,7 @@ export default function WeightSession() {
   const save = async () => {
     setBusy(true);
     try {
-      const o = await recordWeights({
+      const o = await recordWeightsMutation.mutateAsync({
         method,
         operator,
         ...(isBackdating ? { eventDate: backdateDate } : {}),
@@ -408,7 +408,7 @@ export default function WeightSession() {
       ) : null}
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <FieldRow>
         <Button
           label={
@@ -418,7 +418,7 @@ export default function WeightSession() {
                   (mode === "each" ? written.length : selected.length) === 1 ? "" : "s"
                 }`
           }
-          disabled={offline || busy || !ready}
+          disabled={busy || !ready}
           loading={busy}
           onPress={submit}
         />

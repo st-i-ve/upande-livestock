@@ -7,7 +7,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
@@ -40,7 +40,6 @@ export default function Movement() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const { refreshing, onRefresh } = usePullToRefresh();
   useRefreshOnFocus();
   const [toHerdPick, setToHerd] = useState<string>("");
@@ -135,8 +134,8 @@ export default function Movement() {
       }
     }
     const parts: string[] = [];
-    if (succeeded) parts.push(`${succeeded} moved to ${toHerd}`);
-    Alert.alert("Movement recorded", parts.join(" · "));
+    if (succeeded) parts.push(`${succeeded} moving to ${toHerd} · kept on this phone, sent when there is signal`);
+    Alert.alert("Movement saved", parts.join(" · "));
     finish("Movement");
   };
 
@@ -224,10 +223,10 @@ export default function Movement() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit move"}
-        disabled={offline || mutation.isPending || selected.length === 0}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

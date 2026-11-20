@@ -30,6 +30,8 @@ export type TreatmentDose = {
 };
 
 export type TreatAnimalInput = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   animal: string;
   /** Name of her open file to add to. Leave blank with `openNew` to start one. */
   caseName?: string;
@@ -79,6 +81,7 @@ export const treatAnimal = async (input: TreatAnimalInput): Promise<any> => {
     presenting_symptoms: input.openNew ? input.presentingSymptoms : undefined,
     provisional_diagnosis: input.openNew ? input.provisionalDiagnosis || undefined : undefined,
     severity: input.openNew ? input.severity || undefined : undefined,
+    client_ref: input.clientRef || undefined,
     operator: input.operator,
     opened_by: input.operator,
     vet: input.vet || undefined,

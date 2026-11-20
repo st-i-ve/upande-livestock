@@ -5,7 +5,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input } from "@/components/Field";
@@ -53,7 +53,6 @@ export default function Dryoff() {
   const { vets, vet, setVet } = useVetChoice();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const preset = usePresetAnimal();
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
@@ -140,7 +139,7 @@ export default function Dryoff() {
       return;
     }
     const parts: string[] = [];
-    parts.push(`Recorded ${succeeded} · Skipped ${skipped.length}${succeeded ? ` (moved to ${toHerd})` : ""}`);
+    parts.push(`Saved ${succeeded} · Skipped ${skipped.length}${succeeded ? ` (moving to ${toHerd})` : ""}`);
     for (const k of skipped) parts.push(`${k.name}: ${k.reason}`);
     const stockNote = stockOutcomeText(replies);
     Alert.alert(
@@ -244,10 +243,10 @@ export default function Dryoff() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit dry-off"}
-        disabled={offline || mutation.isPending || selected.length === 0}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

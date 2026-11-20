@@ -14,6 +14,8 @@ import { getClient, todayISO } from "@/src/services/api";
  * options; see healthOptions.ts.
  */
 export type CreateCheckUpInput = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   animal: string;
   /** Employee ID of whoever looked at her. */
   operator: string;
@@ -53,6 +55,7 @@ export const createCheckUp = async (input: CreateCheckUpInput): Promise<any> => 
     reason_for_check: input.reasonForCheck,
     action_taken: input.actionTaken,
   };
+  if (input.clientRef) body.client_ref = input.clientRef;
   if (input.vet) body.vet = input.vet;
   if (input.temperatureC != null) body.temperature_c = input.temperatureC;
   if (input.heartRate != null) body.heart_rate = input.heartRate;

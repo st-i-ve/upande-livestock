@@ -149,3 +149,16 @@ export async function markWeighed(weights: { id: string; kg: number }[], date: s
     }
   });
 }
+
+/**
+ * A herd move just saved on this phone, written to the local row at once so the
+ * animal shows in its new herd before the move reaches the server. The next
+ * animals sync brings the server's own answer over it.
+ */
+export async function markMoved(moves: { id: string; herd: string }[]): Promise<void> {
+  if (!moves.length) return;
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    for (const m of moves) await db.runAsync("UPDATE animals SET herd = ? WHERE name = ?", m.herd, m.id);
+  });
+}

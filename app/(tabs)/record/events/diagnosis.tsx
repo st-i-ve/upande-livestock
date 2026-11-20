@@ -6,7 +6,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
@@ -43,7 +43,6 @@ export default function CheckUp() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const options = useHealthOptions();
   const o = options.data;
   const mutation = useCreateCheckUp();
@@ -129,13 +128,8 @@ export default function CheckUp() {
         followUpDate: followUp || undefined,
         actionNotes: notes.trim() || undefined,
       });
-      const d = r;
-      const said = d?.case_opened
-          ? `${animal.name} seen — ${d.name}. A health file is open for her: ${d.case}.`
-          : d?.case
-            ? `${animal.name} seen — ${d.name}. Added to her open file ${d.case}.`
-            : `${animal.name} seen — ${d?.name}.`;
-      Alert.alert("Check up recorded", said);
+      void r;
+      Alert.alert("Check up saved", `${animal.name} seen. Kept on this phone, sent when there is signal.`);
       finish("Check up");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -231,11 +225,11 @@ export default function CheckUp() {
       </Field>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Recording…" : "Record the check up"}
         loading={mutation.isPending}
-        disabled={offline || mutation.isPending || !animal}
+        disabled={mutation.isPending || !animal}
         onPress={submit}
       />
     </Screen>

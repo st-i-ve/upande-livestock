@@ -1,29 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import {
-  amendFeedDay,
-  getAnimalIntake,
-  getDailyFeedReport,
-  getFeedDayProgram,
-  manufactureFeedActuals,
-  resetFeedDay,
-} from "@/src/frappe/feedActuals";
+import { getAnimalIntake, getDailyFeedReport, getFeedDayProgram } from "@/src/frappe/feedActuals";
+import { save } from "@/src/hooks/mutations";
 import { invalidateStock } from "@/src/hooks/useServerLists";
-import { isOfflineError } from "@/src/offline/dispatcher";
-
-const NOT_RECORDED =
-  "Could not reach the server. Nothing was recorded. Check your connection and try again.";
-
-/** Sent now or not at all, like every feeding write: a dead network is
- *  reported, never queued. */
-const sendNow = async <T>(fn: () => Promise<T>): Promise<T> => {
-  try {
-    return await fn();
-  } catch (err) {
-    if (isOfflineError(err)) throw new Error(NOT_RECORDED);
-    throw err;
-  }
-};
 
 export const useFeedDayProgram = (date: string, herd?: string) =>
   useQuery({
@@ -59,11 +38,13 @@ const useInvalidateFeed = () => {
   };
 };
 
+// The day sheet's writes are saved to the phone's queue first (see mutations.ts) and
+// sent when there is signal, in order for the herd: amend, then mix.
 export const useAmendFeedDay = () => {
   const done = useInvalidateFeed();
   return useMutation({
     mutationFn: (v: { herd: string; date: string; kgByItem: Record<string, number>; remarks?: string }) =>
-      sendNow(() => amendFeedDay(v.herd, v.date, v.kgByItem, v.remarks)),
+      save("FeedDay", { action: "amend", ...v }, `Feed amended · ${v.herd}`, [`herd:${v.herd}`]),
     onSuccess: done,
   });
 };
@@ -71,7 +52,8 @@ export const useAmendFeedDay = () => {
 export const useResetFeedDay = () => {
   const done = useInvalidateFeed();
   return useMutation({
-    mutationFn: (v: { herd: string; date: string }) => sendNow(() => resetFeedDay(v.herd, v.date)),
+    mutationFn: (v: { herd: string; date: string }) =>
+      save("FeedDay", { action: "reset", ...v }, `Feed reset · ${v.herd}`, [`herd:${v.herd}`]),
     onSuccess: done,
   });
 };
@@ -80,7 +62,7 @@ export const useManufactureActuals = () => {
   const done = useInvalidateFeed();
   return useMutation({
     mutationFn: (v: { herd: string; date: string; employee?: string | null }) =>
-      sendNow(() => manufactureFeedActuals(v.herd, v.date, v.employee)),
+      save("FeedDay", { action: "mix", ...v }, `Feed mixed · ${v.herd}`, [`herd:${v.herd}`]),
     onSuccess: done,
   });
 };

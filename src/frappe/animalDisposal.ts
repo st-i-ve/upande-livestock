@@ -14,6 +14,8 @@ export type DisposalType =
   | "Slaughtered";
 
 export type CreateAnimalDisposalInput = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   animal: string;                // Animal name
   animalName?: string;           // Display name (Animal.burn_name)
   disposalType: DisposalType;
@@ -53,6 +55,7 @@ export const createAnimalDisposal = async (
     disposal_type: input.disposalType,
     disposal_date: input.disposalDate || todayISO(),
   };
+  if (input.clientRef) body.client_ref = input.clientRef;
   if (input.bookValue != null) body.book_value = input.bookValue;
   if (input.salePrice != null) body.sale_price = input.salePrice;
   if (input.customer) body.customer = input.customer;

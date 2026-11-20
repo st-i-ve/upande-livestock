@@ -64,6 +64,9 @@ export async function addAnimalPhoto(input: {
   context: PhotoContext;
   ref?: string;
   caption?: string;
+  clientRef?: string;
+  /** The client_ref of a queued treatment whose case this photo belongs to. */
+  refClientRef?: string;
 }): Promise<{ url: string }> {
   const fileUrl = await uploadFile(input.asset, false);
   const client = await getClient();
@@ -73,6 +76,8 @@ export async function addAnimalPhoto(input: {
     context: input.context,
     ref: input.ref || undefined,
     caption: input.caption || undefined,
+    client_ref: input.clientRef || undefined,
+    ref_client_ref: input.refClientRef || undefined,
   });
   const m = res.data?.message;
   if (!m || m.error) throw new OpsError(m?.error || "The photo was not added.", m?.code);

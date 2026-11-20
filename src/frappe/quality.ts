@@ -54,6 +54,8 @@ export const getQualityOptions = async (days = 60): Promise<QualityOptions> => {
 };
 
 export type QualityEntry = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   recording: string;
   bulk_scc?: number;
   fat_percent?: number;
@@ -73,7 +75,9 @@ export type QualityFiled = {
 
 export const recordMilkQuality = async (entry: QualityEntry): Promise<QualityFiled> => {
   const client = await getClient();
-  const res = await client.post(RECORD, { payload: entry });
+  const res = await client.post(RECORD, {
+    payload: { ...entry, clientRef: undefined, client_ref: entry.clientRef || undefined },
+  });
   return unwrap<QualityFiled>(res.data?.message, "The server gave no answer.");
 };
 

@@ -21,10 +21,11 @@ const RECORD_FEEDING =
 const callMethod = async <T = any>(
   action: "info" | "day" | "manufacture" | "issue" | "manual",
   args: Record<string, any>,
+  clientRef?: string,
 ): Promise<T> => {
   const client = await getClient();
   const res = await client.post(`/api/method/${RECORD_FEEDING}`, {
-    payload: { action, ...args },
+    payload: { action, ...args, client_ref: clientRef || undefined },
   });
   const message = res.data?.message ?? res.data;
   // The server answers a refusal (e.g. a backdated run the store could not
@@ -182,5 +183,6 @@ export const manufactureHerdFeed = (
   portion = 1,
   postingDate?: string,
   bomNo?: string,
+  clientRef?: string,
 ): Promise<ManufactureResult> =>
-  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo });
+  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo }, clientRef);

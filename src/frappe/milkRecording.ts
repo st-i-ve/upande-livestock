@@ -5,6 +5,8 @@ export { todayISO };
 
 
 export type CreateMilkRecordingInput = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   herd: string;
   /** `HH:MM` on the farm's clock. Omitted means "now", decided by the server. */
   milkingTime?: string;
@@ -62,6 +64,7 @@ export const createMilkRecording = async (
     discarded_kg: discarded,
     net_yield_kg: netYield,
   };
+  if (input.clientRef) body.client_ref = input.clientRef;
   if (discarded > 0 && input.discardReason) body.discard_reason = input.discardReason;
   if (discarded > 0 && input.discardReasonNotes)
     body.discard_reason_notes = input.discardReasonNotes;
@@ -73,10 +76,10 @@ export const createMilkRecording = async (
   if (input.cowsMilked != null) body.cows_milked = input.cowsMilked;
   if (input.operator) body.operator = input.operator;
   if (input.remarks) body.remarks = input.remarks;
-  if (input.offline) {
-    body.offline = 1;
-    if (input.capturedAt) body.captured_at = input.capturedAt;
-  }
+  // `offline` is the phone saying there was no signal when it was taken (it buys
+  // the server's one day of grace on a closed window); captured_at is audit.
+  if (input.offline) body.offline = 1;
+  if (input.capturedAt) body.captured_at = input.capturedAt;
 
   const client = await getClient();
   const res = await client.post(

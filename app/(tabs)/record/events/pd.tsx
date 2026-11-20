@@ -5,7 +5,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField, fromISODate } from "@/components/DateTimeField";
@@ -31,7 +31,6 @@ export default function PD() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const { refreshing, onRefresh } = usePullToRefresh();
   useRefreshOnFocus();
   const [selected, setSelected] = useState<Animal[]>([]);
@@ -93,9 +92,9 @@ export default function PD() {
       }
     }
     const parts: string[] = [];
-    if (succeeded) parts.push(`${succeeded} marked ${result}`);
+    if (succeeded) parts.push(`${succeeded} marked ${result} · kept on this phone, sent when there is signal`);
     Alert.alert(
-      "PD recorded",
+      "PD saved",
       `${parts.join(" · ")}${result === "Confirmed" && succeeded > 0 ? "\nExpected calving in 280 days per cow." : ""}`,
     );
     finish("Pregnancy diagnosis");
@@ -155,10 +154,10 @@ export default function PD() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit PD"}
-        disabled={offline || mutation.isPending || selected.length === 0}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

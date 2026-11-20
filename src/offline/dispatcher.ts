@@ -4,15 +4,17 @@ import { treatAnimal } from "@/src/frappe/treatment";
 import { createAnimalDisposal } from "@/src/frappe/animalDisposal";
 import { createMilkRecording } from "@/src/frappe/milkRecording";
 import { recordQualityTest } from "@/src/frappe/milkQualityTest";
-import { extractFrappeError } from "@/src/services/api";
 
-import {
-  PendingMutation,
-  PendingMutationType,
-  loadQueue,
-  markAttempt,
-  remove,
-} from "./queue";
+import { OpsError } from "@/src/frappe/opsError";
+import { recordWeights } from "@/src/frappe/weights";
+import { recordMilkQuality } from "@/src/frappe/quality";
+import { addAnimalPhoto } from "@/src/frappe/animalPhotos";
+import { manufactureHerdFeed } from "@/src/frappe/feeding";
+import { manualFeed } from "@/src/frappe/manualFeed";
+import { amendFeedDay, manufactureFeedActuals, resetFeedDay } from "@/src/frappe/feedActuals";
+
+import { drain, loadQueue, type PendingMutation, type PendingMutationType } from "./queue";
+import { classify, type DrainResult, type Handler } from "./queueCore";
 
 /**
  * Items an older build queued before stock and vet fees became the server's job.
@@ -59,109 +61,58 @@ async function retiredAnimalCreate(): Promise<never> {
 }
 
 /**
- * Registry mapping each PendingMutationType to the function that submits it.
- * Only MILKING is queued by this build (see `tryDirectOrEnqueue`). The other
- * handlers stay so an item an older build queued still drains when online.
+ * What each kind of queued recording sends. Every handler gets the item, and puts
+ * the item's id on the request as its `client_ref`, so a send the phone never saw
+ * answered is a no-op on the server when it is sent again.
  */
-const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
-  AnimalEvent: createAnimalEvent,
-  MilkRecording: createMilkRecording,
-  MilkQualityTest: recordQualityTest,
-  AnimalDisposal: createAnimalDisposal,
+const withRef = <P extends object>(payload: P, item: PendingMutation): P & { clientRef: string } => ({
+  ...payload,
+  clientRef: item.id,
+});
+
+const HANDLERS: Record<PendingMutationType, Handler> = {
+  AnimalEvent: (p, i) => createAnimalEvent(withRef(p, i as PendingMutation)),
+  MilkRecording: (p, i) => createMilkRecording(withRef(p, i as PendingMutation)),
+  MilkQualityTest: (p, i) => recordQualityTest(withRef(p, i as PendingMutation)),
+  AnimalDisposal: (p, i) => createAnimalDisposal(withRef(p, i as PendingMutation)),
+  AnimalDiagnosis: (p, i) => createCheckUp(withRef(p, i as PendingMutation)),
+  Treatment: (p, i) => treatAnimal(withRef(p, i as PendingMutation)),
+  Weights: async (p, i) => {
+    const out = await recordWeights(withRef(p, i as PendingMutation));
+    // The server saves each animal on its own; a refused one comes back in `failed`
+    // inside an answer that is otherwise fine. It must reach the person, not be
+    // counted as sent.
+    if (out.failed?.length) {
+      throw new OpsError(out.failed.map((f) => `${f.animal}: ${f.why}`).join("\n"));
+    }
+    return out;
+  },
+  MilkQuality: (p, i) => recordMilkQuality(withRef(p, i as PendingMutation)),
+  Feeding: (p, i) => {
+    if (p.action === "manual") return manualFeed(withRef(p.input, i as PendingMutation));
+    return manufactureHerdFeed(p.herd, p.portion ?? 1, p.postingDate, p.bomNo, i.id);
+  },
+  FeedDay: (p, i) => {
+    if (p.action === "amend") return amendFeedDay(p.herd, p.date, p.kgByItem, p.remarks, i.id);
+    if (p.action === "reset") return resetFeedDay(p.herd, p.date, i.id);
+    return manufactureFeedActuals(p.herd, p.date, p.employee, i.id);
+  },
+  // The picture goes up after its record (same keys, queued later). A photo of a
+  // treatment still in the queue names it by client_ref; the server finds the case.
+  AnimalPhoto: (p, i) => addAnimalPhoto({ ...p, clientRef: i.id }),
   Animal: retiredAnimalCreate,
   CalfFeeding: retiredCalfFeeding,
-  AnimalDiagnosis: createCheckUp,
-  Treatment: treatAnimal,
   AnimalHealthCase: retiredHealthCase,
   BatchDrugIssue: retiredBatchDrugIssue,
   AnimalHealthCaseUpdate: retiredHealthCase,
 };
 
-/**
- * Direct call to the right handler. Throws on failure — the caller decides
- * whether to enqueue based on the error shape.
- */
-export const dispatchDirect = (
-  type: PendingMutationType,
-  payload: any,
-): Promise<any> => HANDLERS[type](payload);
+export type { DrainResult };
 
-/** A queued milking the server refuses on a closed window is more than a day
- *  old; say what to do about it. The item stays queued for retry or discard. */
-// The "late offline syncs are switched off" refusal is the server's own words and
-// passes through untouched; it is not a window problem the manager fixes by
-// opening backdating.
-const tooOldMessage = (item: PendingMutation, message: string): string =>
-  item.type === "MilkRecording" && !/switched off/i.test(message) && /backdating is closed|more than a day old/i.test(message)
-    ? "This milking is more than a day old — ask the Livestock Manager to open backdating, then retry."
-    : message;
+/** Send what is waiting. `force` ignores backoff (reconnect, foreground, Retry now). */
+export const drainQueue = (opts: { force?: boolean; onStep?: () => void } = {}): Promise<DrainResult> =>
+  drain(HANDLERS, opts);
 
-let draining = false;
+/** Kept for callers that ask whether a failure was a dead network. */
+export const isOfflineError = (err: unknown): boolean => classify(err) === "network";
 
-export type DrainResult = {
-  /** Replies of the records that synced, so a stock draft one made can be told. */
-  replies: any[];
-  succeeded: number;
-  remaining: number;
-  errors: { id: string; message: string }[];
-};
-
-/**
- * Walk the queue in FIFO order and try each mutation. Stops at the first
- * network-level failure (keeps order); on application-level failure, marks
- * the attempt + leaves the item in place so the user can review and decide
- * what to do via the Pending screen.
- */
-export const drainQueue = async (): Promise<DrainResult> => {
-  if (draining) return { replies: [], succeeded: 0, remaining: (await loadQueue()).length, errors: [] };
-  draining = true;
-  let succeeded = 0;
-  const replies: any[] = [];
-  const errors: DrainResult["errors"] = [];
-  try {
-    let queue: PendingMutation[] = await loadQueue();
-    for (const item of queue) {
-      try {
-        const reply = await HANDLERS[item.type](item.payload);
-        replies.push(reply);
-        await remove(item.id);
-        succeeded += 1;
-      } catch (err) {
-        const message = tooOldMessage(item, extractFrappeError(err));
-        await markAttempt(item.id, message);
-        // A refusal the server wrote (OpsError: HTTP 200 + {error}) carries no
-        // `response` but is not a dead network; it must not stall the queue.
-        const isNetwork = isOfflineError(err);
-        errors.push({ id: item.id, message });
-        if (isNetwork) {
-          // Network problem — stop draining; we'll try again on next signal.
-          break;
-        }
-        // Application-level error: keep going; the user must decide.
-      }
-    }
-    queue = await loadQueue();
-    return { replies, succeeded, remaining: queue.length, errors };
-  } finally {
-    draining = false;
-  }
-};
-
-/**
- * Helpers used by the offline-aware mutation hooks.
- */
-export const isOfflineError = (err: unknown): boolean => {
-  const e = err as any;
-  if (!e) return false;
-  // An operations endpoint that answers `{error: "..."}` does so with HTTP 200
-  // and no axios response attached to the thrown error. Without this check it
-  // looks identical to being offline, and a refused entry — a cow with no open
-  // service, a store that cannot cover the dose — would be queued and retried
-  // forever instead of shown to the operator.
-  if (e.isServerRejection) return false;
-  // No HTTP response means we never got past the network — typical when
-  // offline, DNS fails, or the server is unreachable.
-  if (!e.response) return true;
-  if (e.code === "ECONNABORTED" || e.code === "ERR_NETWORK") return true;
-  return false;
-};

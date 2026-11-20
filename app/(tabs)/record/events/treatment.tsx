@@ -6,7 +6,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { CalfPhotoField } from "@/components/CalfPhotoField";
 import { Chip, Chips } from "@/components/Chips";
@@ -20,7 +20,7 @@ import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields, type StockPick } from "@/components/StockItemFields";
 import { RADIUS, font } from "@/constants/theme";
 import { savedTitle, stockOutcomeText } from "@/src/frappe/eventItems";
-import { addAnimalPhoto } from "@/src/frappe/animalPhotos";
+import { isOfflineError } from "@/src/services/network";
 import type { FileAsset } from "@/src/frappe/files";
 import { getAnimalCase } from "@/src/frappe/treatment";
 import { useBackdate } from "@/src/hooks/useBackdate";
@@ -79,7 +79,6 @@ export default function Treatment() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const options = useHealthOptions().data;
   // Stock fields only where Treatment posts stock (the server's rule). Where it
   // does not, the drug is named in words and nothing leaves a store.
@@ -148,7 +147,7 @@ export default function Treatment() {
     if (!operator) return setError(missingMessage);
     if (!animal) return setError("Pick the animal.");
     if (standingQ.isLoading) return setError("Looking her file up — try again in a moment.");
-    if (standingQ.error) return setError(extractFrappeError(standingQ.error));
+    if (standingQ.error && !isOfflineError(standingQ.error)) return setError(extractFrappeError(standingQ.error));
     const given = doses.filter((d) =>
       consumes ? d.pick.itemCode && Number(d.qty) > 0 : d.drugName.trim(),
     );
@@ -158,6 +157,7 @@ export default function Treatment() {
     try {
       const r = await mutation.mutateAsync({
         animal: animal.id,
+        photo,
         caseName: !fresh && openCase ? openCase.name : undefined,
         openNew: fresh,
         presentingSymptoms: complaint.trim(),
@@ -181,29 +181,11 @@ export default function Treatment() {
           response: d.response || undefined,
         })),
       });
-      const d = r;
-      const stockNote = stockOutcomeText([d]);
-      const said = d.opened
-          ? `A new file is open for ${d.animal} — ${d.case} — with ${d.added} treatment${d.added === 1 ? "" : "s"} in it.`
-          : `${d.added} treatment${d.added === 1 ? "" : "s"} added to ${d.case}. ${d.treatments} in the file now.`;
-      const fee = d.vet_fee;
-      const feeNote = fee
-        ? fee.posted
-          ? `Vet fee KES ${Number(fee.amount).toLocaleString()} posted.`
-          : `Vet fee KES ${Number(fee.amount).toLocaleString()} noted on the record; ${fee.reason}`
-        : "";
-      // The treatment stands whatever happens to the picture; the server
-      // decides whether the file may take it (it is open, it is hers).
-      let photoNote = "";
-      if (photo && d.case) {
-        try {
-          await addAnimalPhoto({ animal: animal.id, asset: photo, context: "health_case", ref: d.case });
-          photoNote = "Photo added to the file.";
-        } catch (pe) {
-          photoNote = `The treatment is recorded but the photo was not added: ${extractFrappeError(pe)}`;
-        }
-      }
-      Alert.alert(savedTitle("Treatment", [d]), [said, stockNote, feeNote, photoNote].filter(Boolean).join("\n\n"));
+      void r;
+      Alert.alert(
+        "Treatment saved",
+        `${animal.name}'s treatment${photo ? " and photo are" : " is"} kept on this phone and sent when there is signal. The health file is opened or added to then.`,
+      );
       finish("Treatment");
     } catch (err) {
       setError(extractFrappeError(err));
@@ -377,11 +359,11 @@ export default function Treatment() {
       ) : null}
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Recording…" : fresh ? "Open a file and record it" : "Add it to her file"}
         loading={mutation.isPending}
-        disabled={offline || mutation.isPending || !animal}
+        disabled={mutation.isPending || !animal}
         onPress={submit}
       />
     </Screen>

@@ -16,6 +16,8 @@ export type ManualFeedLine = {
 };
 
 export type ManualFeedInput = {
+  /** The id the offline queue gave this recording; the server files it once per id. */
+  clientRef?: string;
   herd: string;
   lines: ManualFeedLine[];
   /** How many animals were actually at the trough. Not the herd's head count —
@@ -50,6 +52,7 @@ export const manualFeed = async (
   const res = await client.post(`/api/method/${RECORD_FEEDING}`, {
     payload: {
       action: "manual",
+      client_ref: input.clientRef || undefined,
       herd: input.herd,
       heads: input.heads,
       portion: input.portion ?? 1,

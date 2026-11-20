@@ -6,7 +6,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
@@ -33,7 +33,6 @@ export default function Service() {
   const { operator, missingMessage } = useOperator();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const preset = usePresetAnimal();
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
@@ -193,10 +192,10 @@ export default function Service() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={mutation.isPending ? "Submitting…" : "Submit service"}
-        disabled={offline || mutation.isPending || selected.length === 0}
+        disabled={mutation.isPending || selected.length === 0}
         loading={mutation.isPending}
         onPress={handleSubmit}
       />

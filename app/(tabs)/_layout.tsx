@@ -120,6 +120,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        // Reached from the connection sheet and the Profile page; never a tab of its own.
+        name="pending"
+        options={{ href: null, title: "Waiting to send" }}
+      />
+      <Tabs.Screen
         // Reached from the Quality tab and the Record menu; never a tab of its own.
         name="milk-quality"
         options={{ href: null, title: "Milk quality" }}

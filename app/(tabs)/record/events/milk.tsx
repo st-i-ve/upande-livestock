@@ -87,7 +87,7 @@ export default function Milk() {
         // which posts a Journal Entry.
         remarks: remarks.trim() || undefined,
       });
-      if (r.queued) {
+      if (offline && r.queued) {
         Alert.alert(
           "Saved on this phone",
           "No connection. The milking is kept here and sent when you are back online. The server checks its date then.",

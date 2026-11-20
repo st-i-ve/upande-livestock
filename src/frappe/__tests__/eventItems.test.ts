@@ -113,7 +113,7 @@ test("a single draft reads in the singular; no drafts reads as empty", () => {
 });
 
 test("confirmation title says so when a draft was made", () => {
-  assert.equal(savedTitle("Treatment", [{}]), "Treatment recorded");
+  assert.equal(savedTitle("Treatment", [{}]), "Treatment saved");
   assert.equal(savedTitle("Feeding", [{}], "mixed"), "Feeding mixed");
   assert.equal(
     savedTitle("Treatment", [{ stock_drafts: [{ name: "S", stock_entry_type: "T", short: "" }] }]),

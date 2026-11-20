@@ -6,7 +6,7 @@ import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
 import { BackdateButton } from "@/components/BackdateButton";
 import { Banner } from "@/components/Banner";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Button } from "@/components/Button";
 import { DateField, fromISODate } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
@@ -67,7 +67,6 @@ export default function GenericEvent() {
   const { vets, vet, setVet, isInternal } = useVetChoice();
   const { isBackdating, eventDate: backdateDate, setEventDate: setBackdateDate } = useBackdate();
   const { today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const [selected, setSelected] = useState<Animal[]>([]);
   const preset = usePresetAnimal();
   useSeedAnimal(preset, selected, (a) => setSelected([a]));
@@ -190,8 +189,8 @@ export default function GenericEvent() {
               }))
             : undefined,
         });
-        succeededEvents = r?.animals ?? roundAnimals.length;
-        skippedRows = Array.isArray(r?.skipped) ? r.skipped : [];
+        // Saved on the phone: the server's own skips come back when it files the round.
+        succeededEvents = roundAnimals.length;
         replies.push(r);
       } catch (err) {
         setError(`Nothing was recorded. ${extractFrappeError(err)}`);
@@ -226,10 +225,10 @@ export default function GenericEvent() {
     if (spec.isRound) {
       // Left out before saving (marked on the screen) plus skipped by the server.
       const all = [...ineligible.filter((i) => !skippedRows.some((k) => k.animal === i.animal)), ...skippedRows];
-      eventParts.push(`Recorded ${succeededEvents} · Skipped ${all.length}`);
+      eventParts.push(`Saved ${succeededEvents} · Skipped ${all.length}`);
       for (const k of all) eventParts.push(`${k.animal}: ${k.reason}`);
     } else if (succeededEvents) {
-      eventParts.push(`${succeededEvents} submitted`);
+      eventParts.push(`${succeededEvents} saved on this phone`);
     }
 
     const notes: string[] = [];
@@ -316,10 +315,10 @@ export default function GenericEvent() {
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={submitting ? "Submitting…" : `Submit ${spec.title.toLowerCase()}`}
-        disabled={offline || submitting || roundAnimals.length === 0}
+        disabled={submitting || roundAnimals.length === 0}
         loading={submitting}
         onPress={handleSubmit}
       />

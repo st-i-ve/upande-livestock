@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { countAnimals } from "@/src/db/animals";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useRecordDrafts } from "@/src/record/draft";
+import { usePendingQueue } from "@/src/hooks/useQueueStatus";
 import { summaryText } from "@/src/sync/syncStatus";
 import { useSyncStore } from "@/src/sync/syncStore";
 
@@ -35,6 +36,7 @@ export function useSyncSummary(): string {
   const online = useNetworkStatus();
   const animalsSyncedAt = useSyncStore((s) => s.animalsSyncedAt);
   const animalsError = useSyncStore((s) => s.animalsError);
+  const queue = usePendingQueue();
   const waiting = useRecordDrafts((s) => (s.draft?.pending ? 1 : 0));
 
   // Invalidated with ["animals"] after every sync, so the count follows it.
@@ -46,5 +48,7 @@ export function useSyncSummary(): string {
     offline: online === false,
     now,
     waiting,
+    queued: queue.length,
+    attention: queue.filter((i) => i.status === "attention").length,
   });
 }

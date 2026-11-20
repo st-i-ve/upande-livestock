@@ -19,3 +19,16 @@ export function OnlineOnlyNotice() {
     </Banner>
   );
 }
+
+/**
+ * Shown on a record screen while the phone is offline. Saving still works: the
+ * recording is written to the phone first and sent when there is signal.
+ */
+export function OfflineNotice() {
+  if (!useOffline()) return null;
+  return (
+    <Banner tone="info" icon="wifi-off">
+      No connection. What you save is kept on this phone and sent when you are back online.
+    </Banner>
+  );
+}

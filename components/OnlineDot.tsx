@@ -1,4 +1,4 @@
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Pressable, StyleSheet, Text, View } from "react-native";
 import Reanimated, {
@@ -22,6 +22,9 @@ import { syncAnimals } from "@/src/db/sync";
 import { useColors } from "@/src/hooks/useColors";
 import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useLiveStore } from "@/src/realtime/liveStore";
+import { usePendingQueue } from "@/src/hooks/useQueueStatus";
+import { groupQueue } from "@/src/offline/queueCore";
+import { drainNow } from "@/src/offline/autoDrain";
 import { retryRealtime } from "@/src/realtime/realtime";
 import {
   DOT_BODY,
@@ -267,6 +270,8 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
 
   const syncNow = () => {
     retryRealtime();
+    // And whatever is saved on the phone and waiting to go.
+    void drainNow();
     // Asked for: now, with the bar.
     void syncAnimals();
   };
@@ -282,6 +287,7 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
       <Text style={st.body}>{DOT_BODY[state]}</Text>
       {parts.length ? <Text style={st.line}>{syncText(parts)}</Text> : null}
       <Text style={st.line}>{lastSyncedText(syncedAt, now)}</Text>
+      <QueueGroups onOpen={onClose} />
       {error && state !== "syncing" ? (
         <Text style={[st.line, { color: c.danger }]} numberOfLines={2}>
           Last try did not reach the farm
@@ -301,6 +307,38 @@ export function StatusSheet({ state, onClose }: { state: DotState; onClose: () =
         </View>
       </View>
     </GlassPanel>
+  );
+}
+
+/**
+ * What is saved on the phone and not yet on the server, in the sync bar's own
+ * grouping: the ones that need attention first, then waiting records by kind
+ * (photos last). A tap opens the list, where they can be edited or discarded.
+ */
+function QueueGroups({ onOpen }: { onOpen: () => void }) {
+  const c = useColors();
+  const st = useMemo(() => makeStyles(c), [c]);
+  const queue = usePendingQueue();
+  const groups = useMemo(() => groupQueue(queue), [queue]);
+  if (groups.length === 0) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Open the recordings waiting to send"
+      onPress={() => {
+        onOpen();
+        router.push("/(tabs)/pending" as any);
+      }}
+      style={st.queue}
+    >
+      {groups.map((g) => (
+        <View key={g.key} style={st.queueRow}>
+          <Text style={[st.queueTitle, g.attention && { color: c.danger }]}>{g.title}</Text>
+          <Text style={[st.queueCount, g.attention && { color: c.danger }]}>{g.items.length}</Text>
+        </View>
+      ))}
+      <Text style={st.queueHint}>Tap to open</Text>
+    </Pressable>
   );
 }
 
@@ -338,4 +376,9 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     body: { fontSize: 14, fontFamily: FONT_FAMILY.regular, color: c.textMuted, lineHeight: 20, marginBottom: 10 },
     line: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: c.text, marginBottom: 4, fontVariant: ["tabular-nums"] },
     actions: { flexDirection: "row", gap: 10, marginTop: 14 },
+    queue: { marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.borderSubtle },
+    queueRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
+    queueTitle: { fontSize: 13, fontFamily: FONT_FAMILY.medium, color: c.text },
+    queueCount: { fontSize: 13, fontFamily: FONT_FAMILY.semibold, color: c.text, fontVariant: ["tabular-nums"] },
+    queueHint: { fontSize: 12, fontFamily: FONT_FAMILY.regular, color: c.textMuted, marginTop: 4 },
   });

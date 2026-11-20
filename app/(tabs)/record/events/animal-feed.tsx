@@ -33,7 +33,7 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { useFinishRecording } from "@/src/hooks/useRecordContext";
 import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import type { HerdRecipe } from "@/src/frappe/herdRecipes";
-import { OnlineOnlyNotice, useOffline } from "@/components/OnlineOnlyNotice";
+import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { savedTitle, stockOutcomeText } from "@/src/frappe/eventItems";
 import { extractFrappeError, todayISO } from "@/src/services/api";
@@ -335,7 +335,6 @@ function SystemTab({
     portionPick ?? (day.data ? (day.data.suggestedPortion === 0.5 ? 0.5 : 1) : null);
   const [date, setDate] = useState(resume?.date ?? todayISO());
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // This tab's input, for "Continue recording" (the screen keeps it).
@@ -377,22 +376,15 @@ function SystemTab({
     if (!d) return setSubmitError("Still loading the herd's programme — try again in a moment.");
     if (portionNum <= 0) return setSubmitError("A run has to be for more than nothing.");
     try {
-      const r = await manufacture.mutateAsync({
+      await manufacture.mutateAsync({
         herd,
         portion: portionNum,
         postingDate: backdatingOpen ? date : undefined,
         bomNo: selectedBom || undefined,
       });
-      await Promise.all([info.refetch(), day.refetch()]);
       Alert.alert(
-        savedTitle(`${r.feed_mode} feeding`, [r], "mixed"),
-        [
-          `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
-            `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
-          stockOutcomeText([r]),
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
+        "Feeding saved",
+        `${herd}'s feed is kept on this phone and sent when there is signal. The server mixes and issues it then, and checks the stock.`,
       );
       finish("Animal feeding");
     } catch (err) {
@@ -506,10 +498,10 @@ function SystemTab({
 
       {submitError ? <Banner tone="danger">{submitError}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={manufacture.isPending ? "Mixing…" : "Mix & feed"}
-        disabled={offline || manufacture.isPending || !herd || portionNum <= 0}
+        disabled={manufacture.isPending || !herd || portionNum <= 0}
         onPress={onRun}
       />
     </>
@@ -573,7 +565,6 @@ function ManualTab({
   const heads = headsEdit ?? (info?.heads ? String(info.heads) : "");
   const [date, setDate] = useState(resume?.date ?? todayISO());
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
-  const offline = useOffline();
   const [error, setError] = useState<string | null>(null);
 
   // Which recipe `rows` currently reflects, and a snapshot of the rows it was
@@ -679,7 +670,7 @@ function ManualTab({
       .filter((l) => l.qty > 0);
     if (!lines.length) return setError("Enter a quantity for at least one ingredient.");
     try {
-      const r = await feed.mutateAsync({
+      await feed.mutateAsync({
         herd,
         lines,
         heads: count,
@@ -691,14 +682,8 @@ function ManualTab({
         baseBom: selectedBom || undefined,
       });
       Alert.alert(
-        savedTitle(`${r.feed_mode} feeding`, [r], "mixed"),
-        [
-          `${Number(r.produced_qty).toLocaleString()} ${r.uom} of ${r.production_item} ` +
-            `mixed and issued to ${herd}.\nWork Order ${r.work_order}.`,
-          stockOutcomeText([r]),
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
+        "Feeding saved",
+        `${herd}'s manual feed is kept on this phone and sent when there is signal. The server mixes and issues it then, and checks the stock.`,
       );
       finish("Animal feeding");
     } catch (e) {
@@ -774,11 +759,11 @@ function ManualTab({
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
-      <OnlineOnlyNotice />
+      <OfflineNotice />
       <Button
         label={feed.isPending ? "Mixing…" : "Mix & feed"}
         onPress={submit}
-        disabled={offline || feed.isPending}
+        disabled={feed.isPending}
       />
     </>
   );

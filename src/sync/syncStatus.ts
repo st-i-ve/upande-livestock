@@ -60,13 +60,13 @@ export const DOT_BODY: Record<DotState, string> = {
   connecting:
     "The phone has a network but the live link to the farm is not up yet. Changes are checked every minute until it is.",
   offline:
-    "No network. You can look at the animals already on this phone; recording needs a connection.",
+    "No network. You can look at the animals already on this phone and keep recording: what you save is sent when the network is back.",
   unknown: "Finding out whether the phone has a network.",
 };
 
 // ---- the syncing bar ----
 
-export type SyncKind = "animals" | "photos";
+export type SyncKind = "animals" | "records" | "photos";
 
 export type SyncPart = {
   kind: SyncKind;
@@ -75,10 +75,11 @@ export type SyncPart = {
   total: number | null;
 };
 
-const ORDER: SyncKind[] = ["animals", "photos"];
+const ORDER: SyncKind[] = ["animals", "records", "photos"];
 
 const NOUN: Record<SyncKind, [string, string]> = {
   animals: ["animal", "animals"],
+  records: ["record", "records"],
   photos: ["photo", "photos"],
 };
 
@@ -99,6 +100,10 @@ export const syncText = (parts: SyncPart[]): string => {
       return total === 1
         ? "Uploading photo"
         : `Uploading ${noun("photos", 1)} ${Math.min(p.done + 1, total)} of ${total}`;
+    }
+    if (p.kind === "records") {
+      const total = Math.max(1, p.total ?? 1);
+      return total === 1 ? "Sending record" : `Sending record ${Math.min(p.done + 1, total)} of ${total}`;
     }
     if (p.total === null) return `Syncing ${noun(p.kind, 2)}…`;
     return `Syncing ${Math.min(p.done, p.total)} of ${p.total} ${noun(p.kind, p.total)}`;
@@ -158,6 +163,10 @@ export type SummaryInput = {
   offline?: boolean;
   /** Records kept for Continue recording. */
   waiting?: number;
+  /** Recordings saved on the phone and not yet on the server. */
+  queued?: number;
+  /** Of those, the ones the server refused: they wait for the person. */
+  attention?: number;
 };
 
 /**
@@ -165,7 +174,7 @@ export type SummaryInput = {
  * "All synced · 475 animals · 2 min ago · 1 record waiting",
  * "All synced · 5 herds · 420 head · just now", "Offline · 475 animals · 3 h ago".
  */
-export const summaryText = ({ what, syncedAt, now, failed, offline, waiting = 0 }: SummaryInput): string => {
+export const summaryText = ({ what, syncedAt, now, failed, offline, waiting = 0, queued = 0, attention = 0 }: SummaryInput): string => {
   const head = offline
     ? "Offline"
     : syncedAt === null
@@ -179,5 +188,7 @@ export const summaryText = ({ what, syncedAt, now, failed, offline, waiting = 0 
   }
   if (syncedAt !== null) parts.push(agoText(syncedAt, now));
   if (waiting > 0) parts.push(plural(waiting, "record waiting", "records waiting"));
+  if (queued - attention > 0) parts.push(`${plural(queued - attention, "record", "records")} to send`);
+  if (attention > 0) parts.push(`${attention} need${attention === 1 ? "s" : ""} attention`);
   return parts.join(" · ");
 };
