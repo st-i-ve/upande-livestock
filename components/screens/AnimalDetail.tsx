@@ -29,7 +29,9 @@ import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
-import { visibleActions } from "@/src/events/disabled";
+import { EventIcon } from "@/components/EventIcon";
+import { eventForRoute, visibleActions } from "@/src/events/disabled";
+import { sortByEvent } from "@/src/events/eventCatalog";
 import type { TimelineEvent } from "@/components/Timeline";
 
 export function AnimalDetail({ id }: { id: string }) {
@@ -137,20 +139,21 @@ export function AnimalDetail({ id }: { id: string }) {
   const isFemaleAdult = kind === "cow" || kind === "heifer";
   // In calf and milking: she has calved (so she is a cow, not an in-calf heifer).
   const lactating = (a.parity ?? 0) > 0 || profile?.cycle.daysInMilk != null;
-  type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
-  const actions: Action[] = visibleActions<Action>([
-    { label: "Check up", route: "diagnosis", icon: "magnify" },
-    ...(isFemaleAdult ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
-    { label: "Treat", route: "treatment", icon: "medical-bag" },
-    ...(isFemaleAdult && stage === "served" ? [{ label: "PD", route: "pd", icon: "stethoscope" } as Action] : []),
+  type Action = { label: string; route: string };
+  // Servicing first, then Health, then the rest: the shared event catalog's order and icons.
+  const actions: Action[] = sortByEvent(visibleActions<Action>([
+    { label: "Check up", route: "diagnosis" },
+    ...(isFemaleAdult ? [{ label: "Service", route: "service" } as Action] : []),
+    { label: "Treat", route: "treatment" },
+    ...(isFemaleAdult && stage === "served" ? [{ label: "PD", route: "pd" } as Action] : []),
     ...(isFemaleAdult && stage === "confirmed" && lactating
-      ? [{ label: "Dry off", route: "dryoff", icon: "water-off" } as Action]
+      ? [{ label: "Dry off", route: "dryoff" } as Action]
       : []),
-    { label: "Vaccinate", route: "vaccination", icon: "needle" },
-    { label: "Deworm", route: "deworming", icon: "bug-outline" },
-    { label: "Weigh", route: "weight", icon: "scale" },
-    { label: "Move", route: "movement", icon: "arrow-left-right" },
-  ], disabledEvents);
+    { label: "Vaccinate", route: "vaccination" },
+    { label: "Deworm", route: "deworming" },
+    { label: "Weigh", route: "weight" },
+    { label: "Move", route: "movement" },
+  ], disabledEvents), (a) => eventForRoute(a.route));
 
   return (
     <Screen
@@ -256,7 +259,7 @@ export function AnimalDetail({ id }: { id: string }) {
               style={s.action}
             >
               <View style={s.actionCircle}>
-                <MaterialCommunityIcons name={x.icon} size={22} color={c.text} />
+                <EventIcon event={eventForRoute(x.route) ?? ""} size={22} color={c.text} />
               </View>
               <Text style={s.actionLabel} numberOfLines={1}>{x.label}</Text>
             </Pressable>

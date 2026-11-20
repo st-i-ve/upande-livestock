@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
+import { EventIcon } from "@/components/EventIcon";
 import { Pill } from "@/components/Pill";
 import { font } from "@/constants/theme";
 import { Screen } from "@/components/Screen";
@@ -20,8 +21,8 @@ import { useOffline } from "@/components/OnlineOnlyNotice";
 
 const MILKING = "/(tabs)/record/events/milk";
 
-const QUALITY = "/(tabs)/quality";
-const MILK_QUALITY = "/(tabs)/milk-quality";
+const QUALITY = "/lab";
+const MILK_QUALITY = "/lab/record";
 
 export default function Record() {
   const c = useColors();
@@ -34,14 +35,16 @@ export default function Record() {
   // Events the farm switched off (Settings -> Events) are not offered either.
   const disabled = useDisabledEvents();
   const base = useMemo(() => visibleFeedSections(visibleSections(RECORD_SECTIONS, disabled), feedTypes), [disabled, feedTypes]);
-  const sections = quality
+  // Quality recording sits right after Servicing and Health, before the rest.
+  const afterHealth = base.findIndex((sec) => sec.title === "Health") + 1;
+  const sections: typeof base = quality
     ? [
-        ...base.slice(0, -1),
-        { title: "Lab", items: [
-          { icon: "flask-outline" as const, label: "Quality", href: QUALITY },
-          { icon: "beaker-check-outline" as const, label: "Milk quality", href: MILK_QUALITY },
+        ...base.slice(0, afterHealth),
+        { title: "Quality", items: [
+          { event: "Milk Quality", label: "Quality recording", href: MILK_QUALITY },
+          { icon: "history" as const, label: "Quality history", href: QUALITY },
         ] },
-        base[base.length - 1],
+        ...base.slice(afterHealth),
       ]
     : base;
   return (
@@ -67,7 +70,11 @@ export default function Record() {
                 pressed && { backgroundColor: c.bgMuted },
               ]}
             >
-              <MaterialCommunityIcons name={it.icon} size={20} color={c.textMuted} />
+              {it.event ? (
+                <EventIcon event={it.event} size={20} color={c.textMuted} />
+              ) : (
+                <MaterialCommunityIcons name={it.icon ?? "circle-outline"} size={20} color={c.textMuted} />
+              )}
               <Text style={s.text}>{it.label}</Text>
               {offline ? (
                 <Pill label={onlineOnly ? "online only" : "works offline"} tone={onlineOnly ? "default" : "success"} />

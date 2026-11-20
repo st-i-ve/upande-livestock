@@ -16,6 +16,8 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { canSeeQuality } from "@/src/auth/roles";
 import { pickCalfPhoto } from "@/src/frappe/calfPhoto";
 import type { FileAsset } from "@/src/frappe/files";
+import { batchLabel } from "@/src/frappe/milkBatchLabel";
+import { getMilkBatches } from "@/src/frappe/milkBatches";
 import { getQualityTestOptions, getQualityTests } from "@/src/frappe/milkQualityTest";
 import {
   CHECK_LABELS,
@@ -74,6 +76,10 @@ export default function MilkQuality() {
   const options = useQuery({ queryKey: ["quality-test-options"], queryFn: () => getQualityTestOptions(), staleTime: 60_000 });
   const history = useQuery({ queryKey: ["quality-tests"], queryFn: () => getQualityTests({}, 15), enabled: !offline });
   const limits = options.data?.limits ?? DEFAULT_LIMITS;
+  // The batches milked lately: a result is recorded against one of them.
+  const batchesQ = useQuery({ queryKey: ["milk-batches"], queryFn: () => getMilkBatches(), enabled: !offline, staleTime: 60_000 });
+  const batches = batchesQ.data ?? [];
+  const batchOf = (rec: string) => batches.find((b) => b.milk_recording === rec);
 
   const [form, setForm] = useState<QualityForm>(() => emptyForm(todayISO()));
   const [photo, setPhoto] = useState<FileAsset | null>(null);
@@ -117,6 +123,7 @@ export default function MilkQuality() {
     setDone(null);
     const problem = formProblem(form);
     if (problem) return setError(problem);
+    if (batches.length && !form.milk_recording) return setError("Choose the milked batch this sample came from.");
     try {
       const r = await mutation.mutateAsync({
         fields: payloadFrom({ ...form, buyer }),
@@ -196,6 +203,25 @@ export default function MilkQuality() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {done ? <Banner tone="success">{done}</Banner> : null}
 
+      <SectionTitle>Milked batch</SectionTitle>
+      {batches.length ? (
+        <Field label="Which milking is this sample from?" help="Date and shift are taken from the batch.">
+          <Picker
+            value={batchOf(form.milk_recording) ? batchLabel(batchOf(form.milk_recording)!) : ""}
+            onChange={(label) => {
+              const b = batches.find((x) => batchLabel(x) === label);
+              setForm((f) => ({ ...f, milk_recording: b?.milk_recording ?? "", sample_date: b?.date ?? f.sample_date, shift: b?.shift ?? f.shift }));
+            }}
+            options={batches.map(batchLabel)}
+            placeholder="Choose the milked batch"
+          />
+        </Field>
+      ) : (
+        <Text style={s.empty}>
+          {offline ? "Batches need a connection: enter the date and shift below." : batchesQ.isLoading ? "Loading batches…" : "No milkings in the last 14 days: enter the date and shift below."}
+        </Text>
+      )}
+
       <SectionTitle>Sample</SectionTitle>
       <FieldRow>
         <View style={{ flex: 1 }}>
@@ -221,17 +247,6 @@ export default function MilkQuality() {
           </Field>
         </View>
       </FieldRow>
-      {options.data?.recordings?.length ? (
-        <Field label="Milking this came from">
-          <Picker
-            value={form.milk_recording ? (options.data.recordings.find((r) => r.name === form.milk_recording)?.herd ?? form.milk_recording) : ""}
-            onChange={(label) => set("milk_recording")(options.data?.recordings.find((r) => r.herd === label)?.name ?? "")}
-            options={options.data.recordings.map((r) => r.herd)}
-            placeholder="Not linked"
-            clearable
-          />
-        </Field>
-      ) : null}
       <FieldRow>
         {num("Quantity (L)", "quantity_l")}
         {num("Receiving temp (°C)", "receiving_temp_c")}
