@@ -30,7 +30,8 @@ export function AddSireModal({ visible, initialName, onClose, onAdded }: {
   const [type, setType] = useState<SireType>("Semen");
   const [sexed, setSexed] = useState(false);
   const [breed, setBreed] = useState("");
-  const [supplier, setSupplier] = useState("");
+  const [breeds, setBreeds] = useState<string[]>([]);
+  const [supplier, setSupplier] = useState<string | null>(null);
   const [item, setItem] = useState("");
   const [animal, setAnimal] = useState("");
   const [term, setTerm] = useState("");
@@ -41,18 +42,18 @@ export function AddSireModal({ visible, initialName, onClose, onAdded }: {
 
   useEffect(() => {
     if (!visible) return;
-    setName(initialName); setCode(""); setType("Semen"); setSexed(false); setBreed(""); setSupplier("");
+    setName(initialName); setCode(""); setType("Semen"); setSexed(false); setBreed(""); setSupplier(null);
     setItem(""); setAnimal(""); setTerm(""); setError(null);
   }, [visible, initialName]);
 
   useEffect(() => {
-    if (!visible || type !== "Semen") return;
+    if (!visible) return;
     let live = true;
     const t = setTimeout(() => {
-      getSireItems(name, code).then((r) => { if (live) { setItems(r.items); setSuggested(r.suggested); } }).catch(() => {});
+      getSireItems(name, code, item).then((r) => { if (live) { setItems(r.items); setSuggested(r.suggested); setBreeds(r.breeds); setSupplier(r.supplier); } }).catch(() => {});
     }, 300);
     return () => { live = false; clearTimeout(t); };
-  }, [visible, type, name, code]);
+  }, [visible, name, code, item]);
 
   const shown = useMemo(() => {
     const words = term.toLowerCase().split(/\s+/).filter(Boolean);
@@ -75,7 +76,7 @@ export function AddSireModal({ visible, initialName, onClose, onAdded }: {
     if (type === "Live bull" && !animal) return setError("A live bull needs his animal record.");
     setBusy(true); setError(null);
     try {
-      const made = await saveSire({ sireName: name.trim(), code: code.trim(), type, sexed, breed: breed.trim(), supplier: supplier.trim(), semenItem: item, animal });
+      const made = await saveSire({ sireName: name.trim(), code: code.trim(), type, sexed, breed, semenItem: item, animal });
       onAdded(sireFromSaved(made, { sireName: name.trim(), code, type, semenItem: item, sexed, animal }));
     } catch (e) { setError(extractFrappeError(e)); }
     setBusy(false);
@@ -126,8 +127,10 @@ export function AddSireModal({ visible, initialName, onClose, onAdded }: {
                 />
               </Field>
             )}
-            <Field label="Breed"><Input value={breed} onChangeText={setBreed} /></Field>
-            <Field label="Supplier"><Input value={supplier} onChangeText={setSupplier} /></Field>
+            <Field label="Breed"><Picker value={breed} onChange={setBreed} options={breeds} placeholder="Pick the breed" /></Field>
+            {type === "Semen" ? (
+              <Field label="Supplier" help="Taken from the straw item."><Input value={(item ? supplier : null) ?? ""} editable={false} placeholder="From the straw item" /></Field>
+            ) : null}
           </ScrollView>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Button variant="outline" label="Cancel" onPress={onClose} style={{ flex: 1 }} />
