@@ -59,13 +59,22 @@
       "expo-web-browser",
       "expo-sqlite",
       "@upande/mobile-kit",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "runtimeVersion": "1.1.0-kaitetdairyfrappe16",
+    "runtimeVersion": "1.2.0-kaitetdairyfrappe16",
     "extra": {
       "router": {},
       "eas": {

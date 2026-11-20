@@ -193,7 +193,7 @@ export function AnimalPickerSheet({
                     </View>
                     <Text style={[s.itemName, { ...font("700") }]}>Select all ({list.length})</Text>
                   </Pressable>
-                ) : null
+                ) : undefined
               }
               renderItem={({ item }) => renderAnimal(item)}
             />

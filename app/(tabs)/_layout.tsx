@@ -30,7 +30,7 @@ function RecordTabButton(props: RecordTabButtonProps) {
       accessibilityRole="button"
       accessibilityLabel="Log a livestock event"
       accessibilityState={{ selected }}
-      android_ripple={null}
+      android_ripple={undefined}
       style={s.recordCell}
     >
       <View style={[s.recordCircle, selected && s.recordCircleSelected]}>
@@ -77,7 +77,7 @@ export default function TabLayout() {
           href: qualityOnly ? null : undefined,
           title: "Animals",
           tabBarIcon: ({ color }) => (
-            <CowIcon size={ICON_SIZE + 3} color={color} />
+            <CowIcon size={ICON_SIZE + 3} color={color as string} />
           ),
         }}
       />
@@ -115,7 +115,7 @@ export default function TabLayout() {
           href: qualityOnly ? undefined : null,
           title: "Quality",
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "flask" : "flask-outline"} size={ICON_SIZE} color={color} />
+            <MaterialCommunityIcons name={focused ? "flask" : "flask-outline"} size={ICON_SIZE} color={color as string} />
           ),
         }}
       />
@@ -124,7 +124,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color} />
+            <MaterialCommunityIcons name={focused ? "account" : "account-outline"} size={ICON_SIZE} color={color as string} />
           ),
         }}
       />

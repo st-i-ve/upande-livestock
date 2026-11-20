@@ -1,10 +1,9 @@
-import type { ImageSourcePropType } from "react-native";
 
 export type AnimalKind = "cow" | "heifer" | "calf" | "bull";
 
 /** Generic photos (512px square) for an animal with no picture of her own.
  *  Sources and licences: assets/animals/CREDITS.md, ANIMAL_PHOTO_CREDITS below. */
-export const KIND_IMAGES: Record<AnimalKind, ImageSourcePropType> = {
+export const KIND_IMAGES: Record<AnimalKind, number> = {
   cow: require("@/assets/animals/photo-cow.jpg"),
   heifer: require("@/assets/animals/photo-heifer.jpg"),
   calf: require("@/assets/animals/photo-calf.jpg"),

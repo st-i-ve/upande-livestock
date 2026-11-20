@@ -180,7 +180,7 @@ export default function Animals() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => refetch()}
+              onRefresh={() => { void refetch(); }}
               tintColor={c.text}
             />
           }
