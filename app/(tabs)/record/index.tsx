@@ -10,6 +10,8 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useAuthStore } from "@/src/auth/authStore";
 import { canSeeQuality } from "@/src/auth/roles";
+import { visibleSections } from "@/src/events/disabled";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 import { visibleFeedSections } from "@/src/feed/feedTypes";
 import { useColors } from "@/src/hooks/useColors";
 import { useFeedTypes } from "@/src/hooks/useFeedTypes";
@@ -28,7 +30,9 @@ export default function Record() {
   const quality = canSeeQuality(useAuthStore((st) => st.roles));
   // Feeding modes switched off (Livestock Settings, Feed types) are not offered.
   const feedTypes = useFeedTypes();
-  const base = useMemo(() => visibleFeedSections(RECORD_SECTIONS, feedTypes), [feedTypes]);
+  // Events the farm switched off (Settings -> Events) are not offered either.
+  const disabled = useDisabledEvents();
+  const base = useMemo(() => visibleFeedSections(visibleSections(RECORD_SECTIONS, disabled), feedTypes), [disabled, feedTypes]);
   const sections = quality
     ? [
         ...base.slice(0, -1),
