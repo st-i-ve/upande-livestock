@@ -6,6 +6,12 @@ import { useColors } from "@/src/hooks/useColors";
 import { useSires } from "@/src/hooks/useSires";
 import { filterSires, sireLabel, type Sire, type SireType } from "@/src/frappe/sireList";
 
+import { useAuthStore } from "@/src/auth/authStore";
+import { canManageSires } from "@/src/auth/can";
+import { mayAddSire } from "@/src/frappe/sireList";
+import { useQueryClient } from "@tanstack/react-query";
+import { AddSireModal } from "./AddSireModal";
+import { useOffline } from "./OnlineOnlyNotice";
 import { Input } from "./Field";
 import { Pill } from "./Pill";
 
@@ -39,6 +45,27 @@ export function SirePickerButton({
   const [query, setQuery] = useState("");
   const [type, setType] = useState<SireType | "All">("All");
   const [freeText, setFreeText] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const canAdd = mayAddSire(canManageSires(useAuthStore((st) => st.can)), useOffline());
+  const addRow = canAdd ? (
+    <Pressable onPress={() => { const q = query.trim(); setOpen(false); setAdding(q); }} style={s.addRow} accessibilityLabel="Add a sire">
+      <Text style={s.addText}>+ Add sire{query.trim() ? ` "${query.trim()}"` : ""}</Text>
+    </Pressable>
+  ) : null;
+  const modal = (
+    <AddSireModal
+      visible={adding !== null}
+      initialName={adding ?? ""}
+      onClose={() => setAdding(null)}
+      onAdded={(sire) => {
+        setAdding(null);
+        qc.setQueryData<Sire[]>(["sires"], (cur) => [...(cur ?? []), sire]);
+        void qc.invalidateQueries({ queryKey: ["sires"] });
+        onPick(sire);
+      }}
+    />
+  );
 
   const chosen = sires.find((x) => x.name === linked);
   const list = useMemo(() => filterSires(sires, query, type), [sires, query, type]);
@@ -52,6 +79,10 @@ export function SirePickerButton({
             <Text style={s.link}>Pick from the sire list instead</Text>
           </Pressable>
         ) : null}
+        {canAdd ? (
+          <Pressable onPress={() => setAdding("")} style={s.addRow}><Text style={s.addText}>+ Add sire</Text></Pressable>
+        ) : null}
+        {modal}
       </View>
     );
   }
@@ -98,12 +129,14 @@ export function SirePickerButton({
             ) : list.length === 0 ? (
               <View style={s.empty}>
                 <Text style={s.emptyText}>No sire matches</Text>
+                {addRow}
               </View>
             ) : (
               <FlatList
                 data={list}
                 keyExtractor={(x) => x.name}
                 keyboardShouldPersistTaps="handled"
+                ListFooterComponent={addRow ?? undefined}
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => { onPick(item); setOpen(false); }}
@@ -124,6 +157,7 @@ export function SirePickerButton({
           </Pressable>
         </Pressable>
       </Modal>
+      {modal}
     </>
   );
 }
@@ -136,6 +170,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     },
     btnChosen: { borderWidth: 1.5, borderColor: c.selected, backgroundColor: c.selectedBg },
     text: { flex: 1, fontSize: 13, color: c.textMuted },
+    addRow: { paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.borderSubtle },
+    addText: { fontSize: 13, ...font("600"), color: c.selected },
     link: { fontSize: 12, color: c.textMuted, textDecorationLine: "underline" },
     backdrop: { flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" },
     sheet: {

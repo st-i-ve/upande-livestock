@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Text } from "react-native";
 
 import { AnimalPickerButton } from "@/components/AnimalPickerButton";
 import { BackdateBanner } from "@/components/BackdateBanner";
@@ -23,7 +23,9 @@ import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
-import { sireFields } from "@/src/frappe/sireList";
+import { sireFields, strawFor, strawHint, type Sire } from "@/src/frappe/sireList";
+import { useAuthStore } from "@/src/auth/authStore";
+import { canManageSires } from "@/src/auth/can";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
@@ -46,6 +48,9 @@ export default function Service() {
   // The picked Livestock Sire, and the typed fallback for "Sire not listed".
   const [sireLink, setSireLink] = useState("");
   const [sire, setSire] = useState("");
+  const [pickedSire, setPickedSire] = useState<Sire | null>(null);
+  const [autoStraw, setAutoStraw] = useState("");
+  const can = useAuthStore((st) => st.can);
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -187,22 +192,30 @@ export default function Service() {
           />
         </>
       ) : null}
-      <Field label="Bull / sire" help={type === "A.I." && consumes ? "Optional. A semen sire fills his straw; with a straw picked, the server takes the sire from the straw." : "Optional."}>
+      <Field label="Bull / sire" help={type === "A.I." && consumes ? "Optional. Picking a semen sire adds his straw by itself." : "Optional."}>
         <SirePickerButton
           linked={sireLink}
           typed={sire}
           onType={setSire}
           onPick={(b) => {
             setSireLink(b?.name ?? "");
-            // A semen sire brings his straw when the form has one to fill.
-            const ch = b?.semenItem ? semenChoices?.find((x) => x.value === b.semenItem) : undefined;
-            if (ch && consumes && type === "A.I.") {
-              setStraw(ch.value);
-              setStrawUom(ch.uom ?? "");
-              setSemenWarehouse(ch.warehouse ?? "");
+            setPickedSire(b);
+            // A semen sire brings his straw (changing the sire replaces it; a sire
+            // with none, or none offered, clears the one the last sire brought).
+            if (consumes && type === "A.I.") {
+              const ch = strawFor(b, semenChoices);
+              if (ch || straw === autoStraw) {
+                setStraw(ch?.value ?? "");
+                setStrawUom(ch?.uom ?? "");
+                setSemenWarehouse(ch?.warehouse ?? "");
+              }
+              setAutoStraw(ch?.value ?? "");
             }
           }}
         />
+        {strawHint(pickedSire, canManageSires(can)) ? (
+          <Text style={{ fontSize: 11.5, marginTop: 4, color: "#8a6d00" }}>{strawHint(pickedSire, canManageSires(can))}</Text>
+        ) : null}
       </Field>
       <VetPicker vets={vets} value={vet} onChange={setVet} label="Vet / AI technician" />
       <Field label="Remarks">

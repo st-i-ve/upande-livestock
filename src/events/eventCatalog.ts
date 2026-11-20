@@ -32,7 +32,7 @@ export const EVENT_GROUPS: { key: EventGroupKey; label: string }[] = [
 export const EVENT_CATALOG: EventEntry[] = [
   { key: "Heat Detection", eventType: "Heat Detection", view: "heat", label: "Heat detection", group: "servicing", icon: "Flame" },
   { key: "Service", eventType: "Service", view: "service", label: "Service", group: "servicing", icon: "Dna" },
-  { key: "Pregnancy Diagnosis", eventType: "Pregnancy Diagnosis", view: "diagnosis", label: "Pregnancy confirmation (PD)", group: "servicing", icon: "ScanHeart" },
+  { key: "Pregnancy Diagnosis", eventType: "Pregnancy Diagnosis", view: "diagnosis", label: "Pregnancy diagnosis", group: "servicing", icon: "ScanHeart" },
   { key: "Abortion", eventType: "Abortion", view: "abortion", label: "Abortion", group: "servicing", icon: "HeartCrack" },
   { key: "Calving", eventType: "Calving", view: "calving", label: "Calving", group: "servicing", icon: "Baby" },
   { key: "Birth", eventType: "Birth", view: null, label: "Birth", group: "servicing", icon: "Sparkles" },

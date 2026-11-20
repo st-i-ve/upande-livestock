@@ -21,6 +21,7 @@ export type Capabilities = {
   cull_vet: boolean;
   cull_manager: boolean;
   quality: boolean;
+  manage_sires?: boolean;
   operator: boolean;
 };
 
@@ -36,6 +37,9 @@ export const mapCapabilities = (raw: unknown): Capabilities | null => {
 export const canRead = (can: Can, doctype: string): boolean => !can || !!can.read?.[doctype];
 export const canCreate = (can: Can, doctype: string): boolean => !can || !!can.create?.[doctype];
 export const canFlag = (can: Can, flag: Exclude<keyof Capabilities, "read" | "create" | "write">): boolean => !can || !!can[flag];
+
+/** Adding or changing a sire is the Livestock Manager's (the desk's manage_sires). */
+export const canManageSires = (can: Can): boolean => !!can && !!can.manage_sires;
 
 /** Mixing and issuing feed moves stock: the stores and manager roles (guard_stock). */
 export const canMix = (can: Can): boolean => canFlag(can, "stock");
