@@ -10,6 +10,11 @@ import {
   CreateMilkRecordingInput,
   createMilkRecording,
 } from "@/src/frappe/milkRecording";
+import {
+  RecordQualityInput,
+  recordQualityTest,
+} from "@/src/frappe/milkQualityTest";
+import { keepSlipPhoto } from "@/src/frappe/slipPhoto";
 import { manufactureHerdFeed } from "@/src/frappe/feeding";
 import { invalidateStock } from "@/src/hooks/useServerLists";
 import { isOfflineError } from "@/src/offline/dispatcher";
@@ -121,6 +126,40 @@ export const useCreateMilkRecording = () => {
     mutationFn: (input: CreateMilkRecordingInput) =>
       tryDirectOrEnqueue("MilkRecording", input, createMilkRecording, labelMilk(input)),
     onSuccess: () => invalidateAll(qc),
+  });
+};
+
+/**
+ * A buyer's quality sheet. Like milking it is kept on the phone when there is no
+ * signal and sent later; unlike milking it posts nothing, so a late send is safe.
+ * The queue entry's id is the `clientRef`, so a send the phone never heard back
+ * from cannot file the sheet twice.
+ */
+export const useRecordQualityTest = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<RecordQualityInput, "clientRef">): Promise<OfflineMutationResult> => {
+      const id = newId();
+      const full: RecordQualityInput = { ...input, clientRef: id };
+      try {
+        return { queued: false, data: await recordQualityTest(full) };
+      } catch (err) {
+        if (!isOfflineError(err)) throw err;
+        const photo = input.slipPhoto ? keepSlipPhoto(input.slipPhoto) : null;
+        const when = stampOffline({}) as { capturedAt: string };
+        const queued = await enqueue({
+          id,
+          type: "MilkQualityTest",
+          payload: { ...full, slipPhoto: photo, capturedAt: when.capturedAt },
+          label: `Milk quality · ${String(input.fields.sample_date ?? "")}`,
+          createdAt: new Date().toISOString(),
+        });
+        return { queued: true, data: queued };
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["quality-tests"] });
+    },
   });
 };
 

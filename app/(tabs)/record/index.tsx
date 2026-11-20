@@ -19,6 +19,7 @@ import { useOffline } from "@/components/OnlineOnlyNotice";
 const MILKING = "/(tabs)/record/events/milk";
 
 const QUALITY = "/(tabs)/quality";
+const MILK_QUALITY = "/(tabs)/milk-quality";
 
 export default function Record() {
   const c = useColors();
@@ -32,7 +33,10 @@ export default function Record() {
   const sections = quality
     ? [
         ...base.slice(0, -1),
-        { title: "Lab", items: [{ icon: "flask-outline" as const, label: "Quality", href: QUALITY }] },
+        { title: "Lab", items: [
+          { icon: "flask-outline" as const, label: "Quality", href: QUALITY },
+          { icon: "beaker-check-outline" as const, label: "Milk quality", href: MILK_QUALITY },
+        ] },
         base[base.length - 1],
       ]
     : base;
@@ -48,7 +52,7 @@ export default function Record() {
         <View key={sec.title}>
           <SectionTitle style={s.section}>{sec.title}</SectionTitle>
           {sec.items.map((it) => {
-            const onlineOnly = offline && it.href !== MILKING;
+            const onlineOnly = offline && it.href !== MILKING && it.href !== MILK_QUALITY;
             return (
             <Pressable
               key={it.href + it.label}

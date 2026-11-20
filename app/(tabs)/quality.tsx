@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -59,6 +60,7 @@ export default function Quality() {
           <Chip label="Feed quality" active={segment === "feed"} onPress={() => setSegment("feed")} />
         </Chips>
       </View>
+      <Button label="Record a buyer's quality result" onPress={() => router.push("/(tabs)/milk-quality" as any)} />
       {segment === "milk" ? <MilkQuality offline={offline} /> : <FeedQuality />}
     </Screen>
   );

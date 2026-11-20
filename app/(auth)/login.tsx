@@ -4,7 +4,6 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
-  Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
@@ -22,6 +21,7 @@ import Animated, {
   cancelAnimation,
   runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -30,12 +30,14 @@ import { TextInput } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
+import { LivestockLogo, PHONE_OUT_MS } from "@/components/LivestockLogo";
 import { BANNER_COLORS } from "@/constants/paperTheme";
 import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useAuthStore } from "@/src/auth/authStore";
 import { classifyError } from "@/src/services/api";
 import { INSTANCE_URL_PLACEHOLDER } from "@/src/services/storage";
+import { sceneOf, useLoginExit, useLoginLogo } from "@/src/logo/loginLogo";
 
 // Login form fields never grow past 80% of the screen width so they stay
 // comfortable to read on tablets and large phones.
@@ -65,6 +67,12 @@ export default function LoginScreen() {
   const instanceUrl = useAuthStore((st) => st.instanceUrl);
   const storedEmail = useAuthStore((st) => st.email);
   const login = useAuthStore((st) => st.login);
+
+  // The logo, as the desk tile: the Upande mark, the cow scene played in as a preview when the
+  // screen appears (a tap plays it again), and after a login played back out to the Upande mark
+  // before the app moves on (AuthGate waits while useLoginExit holds). Reduce-motion: the mark.
+  const reduceMotion = useReducedMotion();
+  const { phase, send } = useLoginLogo(!!reduceMotion);
 
   // Editable mirror of the stored URL. Persists via the login flow.
   const [url, setUrl] = useState(instanceUrl);
@@ -167,9 +175,13 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
+    // Hold the next screen until the logo has played back to the Upande mark.
+    useLoginExit.getState().hold();
     try {
       await login(email.trim(), password, url.trim());
+      send("loggedIn");
     } catch (err) {
+      useLoginExit.getState().release(false);
       setError(classifyError(err).message);
     } finally {
       setLoading(false);
@@ -197,9 +209,20 @@ export default function LoginScreen() {
   // mode has no backing disc to hide a fill behind, so a solid halo would wash
   // across the mark. An expanding outline reads as a pulse against either
   // background and stays inside the black-and-white palette.
+  // The form leaves as the logo returns: eased out over the logo's own exit.
+  const leavingForm = phase === "returning" || phase === "upande" || phase === "navigate";
+  const formOut = useSharedValue(0);
+  useEffect(() => {
+    formOut.value = withTiming(leavingForm ? 1 : 0, { duration: PHONE_OUT_MS, easing: Easing.inOut(Easing.cubic) });
+  }, [leavingForm, formOut]);
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: 1 - formOut.value,
+    transform: [{ translateY: 14 * formOut.value }, { scale: 1 - 0.03 * formOut.value }],
+  }));
+
   const haloStyle = useAnimatedStyle(() => ({
-    opacity: 0.45 * (1 - pulse.value),
-    transform: [{ scale: 0.78 + pulse.value * 0.5 }],
+    opacity: 0.55 * (1 - pulse.value),
+    transform: [{ scale: 0.85 + pulse.value * 0.4 }],
   }));
 
   return (
@@ -226,9 +249,9 @@ export default function LoginScreen() {
             >
               <View style={s.content}>
                 <View style={s.header}>
-                  <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl}>
+                  <Pressable delayLongPress={REVEAL_HOLD_MS} onLongPress={revealUrl} onPress={() => send("replay")}>
                     <View style={s.logoBox}>
-                      {dark ? <View style={s.disc} /> : null}
+                      <View style={s.disc} />
                       {/* Behind the logo and out of layout, so the header never
                           reflows and the mark itself never animates — the logo
                           stays crisp while the ring travels. pointerEvents none
@@ -236,10 +259,11 @@ export default function LoginScreen() {
                       {!hasInstance ? (
                         <Animated.View pointerEvents="none" style={[s.logoHalo, haloStyle]} />
                       ) : null}
-                      <Image
-                        source={require("../../assets/images/upande_logo_no_bg.png")}
-                        style={s.logo}
-                        resizeMode="contain"
+                      <LivestockLogo
+                        size={LOGO}
+                        scene={sceneOf(phase)}
+                        onEntered={() => send("entered")}
+                        onReturned={() => send("returned")}
                       />
                     </View>
                   </Pressable>
@@ -257,6 +281,7 @@ export default function LoginScreen() {
                   <Text style={s.title}>Upande Livestock</Text>
                 </View>
 
+                <Animated.View style={formStyle} pointerEvents={leavingForm ? "none" : "auto"}>
                 <Animated.View
                   pointerEvents={urlRevealed ? "auto" : "none"}
                   style={[s.urlWrap, urlStyle]}
@@ -338,6 +363,7 @@ export default function LoginScreen() {
                 ) : null}
 
                 <Button label="Login" onPress={handleLogin} loading={loading} />
+                </Animated.View>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -348,8 +374,8 @@ export default function LoginScreen() {
 }
 
 const RING = 220;
-const DISC = 190;
-const LOGO = 185;
+const DISC = 220;
+const LOGO = 220;
 const STATUS_GREEN = "#2ECC71";
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
@@ -368,8 +394,7 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       width: RING,
       height: RING,
       borderRadius: RING / 2,
-      borderWidth: 2,
-      borderColor: c.text,
+      backgroundColor: "#ffffff",
     },
     statusDot: {
       width: 10,
@@ -383,7 +408,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderRadius: DISC / 2,
       backgroundColor: "#ffffff",
     },
-    logo: { width: LOGO, height: LOGO },
     title: {
       color: c.text,
       letterSpacing: 1,

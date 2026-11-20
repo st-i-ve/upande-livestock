@@ -1,4 +1,5 @@
 import { discardCalfPhoto } from "@/src/frappe/calfPhoto";
+import { discardSlipPhoto } from "@/src/frappe/slipPhoto";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
@@ -14,6 +15,8 @@ import { STORAGE_KEYS, storage } from "@/src/services/storage";
 export type PendingMutationType =
   | "AnimalEvent"
   | "MilkRecording"
+  /** A buyer's milk quality sheet, recorded without signal. */
+  | "MilkQualityTest"
   | "AnimalDisposal"
   | "Animal"
   | "CalfFeeding"
@@ -92,7 +95,10 @@ export const enqueue = async (
 
 /** A dropped or finished item no longer needs its durable calf photo copy. */
 const discardPhotos = (items: PendingMutation[]) => {
-  for (const m of items) discardCalfPhoto(m.payload?.calfPhoto?.uri);
+  for (const m of items) {
+    discardCalfPhoto(m.payload?.calfPhoto?.uri);
+    discardSlipPhoto(m.payload?.slipPhoto?.uri);
+  }
 };
 
 export const remove = async (id: string): Promise<void> => {

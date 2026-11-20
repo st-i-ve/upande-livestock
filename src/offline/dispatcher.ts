@@ -3,6 +3,7 @@ import { createCheckUp } from "@/src/frappe/checkUp";
 import { treatAnimal } from "@/src/frappe/treatment";
 import { createAnimalDisposal } from "@/src/frappe/animalDisposal";
 import { createMilkRecording } from "@/src/frappe/milkRecording";
+import { recordQualityTest } from "@/src/frappe/milkQualityTest";
 import { extractFrappeError } from "@/src/services/api";
 
 import {
@@ -65,6 +66,7 @@ async function retiredAnimalCreate(): Promise<never> {
 const HANDLERS: Record<PendingMutationType, (payload: any) => Promise<any>> = {
   AnimalEvent: createAnimalEvent,
   MilkRecording: createMilkRecording,
+  MilkQualityTest: recordQualityTest,
   AnimalDisposal: createAnimalDisposal,
   Animal: retiredAnimalCreate,
   CalfFeeding: retiredCalfFeeding,

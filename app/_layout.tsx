@@ -30,6 +30,7 @@ import { startAnimalSync } from "@/src/db/sync";
 import { startAutoDrain } from "@/src/offline/autoDrain";
 import { startRealtime } from "@/src/realtime/realtime";
 import { queryClient } from "@/src/services/queryClient";
+import { useLoginExit } from "@/src/logo/loginLogo";
 import { useScheme, useThemeStore } from "@/src/theme/themeStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -63,17 +64,21 @@ function AuthGate() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const qualityOnly = isQualityOnly(useAuthStore((s) => s.roles));
+  // Just signed in: the login logo is playing back to the Upande mark; move on when it is done.
+  const loginHeld = useLoginExit((s) => s.holding);
 
   React.useEffect(() => {
     if (isLoading) return;
     const inAuthGroup = segments[0] === "(auth)";
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)/login");
+    } else if (isAuthenticated && inAuthGroup && loginHeld) {
+      return;
     } else if (isAuthenticated && inAuthGroup) {
       // The lab role has one view; everyone else lands on the animals.
       router.replace(qualityOnly ? "/(tabs)/quality" : "/(tabs)/animals");
     }
-  }, [isAuthenticated, isLoading, segments, router, qualityOnly]);
+  }, [isAuthenticated, isLoading, segments, router, qualityOnly, loginHeld]);
 
   return null;
 }
