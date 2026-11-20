@@ -19,7 +19,9 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { appetiteLabel, dayIsOpen, fmtKg, signedKg, signedPct, statusTone } from "@/src/feed/daySheet";
-import { defaultChoice, guardChoice, halfLabel, type FeedChoice } from "@/src/feed/feedSessions";
+import { canAmend, canMix } from "@/src/auth/can";
+import { useAuthStore } from "@/src/auth/authStore";
+import { allowedChoices, defaultChoice, guardChoice, halfLabel, type FeedChoice } from "@/src/feed/feedSessions";
 import type { HerdDay } from "@/src/frappe/feedActuals";
 import { useAmendFeedDay, useAnimalIntake, useFeedDayProgram, useManufactureActuals, useResetFeedDay } from "@/src/hooks/useFeedActuals";
 import { useColors } from "@/src/hooks/useColors";
@@ -216,6 +218,10 @@ function HerdCard({
   const [pick, setPick] = useState<FeedChoice | null>(null);
   const choice = pick ?? defaultChoice(day.session);
   const fed = day.session.state !== "not_fed";
+  // Hide what the user's rights or the day do not allow: no Mix without the stock rights or with no choice left, no Amend/Reset without the actuals right.
+  const can = useAuthStore((st) => st.can);
+  const mixAllowed = canMix(can) && allowedChoices(day.session).length > 0;
+  const amendAllowed = canAmend(can);
 
   return (
     <View style={s.card}>
@@ -257,16 +263,22 @@ function HerdCard({
       {day.components.some((x) => x.removed) ? <Text style={s.meta}>Struck through: not used this day, left out of the mix.</Text> : null}
       {day.remarks ? <Text style={s.meta}>Note: {day.remarks}</Text> : null}
 
-      {open ? <SessionPicker session={day.session} value={choice} onChange={setPick} /> : null}
+      {open && mixAllowed ? <SessionPicker session={day.session} value={choice} onChange={setPick} /> : null}
+      {amendAllowed || mixAllowed ? (
       <View style={s.actions}>
+        {amendAllowed ? (
         <View style={{ flex: 1 }}>
           <Button label="Amend" variant="outline" icon="pencil-outline" disabled={!open || offline} onPress={onAmend} />
         </View>
+        ) : null}
+        {mixAllowed ? (
         <View style={{ flex: 1 }}>
           <Button label={`${day.amended ? "Mix as amended" : "Confirm and mix"}${choice === "Half" ? " (half)" : ""}`} icon="grain" disabled={!open || offline || busy} loading={busy} onPress={() => onMix(choice)} />
         </View>
+        ) : null}
       </View>
-      {day.amended && open && !fed ? (
+      ) : null}
+      {amendAllowed && day.amended && open && !fed ? (
         <Button label="Reset to recipe" variant="link" disabled={offline || resetting} loading={resetting} onPress={onReset} />
       ) : null}
       <Button

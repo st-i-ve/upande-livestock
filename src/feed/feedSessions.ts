@@ -106,13 +106,23 @@ export const nextHalf = (s: Pick<DaySession, "sessions">): "Half-1" | "Half-2" =
 export const halfLabel = (s: Pick<DaySession, "sessions">): string => SESSION_LABEL[nextHalf(s)];
 
 /** The two segments of the control. */
-export const segments = (s: DaySession): { value: FeedChoice; label: string }[] => [
-  { value: "Full", label: "Full day" },
-  { value: "Half", label: s.state === "half_fed" ? "Half day (2 of 2)" : "Half day (1 of 2)" },
-];
+export const segments = (s: DaySession): { value: FeedChoice; label: string }[] =>
+  [
+    { value: "Full" as FeedChoice, label: "Full day" },
+    { value: "Half" as FeedChoice, label: s.state === "half_fed" ? "Half day (2 of 2)" : "Half day (1 of 2)" },
+  ].filter((o) => allowedChoices(s).includes(o.value));
 
 /** Which segment to preselect: the second half when one is owed, else a full day. */
-export const defaultChoice = (s: DaySession): FeedChoice => (s.state === "half_fed" ? "Half" : "Full");
+export const defaultChoice = (s: DaySession): FeedChoice => {
+  const wanted: FeedChoice = s.state === "half_fed" ? "Half" : "Full";
+  const ok = allowedChoices(s);
+  return ok.includes(wanted) || ok.length === 0 ? wanted : ok[0];
+};
+
+/** The choices the user is offered: those the server would not refuse (a manager gets them all, to confirm).
+ *  Nothing left means the herd is fed for the day and the user cannot override: no Mix is offered. */
+export const allowedChoices = (s: DaySession): FeedChoice[] =>
+  (["Full", "Half"] as FeedChoice[]).filter((c) => guardChoice(s, c).kind !== "refuse");
 
 export type Guard =
   | { kind: "ok" }

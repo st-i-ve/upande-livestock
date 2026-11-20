@@ -10,6 +10,7 @@ import { font } from "@/constants/theme";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useAuthStore } from "@/src/auth/authStore";
+import { sectionsFor } from "@/src/auth/can";
 import { canSeeQuality } from "@/src/auth/roles";
 import { visibleSections } from "@/src/events/disabled";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
@@ -34,7 +35,12 @@ export default function Record() {
   const feedTypes = useFeedTypes();
   // Events the farm switched off (Settings -> Events) are not offered either.
   const disabled = useDisabledEvents();
-  const base = useMemo(() => visibleFeedSections(visibleSections(RECORD_SECTIONS, disabled), feedTypes), [disabled, feedTypes]);
+  // What the user's rights do not cover (Milker: no Treatment; Attendant: no Milk recording) is left out.
+  const can = useAuthStore((st) => st.can);
+  const base = useMemo(
+    () => visibleFeedSections(visibleSections(sectionsFor(RECORD_SECTIONS, can), disabled), feedTypes),
+    [can, disabled, feedTypes],
+  );
   // Quality recording sits right after Servicing and Health, before the rest.
   const afterHealth = base.findIndex((sec) => sec.title === "Health") + 1;
   const sections: typeof base = quality

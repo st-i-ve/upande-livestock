@@ -22,7 +22,8 @@ test("half fed offers the second half and labels it", () => {
   const s = mapSession(server("half_fed", [half1], { label: "Half fed (1 of 2)", second_due: true }));
   assert.equal(s.secondDue, true);
   assert.equal(halfLabel(s), "Half day, session 2 of 2");
-  assert.equal(segments(s)[1].label, "Half day (2 of 2)");
+  assert.equal(segments(s).length, 1); // a full day on top would be refused, so it is not offered
+  assert.equal(segments(s)[0].label, "Half day (2 of 2)");
   assert.equal(defaultChoice(s), "Half");
   assert.equal(halfLabel(mapSession(server("not_fed"))), "Half day, session 1 of 2");
   assert.equal(defaultChoice(mapSession(server("not_fed"))), "Full");

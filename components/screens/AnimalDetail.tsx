@@ -30,6 +30,8 @@ import { useColors } from "@/src/hooks/useColors";
 import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
 import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
 import { EventIcon } from "@/components/EventIcon";
+import { actionsFor } from "@/src/auth/can";
+import { useAuthStore } from "@/src/auth/authStore";
 import { eventForRoute, visibleActions } from "@/src/events/disabled";
 import { sortByEvent } from "@/src/events/eventCatalog";
 import type { TimelineEvent } from "@/components/Timeline";
@@ -78,6 +80,7 @@ export function AnimalDetail({ id }: { id: string }) {
     error: eventsError,
     refetch: refetchEvents,
   } = useAnimalEvents(id);
+  const can = useAuthStore((st) => st.can);
 
   // Timeline is built from Livestock Event — the doctype every submitted
   // event (movement, service, diagnosis, calving, vaccination, ...) lands in.
@@ -141,7 +144,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const lactating = (a.parity ?? 0) > 0 || profile?.cycle.daysInMilk != null;
   type Action = { label: string; route: string };
   // Servicing first, then Health, then the rest: the shared event catalog's order and icons.
-  const actions: Action[] = sortByEvent(visibleActions<Action>([
+  const actions: Action[] = sortByEvent(actionsFor(visibleActions<Action>([
     { label: "Check up", route: "diagnosis" },
     ...(isFemaleAdult ? [{ label: "Service", route: "service" } as Action] : []),
     { label: "Treat", route: "treatment" },
@@ -153,7 +156,7 @@ export function AnimalDetail({ id }: { id: string }) {
     { label: "Deworm", route: "deworming" },
     { label: "Weigh", route: "weight" },
     { label: "Move", route: "movement" },
-  ], disabledEvents), (a) => eventForRoute(a.route));
+  ], disabledEvents), can), (a) => eventForRoute(a.route));
 
   return (
     <Screen

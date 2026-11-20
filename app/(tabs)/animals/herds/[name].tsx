@@ -11,6 +11,8 @@ import { MetricGrid } from "@/components/MetricGrid";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { extractFrappeError } from "@/src/services/api";
+import { routeAllowed } from "@/src/auth/can";
+import { useAuthStore } from "@/src/auth/authStore";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useAnimals } from "@/src/hooks/useAnimals";
 import { isFeedRouteOn } from "@/src/feed/feedTypes";
@@ -21,6 +23,7 @@ import { useHerds } from "@/src/hooks/useHerds";
 
 export default function HerdDetail() {
   const { canRecord } = useCanRecord();
+  const can = useAuthStore((st) => st.can);
   const feedTypes = useFeedTypes();
   const disabledEvents = useDisabledEvents();
   const { name } = useLocalSearchParams<{ name: string }>();
@@ -97,13 +100,13 @@ export default function HerdDetail() {
         <Empty text="No animals in this herd" />
       )}
 
-      {canRecord ? (
+      {canRecord && (routeAllowed("animal-feed", can) || routeAllowed("milk", can)) ? (
         <>
           <SectionTitle>Quick actions</SectionTitle>
-          {isRouteEnabled("animal-feed", disabledEvents) && isFeedRouteOn("animal-feed", feedTypes) ? (
+          {isRouteEnabled("animal-feed", disabledEvents) && isFeedRouteOn("animal-feed", feedTypes) && routeAllowed("animal-feed", can) ? (
             <Button label="Feed this herd" icon="grain" variant="outline" onPress={() => router.push("/(tabs)/animals/act/animal-feed")} />
           ) : null}
-          {isRouteEnabled("milk", disabledEvents) ? (
+          {isRouteEnabled("milk", disabledEvents) && routeAllowed("milk", can) ? (
           <Button label="Record milking" icon="water" variant="outline" onPress={() => router.push("/(tabs)/animals/act/milk")} />
           ) : null}
         </>

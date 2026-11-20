@@ -24,7 +24,7 @@ import { useScheme } from "@/src/theme/themeStore";
 import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { feedingTabs } from "@/src/feed/feedTypes";
 import { SecondSessionBanner, SessionHistory, SessionPicker, SessionPill } from "@/components/feed/SessionPanel";
-import { defaultChoice, guardChoice, halfLabel, type FeedChoice } from "@/src/feed/feedSessions";
+import { allowedChoices, defaultChoice, guardChoice, halfLabel, type FeedChoice } from "@/src/feed/feedSessions";
 import { useFeedDayStatus } from "@/src/hooks/useFeedDayStatus";
 import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
 import { useHerdRecipes } from "@/src/hooks/useHerdRecipes";
@@ -527,11 +527,16 @@ function SystemTab({
       {submitError ? <Banner tone="danger">{submitError}</Banner> : null}
 
       <OfflineNotice />
+      {/* A herd fed for the day, by a user who cannot override, is offered nothing to run. */}
+      {st && allowedChoices(st.session).length === 0 ? (
+        <Banner tone="info">{`${herd || "This herd"} has been fed for the day.`}</Banner>
+      ) : (
       <Button
         label={manufacture.isPending ? "Mixing…" : "Mix & feed"}
         disabled={manufacture.isPending || !herd || portionNum <= 0}
         onPress={onRun}
       />
+      )}
     </>
   );
 }

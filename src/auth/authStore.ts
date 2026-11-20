@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import type { Capabilities } from "@/src/auth/can";
 import { isQualityOnly } from "@/src/auth/roles";
 import { cachedEmployeeStatus, fetchEmployeeStatus } from "@/src/frappe/employee";
 import { setNotEmployeeHandler } from "@/src/frappe/opsError";
@@ -27,6 +28,8 @@ interface AuthState {
   /** The livestock roles the server says this user holds; `null` until known.
    *  Cached like `isEmployee`: a failed lookup keeps the last answer. */
   roles: string[] | null;
+  /** What the server says the user may do; `null` until known (nothing is hidden then). Cached with the roles. */
+  can: Capabilities | null;
   /** Ask the server who this user is; offline, keep the last answer. */
   refreshEmployeeStatus: () => Promise<void>;
 
@@ -53,6 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   employeeName: null,
   isEmployee: null,
   roles: null,
+  can: null,
 
   refreshEmployeeStatus: async () => {
     try {
@@ -64,6 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isEmployee: st.isEmployee,
         employeeName: st.employee,
         roles: st.roles ?? get().roles,
+        can: st.can ?? get().can,
       });
     } catch (e) {
       // Offline or the server is busy: keep what we last knew.
@@ -96,6 +101,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         employeeName: employee,
         isEmployee: status ? status.isEmployee : null,
         roles: status ? status.roles : null,
+        can: status ? status.can : null,
       });
     } catch (e) {
       console.error("[auth] checkAuth failed", e);
@@ -119,11 +125,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     let employeeName: string | null = null;
     let isEmployee: boolean | null = null;
     let roles: string[] | null = null;
+    let can: Capabilities | null = null;
     try {
       const st = await fetchEmployeeStatus();
       isEmployee = st.isEmployee;
       employeeName = st.employee;
       roles = st.roles;
+      can = st.can;
       if (st.employee) await storage.setItem(STORAGE_KEY_EMPLOYEE, st.employee);
       else await storage.removeItem(STORAGE_KEY_EMPLOYEE);
     } catch (e) {
@@ -138,6 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       employeeName,
       isEmployee,
       roles,
+      can,
     });
     // The whole herd, once, so the phone works offline from here on. Not
     // awaited: a slow sync must not hold up signing in.
@@ -157,6 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       employeeName: null,
       isEmployee: null,
       roles: null,
+      can: null,
     });
     const cleanup = (async () => {
       await api.logout().catch((e: unknown) => console.warn("[auth] server sign-out failed", e));
@@ -196,6 +206,7 @@ setNotEmployeeHandler(() => {
       employee: null,
       employeeName: null,
       roles: useAuthStore.getState().roles,
+      can: useAuthStore.getState().can,
     }),
   );
 });
