@@ -90,12 +90,12 @@ const HANDLERS: Record<PendingMutationType, Handler> = {
   MilkQuality: (p, i) => recordMilkQuality(withRef(p, i as PendingMutation)),
   Feeding: (p, i) => {
     if (p.action === "manual") return manualFeed(withRef(p.input, i as PendingMutation));
-    return manufactureHerdFeed(p.herd, p.portion ?? 1, p.postingDate, p.bomNo, i.id);
+    return manufactureHerdFeed(p.herd, p.portion ?? 1, p.postingDate, p.bomNo, i.id, p.feedSession, p.override);
   },
   FeedDay: (p, i) => {
     if (p.action === "amend") return amendFeedDay(p.herd, p.date, p.kgByItem, p.remarks, i.id);
     if (p.action === "reset") return resetFeedDay(p.herd, p.date, i.id);
-    return manufactureFeedActuals(p.herd, p.date, p.employee, i.id);
+    return manufactureFeedActuals(p.herd, p.date, p.employee, i.id, p.feedSession, p.override);
   },
   // The picture goes up after its record (same keys, queued later). A photo of a
   // treatment still in the queue names it by client_ref; the server finds the case.

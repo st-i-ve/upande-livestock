@@ -45,10 +45,11 @@ export const changedKg = (
 };
 
 /** Mixing needs the day not already mixed; amending needs the same. */
-export const dayIsOpen = (d: Pick<HerdDay, "status">): boolean => d.status === "Planned" || d.status === "Amended";
+export const dayIsOpen = (d: Pick<HerdDay, "status">): boolean =>
+  d.status === "Planned" || d.status === "Amended" || d.status === "Half fed";
 
 export const statusTone = (status: string): "default" | "warning" | "success" =>
-  status === "Waiting for stock" ? "warning" : status === "Manufactured" ? "success" : "default";
+  status === "Waiting for stock" || status === "Half fed" ? "warning" : status === "Manufactured" ? "success" : "default";
 
 export const appetiteLabel = (a: "below" | "above" | "on_plan"): string =>
   a === "below" ? "Below plan" : a === "above" ? "Above plan" : "On plan";

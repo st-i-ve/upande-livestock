@@ -50,6 +50,7 @@ test("changedKg names the items whose box is unusable and does not send them", (
 test("a day is open to amend and mix only while Planned or Amended", () => {
   assert.equal(dayIsOpen({ status: "Planned" }), true);
   assert.equal(dayIsOpen({ status: "Amended" }), true);
+  assert.equal(dayIsOpen({ status: "Half fed" }), true);
   assert.equal(dayIsOpen({ status: "Waiting for stock" }), false);
   assert.equal(dayIsOpen({ status: "Manufactured" }), false);
 });

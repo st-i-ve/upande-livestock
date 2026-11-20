@@ -1,5 +1,6 @@
 import { getClient } from "@/src/services/api";
 import { OpsError } from "@/src/frappe/opsError";
+import { mapSession, type DaySession, type FeedChoice } from "@/src/feed/feedSessions";
 
 /**
  * The feeding day sheet: a herd's plan (its recipe, per head times head count)
@@ -58,6 +59,10 @@ export type HerdDay = {
   issueEntry: string;
   /** Pending after a manufacture that stayed a draft (what stock was short). */
   waitingFor: string[];
+  /** Full day / Half day: what has been fed, what is owed, the sessions so far. */
+  session: DaySession;
+  /** Kilograms fed so far, across the day's sessions. */
+  fedKg: number;
 };
 
 /** The server sends what stock is short as a sentence; older shapes sent a list. */
@@ -108,6 +113,8 @@ export const mapHerdDay = (m: any): HerdDay => ({
   manufactureEntry: m.stock?.manufacture_stock_entry ?? "",
   issueEntry: m.stock?.issue_stock_entry ?? "",
   waitingFor: waitingForList(m.waiting_for),
+  session: mapSession(m.session),
+  fedKg: n(m.fed_kg),
 });
 
 export const getFeedDayProgram = async (date?: string, herd?: string): Promise<FeedDayProgram> => {
@@ -146,8 +153,24 @@ export const resetFeedDay = async (herd: string, date: string, clientRef?: strin
   return mapHerdDay(m);
 };
 
-export const manufactureFeedActuals = async (herd: string, date: string, employee?: string | null, clientRef?: string): Promise<HerdDay> => {
-  const m = await call("feed_actuals.manufacture_feed_actuals", { herd, date, employee: employee || undefined, client_ref: clientRef });
+/** `feedSession` is "Full" or "Half" (the next half of the day); `override` is a manager's
+ *  confirmed feeding of more than a day. Sent so the server mixes exactly that share. */
+export const manufactureFeedActuals = async (
+  herd: string,
+  date: string,
+  employee?: string | null,
+  clientRef?: string,
+  feedSession?: FeedChoice,
+  override?: boolean,
+): Promise<HerdDay> => {
+  const m = await call("feed_actuals.manufacture_feed_actuals", {
+    herd,
+    date,
+    employee: employee || undefined,
+    feed_session: feedSession || undefined,
+    override: override ? 1 : undefined,
+    client_ref: clientRef,
+  });
   return mapHerdDay({ ...m, waiting_for: m.waiting_for });
 };
 
@@ -227,7 +250,10 @@ export type ReportAnimal = {
 
 export type FeedReport = {
   date: string;
-  herds: Omit<HerdDay, "status" | "record" | "bom" | "remarks" | "plannedPerHead" | "actualPerHead" | "varianceKg" | "workOrder" | "transferEntry" | "manufactureEntry" | "issueEntry" | "waitingFor">[];
+  herds: (Omit<HerdDay, "status" | "record" | "bom" | "remarks" | "plannedPerHead" | "actualPerHead" | "varianceKg" | "workOrder" | "transferEntry" | "manufactureEntry" | "issueEntry" | "waitingFor" | "session" | "fedKg"> & {
+    dayState?: string;
+    sessions?: DaySession["sessions"];
+  })[];
   animals: ReportAnimal[];
   totals: FeedTotals;
 };
@@ -250,6 +276,8 @@ export const getDailyFeedReport = async (date?: string, herd?: string): Promise<
         actualKg: d.actualKg,
         components: d.components,
         draftEntries: d.draftEntries,
+        dayState: h.day_state ?? "not_fed",
+        sessions: mapSession({ sessions: h.sessions, state: h.day_state }).sessions,
       };
     }),
     animals: (m.animals ?? []).map((a: any) => ({

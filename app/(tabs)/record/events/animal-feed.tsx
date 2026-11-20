@@ -23,6 +23,8 @@ import { useColors } from "@/src/hooks/useColors";
 import { useScheme } from "@/src/theme/themeStore";
 import { useFeedTypes } from "@/src/hooks/useFeedTypes";
 import { feedingTabs } from "@/src/feed/feedTypes";
+import { SecondSessionBanner, SessionHistory, SessionPicker, SessionPill } from "@/components/feed/SessionPanel";
+import { defaultChoice, guardChoice, halfLabel, type FeedChoice } from "@/src/feed/feedSessions";
 import { useFeedDayStatus } from "@/src/hooks/useFeedDayStatus";
 import { useHerdFeedInfo } from "@/src/hooks/useHerdFeedInfo";
 import { useHerdRecipes } from "@/src/hooks/useHerdRecipes";
@@ -51,7 +53,7 @@ const MANUAL_WARNING =
 type Mode = "system" | "manual";
 
 /** A tab's own input, reported up so "Continue recording" can keep it. */
-type SystemDraft = { portionPick: Portion | null; date: string; filled: boolean };
+type SystemDraft = { portionPick: FeedChoice | null; date: string; filled: boolean };
 type ManualDraft = {
   rows: TunedRow[] | null;
   headsEdit: string | null;
@@ -330,9 +332,10 @@ function SystemTab({
   const day = useFeedDayStatus(herd);
   const manufacture = useManufactureHerdFeed();
 
-  const [portionPick, setPortion] = useState<Portion | null>(resume?.portionPick ?? null);
-  const portion: Portion | null =
-    portionPick ?? (day.data ? (day.data.suggestedPortion === 0.5 ? 0.5 : 1) : null);
+  // Full day or Half day, asked before every run. A herd already fed half a day is offered the second half.
+  const [portionPick, setPortion] = useState<FeedChoice | null>(resume?.portionPick ?? null);
+  const choice: FeedChoice | null = portionPick ?? (day.data ? defaultChoice(day.data.session) : null);
+  const portion: Portion | null = choice === null ? null : choice === "Half" ? 0.5 : 1;
   const [date, setDate] = useState(resume?.date ?? todayISO());
   const { open: backdatingOpen, today: serverToday } = useBackdatingWindow();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -374,10 +377,28 @@ function SystemTab({
     setSubmitError(null);
     if (!herd) return setSubmitError("Pick a herd.");
     if (!d) return setSubmitError("Still loading the herd's programme — try again in a moment.");
-    if (portionNum <= 0) return setSubmitError("A run has to be for more than nothing.");
+    if (portionNum <= 0 || !choice) return setSubmitError("A run has to be for more than nothing.");
+    // The write is queued, so ask about feeding more than a day here, from the state last seen.
+    let override = false;
+    if (st) {
+      const g = guardChoice(st.session, choice);
+      if (g.kind === "refuse") return setSubmitError(g.message);
+      if (g.kind === "confirm") {
+        const yes = await new Promise<boolean>((resolve) =>
+          Alert.alert("More than a day", g.message, [
+            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+            { text: "Feed anyway", style: "destructive", onPress: () => resolve(true) },
+          ]),
+        );
+        if (!yes) return;
+        override = true;
+      }
+    }
     try {
       await manufacture.mutateAsync({
         herd,
+        feedSession: choice,
+        override: override || undefined,
         portion: portionNum,
         postingDate: backdatingOpen ? date : undefined,
         bomNo: selectedBom || undefined,
@@ -436,8 +457,11 @@ function SystemTab({
               ? "The day is fed."
               : `${kg(st.remainingKg)} still owed · run ${st.runsDone + 1} of ${st.runsPerDay}`}
           </Text>
+          <SessionPill session={st.session} />
+          <SessionHistory session={st.session} />
         </View>
       ) : null}
+      {st ? <SecondSessionBanner session={st.session} herdName={herd} /> : null}
 
       <Field
         label="Recipe"
@@ -459,7 +483,11 @@ function SystemTab({
         label="This run"
         help="Half is offered because the farm feeds twice; switch to Full day if this run covers the whole day instead."
       >
-        <PortionSwitch value={portion ?? 1} onChange={setPortion} colors={c} />
+        {st ? (
+          <SessionPicker session={st.session} value={choice} onChange={setPortion} />
+        ) : (
+          <PortionSwitch value={portion ?? 1} onChange={(v) => setPortion(v === 1 ? "Full" : "Half")} colors={c} />
+        )}
       </Field>
 
       <Field label="Date fed">
@@ -472,7 +500,7 @@ function SystemTab({
 
       <Calc
         label="This run mixes and feeds"
-        value={kg(activeTotal * portionNum)}
+        value={`${kg(activeTotal * portionNum)}${choice === "Half" && st ? ` (${halfLabel(st.session).toLowerCase()})` : ""}`}
         footer={`${d.heads} head · mixed into ${d.store} and issued in the same action`}
       />
 

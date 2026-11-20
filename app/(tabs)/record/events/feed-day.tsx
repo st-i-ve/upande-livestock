@@ -14,10 +14,12 @@ import { KV } from "@/components/KV";
 import { Loader } from "@/components/Loader";
 import { OfflineNotice } from "@/components/OnlineOnlyNotice";
 import { Pill } from "@/components/Pill";
+import { SecondSessionBanner, SessionHistory, SessionPicker, SessionPill } from "@/components/feed/SessionPanel";
 import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { appetiteLabel, dayIsOpen, fmtKg, signedKg, signedPct, statusTone } from "@/src/feed/daySheet";
+import { defaultChoice, guardChoice, halfLabel, type FeedChoice } from "@/src/feed/feedSessions";
 import type { HerdDay } from "@/src/frappe/feedActuals";
 import { useAmendFeedDay, useAnimalIntake, useFeedDayProgram, useManufactureActuals, useResetFeedDay } from "@/src/hooks/useFeedActuals";
 import { useColors } from "@/src/hooks/useColors";
@@ -53,7 +55,7 @@ function FeedDay() {
   const [date, setDate] = useState(todayISO());
   const q = useFeedDayProgram(date);
   const [amending, setAmending] = useState<HerdDay | null>(null);
-  const [mixing, setMixing] = useState<HerdDay | null>(null);
+  const [mixing, setMixing] = useState<{ day: HerdDay; choice: FeedChoice; override: boolean; warn?: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [amendError, setAmendError] = useState<string | null>(null);
   const amend = useAmendFeedDay();
@@ -90,12 +92,20 @@ function FeedDay() {
     );
   };
 
+  // The write is queued, so the over-feed check is made here first, from the state the phone last saw.
+  const askMix = (d: HerdDay, choice: FeedChoice) => {
+    const g = guardChoice(d.session, choice);
+    if (g.kind === "refuse") return setNotice(`${d.herdName}: ${g.message}`);
+    setMixing({ day: d, choice, override: g.kind === "confirm", warn: g.kind === "confirm" ? g.message : undefined });
+  };
+
   const doMix = () => {
-    const d = mixing;
-    if (!d) return;
+    const m = mixing;
+    if (!m) return;
+    const d = m.day;
     setMixing(null);
     mix.mutate(
-      { herd: d.herd, date, employee: operator },
+      { herd: d.herd, date, employee: operator, feedSession: m.choice, override: m.override || undefined },
       {
         onSuccess: () =>
           setNotice(`${d.herdName}: saved on this phone. It is mixed and issued when it reaches the server.`),
@@ -137,7 +147,7 @@ function FeedDay() {
             setAmendError(null);
             setAmending(d);
           }}
-          onMix={() => setMixing(d)}
+          onMix={(choice) => askMix(d, choice)}
           onReset={() => doReset(d, false)}
           resetting={reset.isPending}
         />
@@ -163,10 +173,12 @@ function FeedDay() {
       ) : null}
       <ConfirmModal
         visible={!!mixing}
-        title={`Mix ${mixing?.herdName ?? ""}?`}
+        title={`Mix ${mixing?.day.herdName ?? ""}?`}
         message={
-          `This books ${fmtKg(mixing?.actualKg ?? 0)} of feed out of the store for ${date}` +
-          `${mixing?.amended ? ", as amended" : ""}. If stock is short it is saved as a draft and waits for stock.`
+          `${mixing?.warn ? mixing.warn + "\n\n" : ""}` +
+          `${mixing?.choice === "Half" ? halfLabel(mixing.day.session) : "Full day"}: this books ` +
+          `${fmtKg((mixing?.day.actualKg ?? 0) * (mixing?.choice === "Half" ? 0.5 : 1))} of feed out of the store for ${date}` +
+          `${mixing?.day.amended ? ", as amended" : ""}. If stock is short it is saved as a draft and waits for stock.`
         }
         confirmLabel="Mix and feed"
         onConfirm={doMix}
@@ -191,7 +203,7 @@ function HerdCard({
   offline: boolean;
   busy: boolean;
   onAmend: () => void;
-  onMix: () => void;
+  onMix: (choice: FeedChoice) => void;
   onReset: () => void;
   resetting: boolean;
 }) {
@@ -201,6 +213,9 @@ function HerdCard({
   const open = dayIsOpen(day);
   const intake = useAnimalIntake(day.herd, date, showIntake);
   const label = day.status === "Planned" && day.amended ? "Amended" : day.status;
+  const [pick, setPick] = useState<FeedChoice | null>(null);
+  const choice = pick ?? defaultChoice(day.session);
+  const fed = day.session.state !== "not_fed";
 
   return (
     <View style={s.card}>
@@ -209,8 +224,10 @@ function HerdCard({
           <Text style={s.herd}>{day.herdName}</Text>
           <Text style={s.meta}>{day.headCount} head</Text>
         </View>
-        <Pill label={label} tone={statusTone(day.status)} />
+        {fed ? <SessionPill session={day.session} /> : <Pill label={label} tone={statusTone(day.status)} />}
       </View>
+      <SecondSessionBanner session={day.session} herdName={day.herdName} />
+      <SessionHistory session={day.session} />
 
       <View style={s.totals}>
         <Total k="Plan" v={fmtKg(day.plannedKg)} sub={`${day.plannedPerHead.toFixed(2)} kg/head`} />
@@ -240,15 +257,16 @@ function HerdCard({
       {day.components.some((x) => x.removed) ? <Text style={s.meta}>Struck through: not used this day, left out of the mix.</Text> : null}
       {day.remarks ? <Text style={s.meta}>Note: {day.remarks}</Text> : null}
 
+      {open ? <SessionPicker session={day.session} value={choice} onChange={setPick} /> : null}
       <View style={s.actions}>
         <View style={{ flex: 1 }}>
           <Button label="Amend" variant="outline" icon="pencil-outline" disabled={!open || offline} onPress={onAmend} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button label={day.amended ? "Mix as amended" : "Confirm and mix"} icon="grain" disabled={!open || offline || busy} loading={busy} onPress={onMix} />
+          <Button label={`${day.amended ? "Mix as amended" : "Confirm and mix"}${choice === "Half" ? " (half)" : ""}`} icon="grain" disabled={!open || offline || busy} loading={busy} onPress={() => onMix(choice)} />
         </View>
       </View>
-      {day.amended && open ? (
+      {day.amended && open && !fed ? (
         <Button label="Reset to recipe" variant="link" disabled={offline || resetting} loading={resetting} onPress={onReset} />
       ) : null}
       <Button

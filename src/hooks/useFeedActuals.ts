@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getAnimalIntake, getDailyFeedReport, getFeedDayProgram } from "@/src/frappe/feedActuals";
+import { queuedTitle, type FeedChoice } from "@/src/feed/feedSessions";
 import { save } from "@/src/hooks/mutations";
 import { invalidateStock } from "@/src/hooks/useServerLists";
 
@@ -61,8 +62,8 @@ export const useResetFeedDay = () => {
 export const useManufactureActuals = () => {
   const done = useInvalidateFeed();
   return useMutation({
-    mutationFn: (v: { herd: string; date: string; employee?: string | null }) =>
-      save("FeedDay", { action: "mix", ...v }, `Feed mixed · ${v.herd}`, [`herd:${v.herd}`]),
+    mutationFn: (v: { herd: string; date: string; employee?: string | null; feedSession?: FeedChoice; override?: boolean }) =>
+      save("FeedDay", { action: "mix", ...v }, queuedTitle(`Feed mixed · ${v.herd}`, v.feedSession), [`herd:${v.herd}`]),
     onSuccess: done,
   });
 };

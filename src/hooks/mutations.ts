@@ -13,6 +13,7 @@ import type { ManualFeedInput } from "@/src/frappe/manualFeed";
 import type { QualityEntry } from "@/src/frappe/quality";
 import type { WeightOutcome, WeightSession } from "@/src/frappe/weights";
 import { invalidateStock } from "@/src/hooks/useServerLists";
+import { queuedTitle, type FeedChoice } from "@/src/feed/feedSessions";
 import { kickDrain } from "@/src/offline/autoDrain";
 import { keepQueuedPhoto } from "@/src/offline/photos";
 import { PendingMutation, PendingMutationType, enqueue, newId } from "@/src/offline/queue";
@@ -217,8 +218,15 @@ export const useRecordWeights = () => {
 export const useManufactureHerdFeed = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { herd: string; portion?: number; postingDate?: string; bomNo?: string }): Promise<OfflineMutationResult> =>
-      save("Feeding", { action: "manufacture", ...v }, `Feed · ${v.herd}`, [`herd:${v.herd}`]),
+    mutationFn: (v: {
+      herd: string;
+      portion?: number;
+      postingDate?: string;
+      bomNo?: string;
+      feedSession?: FeedChoice;
+      override?: boolean;
+    }): Promise<OfflineMutationResult> =>
+      save("Feeding", { action: "manufacture", ...v }, queuedTitle(`Feed · ${v.herd}`, v.feedSession), [`herd:${v.herd}`]),
     onSuccess: () => invalidateAll(qc),
   });
 };

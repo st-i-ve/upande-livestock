@@ -1,5 +1,6 @@
 import { getClient } from "@/src/services/api";
 import { OpsError } from "@/src/frappe/opsError";
+import { mapSession, type DaySession, type FeedChoice } from "@/src/feed/feedSessions";
 
 /**
  * Animal feeding — two-stage flow backed by whitelisted methods in
@@ -146,6 +147,8 @@ export type FeedDayStatus = {
   runsDone: number;
   suggestedPortion: number;
   complete: boolean;
+  /** Full day / Half day state of today: Not fed, Half fed (1 of 2) or Fully fed. */
+  session: DaySession;
 };
 
 export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => {
@@ -160,6 +163,7 @@ export const getFeedDayStatus = async (herd: string): Promise<FeedDayStatus> => 
     runsDone: Number(m.runs_done ?? 0),
     suggestedPortion: Number(m.suggested_portion ?? 1),
     complete: !!m.complete,
+    session: mapSession(m.session),
   };
 };
 
@@ -184,5 +188,19 @@ export const manufactureHerdFeed = (
   postingDate?: string,
   bomNo?: string,
   clientRef?: string,
+  feedSession?: FeedChoice,
+  override?: boolean,
 ): Promise<ManufactureResult> =>
-  callMethod("manufacture", { herd, portion, posting_date: postingDate, bom_no: bomNo }, clientRef);
+  callMethod(
+    "manufacture",
+    {
+      herd,
+      // A named session decides the share on the server; the portion stays for older servers.
+      portion: feedSession ? (feedSession === "Half" ? 0.5 : 1) : portion,
+      feed_session: feedSession || undefined,
+      override: override ? 1 : undefined,
+      posting_date: postingDate,
+      bom_no: bomNo,
+    },
+    clientRef,
+  );
