@@ -4,11 +4,13 @@ import { StyleProp, View, ViewStyle } from "react-native";
 
 import { useAuthStore } from "@/src/auth/authStore";
 import { useColors } from "@/src/hooks/useColors";
-import { KIND_IMAGES, kindOf, type KindFacts } from "@/src/animalKind";
+import { AnimalSilhouette } from "./AnimalSilhouette";
+import type { SilhouetteSubject } from "@/src/silhouettes";
 import { STORAGE_KEYS, storage } from "@/src/services/storage";
 
 /**
- * The animal's picture, or a generic cow, heifer, calf or bull when she has none. Loaded lazily by
+ * The animal's picture, or her traced silhouette (cow, heifer, bull, steer or
+ * calf, posed by her number, as on the web app) when she has none. Loaded lazily by
  * the view that shows it (no bulk prefetch) and kept on disk by expo-image, so
  * a picture seen once is there offline. Private files need the session cookie.
  */
@@ -22,9 +24,9 @@ export function AnimalImage({
   /** The small version, for rows and pickers; the full `image` is used when absent or if it fails. */
   thumb?: string | null;
   style?: StyleProp<ViewStyle>;
-  /** Her sex, age and stage, to pick the generic picture when she has no photo. */
-  animal?: KindFacts | null;
-  /** Kept for callers written before the generic pictures; unused. */
+  /** Her number, sex, age and stage, to pick the silhouette when she has no photo. */
+  animal?: (Omit<SilhouetteSubject, "id"> & { id?: string | null }) | null;
+  /** Kept for callers written before the silhouettes; unused. */
   iconSize?: number;
 }) {
   const c = useColors();
@@ -62,11 +64,7 @@ export function AnimalImage({
           style={{ width: "100%", height: "100%" }}
         />
       ) : (
-        <Image
-          source={KIND_IMAGES[kindOf(animal)]}
-          contentFit="cover"
-          style={{ width: "100%", height: "100%" }}
-        />
+        <AnimalSilhouette animal={{ ...(animal ?? {}), id: animal?.id ?? "" }} color={c.textSubtle} />
       )}
     </View>
   );

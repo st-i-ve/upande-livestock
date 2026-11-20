@@ -26,6 +26,7 @@ import { useVetChoice } from "@/src/hooks/useVets";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 
 export default function Service() {
 
@@ -52,6 +53,27 @@ export default function Service() {
   const { vets, vet, setVet } = useVetChoice();
   const { refreshing, onRefresh } = usePullToRefresh();
   useRefreshOnFocus();
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Service",
+    state: { selected, type, straw, strawUom, semenWarehouse, sire, remarks, vet, day: isBackdating ? backdateDate : "" },
+    filled:
+      selected.some((a) => a.id !== preset?.id) ||
+      type !== "A.I." ||
+      !!(straw || sire.trim() || remarks.trim()),
+    restore: (d) => {
+      setSelected(d.selected);
+      setType(d.type);
+      setStraw(d.straw);
+      setStrawUom(d.strawUom);
+      setSemenWarehouse(d.semenWarehouse);
+      setSire(d.sire);
+      setRemarks(d.remarks);
+      setVet(d.vet);
+      if (isBackdating && d.day) setBackdateDate(d.day);
+    },
+  });
 
   const handleSubmit = async () => {
     setError(null);

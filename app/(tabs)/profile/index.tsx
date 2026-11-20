@@ -10,18 +10,21 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { OnlineDot } from "@/components/OnlineDot";
+import { SyncBar } from "@/components/SyncBar";
 import { APP, FONT_FAMILY, RADIUS } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
 import { useAuthStore } from "@/src/auth/authStore";
-import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { useOtaUpdate } from "@/src/hooks/useOtaUpdate";
+import { useNetworkStatus } from "@/src/hooks/useNetworkStatus";
 import { usePendingCount } from "@/src/hooks/useQueueStatus";
-import { useLiveStore } from "@/src/realtime/liveStore";
+import { textStepOf } from "@/src/theme/textScale";
+import { useTextScale, useThemePref } from "@/src/theme/themeStore";
 
 type RowProps = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -85,40 +88,49 @@ const runtimeLabel = runtimeVersion ? `Runtime ${runtimeVersion}` : "Runtime emb
 
 export default function Profile() {
   const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
+  // Small phones: a smaller avatar and less padding, so a long name has room.
+  const narrow = useWindowDimensions().width < 380;
+  const s = useMemo(() => makeStyles(c, narrow), [c, narrow]);
   const fullname = useAuthStore((s) => s.fullname);
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
   const isEmployee = useAuthStore((s) => s.isEmployee);
+  const ota = useOtaUpdate();
   const pending = usePendingCount();
   const online = useNetworkStatus();
-  const ota = useOtaUpdate();
-  const live = useLiveStore((x) => x.status);
+  const themePref = useThemePref();
+  const textStep = textStepOf(useTextScale());
 
   const displayName = fullname || email || "Signed in";
   const subtitle = email ?? "";
 
   const [confirmLogout, setConfirmLogout] = useState(false);
 
-  const doLogout = async () => {
+  const doLogout = () => {
     setConfirmLogout(false);
-    await logout();
+    // Leave at once; the sign-out and the wipe finish behind the login page.
     router.replace("/(auth)/login");
+    void logout();
   };
 
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
       <View style={s.appbar}>
-        <Text style={s.appbarTitle}>Profile</Text>
+        <Text style={[s.appbarTitle, { flex: 1 }]}>Profile</Text>
+        <OnlineDot />
       </View>
+      <SyncBar summary />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.userSection}>
           <View style={s.avatar}>
             <Text style={s.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
           </View>
-          <View style={{ marginLeft: 20, flex: 1, justifyContent: "center" }}>
-            <Text style={s.name} numberOfLines={1}>{displayName}</Text>
+          <View style={s.userText}>
+            {/* A long name wraps to a second line and shrinks a little before it is cut. */}
+            <Text style={s.name} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {displayName}
+            </Text>
             {subtitle ? (
               <Text style={s.caption} numberOfLines={1}>{subtitle}</Text>
             ) : null}
@@ -130,37 +142,12 @@ export default function Profile() {
 
         <View style={s.menuWrapper}>
           <Subheader>Settings</Subheader>
-          <Row icon="theme-light-dark" label="Appearance" right={<ThemeToggle />} />
-          {/* The offline queue holds milkings only; this row only reports it. Tapping it
-              went to a pending-submissions screen that no longer exists, so the
-              count is shown here as plain status. */}
+          {/* The offline queue holds milkings only; this row only reports it. */}
           <Row
             icon="cloud-upload-outline"
             label={online === false ? "Offline · milkings waiting to sync" : "Milkings waiting to sync"}
-            right={
-              <Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>
-            }
+            right={<Text style={s.pendingCount}>{pending > 0 ? String(pending) : "None"}</Text>}
           />
-
-          <Row
-            icon="broadcast"
-            label={
-              live === "live" ? "Live updates" : live === "reconnecting" ? "Live updates · reconnecting" : "Live updates · offline"
-            }
-            right={
-              <View
-                accessibilityLabel={`Live updates ${live}`}
-                style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: 5,
-                  backgroundColor: live === "live" ? c.text : live === "reconnecting" ? c.textMuted : c.danger,
-                  marginRight: 4,
-                }}
-              />
-            }
-          />
-
           <Row
             icon="cloud-download-outline"
             label={OTA_LABEL[ota.stage]}
@@ -171,6 +158,21 @@ export default function Profile() {
               ) : (
                 <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
               )
+            }
+          />
+
+          <Subheader>Accessibility</Subheader>
+          <Row
+            icon="format-size"
+            label="Text size & theme"
+            onPress={() => router.push("/accessibility")}
+            right={
+              <View style={s.rowValue}>
+                <Text style={s.rowValueText} numberOfLines={1}>
+                  {textStep.label} · {themePref === "system" ? "System" : themePref === "dark" ? "Dark" : "Light"}
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={c.textSubtle} />
+              </View>
             }
           />
 
@@ -239,12 +241,15 @@ export default function Profile() {
   );
 }
 
-const makeStyles = (c: ReturnType<typeof useColors>) =>
+const makeStyles = (c: ReturnType<typeof useColors>, narrow = false) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.bg },
     appbar: {
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      // The same as every tab's app bar, so the connection dot lines up here too.
+      paddingHorizontal: 12,
+      paddingVertical: 10,
       backgroundColor: c.bg,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.borderSubtle,
@@ -258,25 +263,26 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     userSection: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 24,
+      paddingHorizontal: narrow ? 16 : 24,
       paddingTop: 20,
       paddingBottom: 24,
     },
+    userText: { marginLeft: narrow ? 14 : 20, flex: 1, minWidth: 0, justifyContent: "center" },
     avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: narrow ? 60 : 80,
+      height: narrow ? 60 : 80,
+      borderRadius: narrow ? 30 : 40,
       backgroundColor: c.text,
       alignItems: "center",
       justifyContent: "center",
     },
     avatarText: {
       color: c.bg,
-      fontSize: 32,
+      fontSize: narrow ? 26 : 32,
       fontFamily: FONT_FAMILY.bold,
     },
     name: {
-      fontSize: 22,
+      fontSize: narrow ? 19 : 22,
       color: c.text,
       fontFamily: FONT_FAMILY.bold,
     },
@@ -323,6 +329,8 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       fontSize: 14,
       fontFamily: FONT_FAMILY.regular,
     },
+    rowValue: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 1, maxWidth: "50%" },
+    rowValueText: { fontSize: 13, color: c.textMuted, flexShrink: 1 },
     divider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.borderSubtle,

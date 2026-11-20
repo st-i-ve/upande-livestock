@@ -21,8 +21,11 @@ import { useAnimals } from "@/src/hooks/useAnimals";
 import { useHerdFacts, type HerdFacts } from "@/src/hooks/useHerds";
 import type { Animal } from "@/types";
 
+/** ONE row of chips, one choice: All, Cows, Bulls (every male), then the farm's groups. */
 const FILTERS = [
   { id: "all", label: "All" },
+  { id: "cows", label: "Cows" },
+  { id: "bulls", label: "Bulls" },
   { id: "lactating", label: "Lactating" },
   { id: "heifer", label: "Heifers" },
   { id: "calf", label: "Calves" },
@@ -41,6 +44,8 @@ function matcher(id: string, facts: HerdFacts, anyCalfHerd: boolean): (a: Animal
   const heiferHerds = new Set(facts.heifer);
   const inCalfHerds = new Set(facts.inCalf);
   switch (id) {
+    case "cows": return (a) => a.sex !== "M";
+    case "bulls": return (a) => a.sex === "M";
     case "lactating": return (a) => milking.has(a.herd);
     case "heifer":
       // The farm's heifer herds when set; otherwise unserved females that are
@@ -80,11 +85,12 @@ export default function Animals() {
     const any = facts.calf.length > 0;
     return Object.fromEntries(FILTERS.map((f) => [f.id, matcher(f.id, facts, any)]));
   }, [facts]);
+  // The counts follow the search box, so each chip says how many it would show.
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const f of FILTERS) out[f.id] = f.id === "all" ? animals.length : animals.filter(matchers[f.id]).length;
+    for (const f of FILTERS) out[f.id] = f.id === "all" ? found.length : found.filter(matchers[f.id]).length;
     return out;
-  }, [animals, matchers]);
+  }, [found, matchers]);
 
   const list = useMemo(() => (filter === "all" ? found : found.filter(matchers[filter])), [found, filter, matchers]);
 

@@ -1,5 +1,10 @@
-import '../src/mobile-kit';
+import "@/src/ui/installAlert";
+// First: configures @upande/mobile-kit before anything uses it.
+import { applyKitTheme } from '../src/mobile-kit';
 import { MobileKitProvider } from '@upande/mobile-kit';
+import { BlurTargetRoot } from '@/components/BlurBackdrop';
+import { StatusSheetHost } from '@/components/OnlineDot';
+import { checkKitServer, loadKitServer, useKitServer } from '@/src/kit/kitServer';
 import "@/src/theme/patchText";
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -15,13 +20,16 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import React from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Appearance, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
+import { AppAlertHost } from "@/components/AppAlertHost";
+import { DatePickerHost } from "@/components/DatePickerHost";
 import { getPaperTheme } from "@/constants/paperTheme";
 import { DARK, LIGHT } from "@/constants/theme";
 import { useAuthStore } from "@/src/auth/authStore";
@@ -89,11 +97,23 @@ const paperSettings = {
 
 export default function RootLayout() {
   const scheme = useScheme();
+  // The kit (connection banner, its Settings) follows our theme, light or dark.
+  applyKitTheme(scheme);
+  // Upande Mobile: held off until the signed-in site has it (src/kit/kitServer.ts).
+  // Subscribed so the kit's provider is drawn again when it switches on.
+  useKitServer((k) => k.ready);
+  const kitSignedIn = useAuthStore((st) => st.isAuthenticated);
+  const site = useAuthStore((st) => st.instanceUrl);
+  React.useEffect(() => {
+    const url = site?.trim() || null;
+    void loadKitServer(url).then(() => (kitSignedIn ? checkKitServer(url) : undefined));
+  }, [kitSignedIn, site]);
   const dark = scheme === "dark";
   const palette = dark ? DARK : LIGHT;
 
   const hydrate = useThemeStore((s) => s.hydrate);
   const hydrated = useThemeStore((s) => s.hydrated);
+  const themeOverride = useThemeStore((s) => s.override);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const authLoading = useAuthStore((s) => s.isLoading);
   const signedIn = useAuthStore((s) => s.isAuthenticated);
@@ -107,6 +127,20 @@ export default function RootLayout() {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+
+  // The theme chosen in Profile > Accessibility reaches native UI too (date
+  // pickers, alerts, the window behind a modal), not only our own palette.
+  React.useEffect(() => {
+    if (!hydrated) return;
+    try {
+      Appearance.setColorScheme(themeOverride ?? "unspecified");
+    } catch {
+      // older native module: our own palette still follows the choice
+    }
+  }, [hydrated, themeOverride]);
+  React.useEffect(() => {
+    SystemUI.setBackgroundColorAsync(palette.bg).catch(() => {});
+  }, [palette.bg]);
 
   React.useEffect(() => {
     hydrate();
@@ -176,6 +210,8 @@ export default function RootLayout() {
           <PaperProvider theme={getPaperTheme(scheme)} settings={paperSettings}>
             <ThemeProvider value={navTheme(dark)}>
               <AuthGate />
+              {/* The app's content, which a sheet's backdrop blurs (components/BlurBackdrop). */}
+              <BlurTargetRoot backgroundColor={palette.bg}>
               <Stack
                 screenOptions={{
                   headerShown: false,
@@ -185,8 +221,16 @@ export default function RootLayout() {
               >
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="accessibility" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
               </Stack>
+              </BlurTargetRoot>
               <StatusBar style={dark ? "light" : "dark"} />
+              {/* Every Alert.alert, drawn over everything (src/ui/alert.ts). */}
+              <AppAlertHost />
+              {/* Every date/time picker, as the app's own sheet (src/ui/datetimepicker.tsx). */}
+              <DatePickerHost />
+              {/* The green dot's sheet, over everything, its backdrop blurring the page. */}
+              <StatusSheetHost />
             </ThemeProvider>
           </PaperProvider>
         </SafeAreaProvider>

@@ -1,5 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -142,6 +144,74 @@ export function AnimalPhotos({
   );
 }
 
+/** A photo that pinches up to 4x, pans while zoomed and double-taps in and out.
+ *  Unzoomed, the pan is off so the pager's swipe moves to the next photo. */
+function ZoomPic({ photo, width, height }: { photo: AnimalPhoto; width: number; height: number }) {
+  const scale = useSharedValue(1);
+  const base = useSharedValue(1);
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const sx = useSharedValue(0);
+  const sy = useSharedValue(0);
+  const [zoomed, setZoomed] = useState(false);
+  const reset = () => {
+    "worklet";
+    scale.value = withTiming(1);
+    base.value = 1;
+    x.value = withTiming(0);
+    y.value = withTiming(0);
+    sx.value = 0;
+    sy.value = 0;
+  };
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(4, Math.max(1, base.value * e.scale));
+    })
+    .onEnd(() => {
+      if (scale.value <= 1.02) {
+        reset();
+        runOnJS(setZoomed)(false);
+      } else {
+        base.value = scale.value;
+        runOnJS(setZoomed)(true);
+      }
+    });
+  const pan = Gesture.Pan()
+    .enabled(zoomed)
+    .onUpdate((e) => {
+      const mx = (width * (scale.value - 1)) / 2;
+      const my = (height * (scale.value - 1)) / 2;
+      x.value = Math.min(mx, Math.max(-mx, sx.value + e.translationX));
+      y.value = Math.min(my, Math.max(-my, sy.value + e.translationY));
+    })
+    .onEnd(() => {
+      sx.value = x.value;
+      sy.value = y.value;
+    });
+  const dbl = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scale.value > 1) {
+        reset();
+        runOnJS(setZoomed)(false);
+      } else {
+        scale.value = withTiming(2.5);
+        base.value = 2.5;
+        runOnJS(setZoomed)(true);
+      }
+    });
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }],
+  }));
+  return (
+    <GestureDetector gesture={Gesture.Simultaneous(pinch, pan, dbl)}>
+      <Animated.View style={[{ width, height, backgroundColor: "#000" }, style]}>
+        <Pic photo={photo} style={{ width, height, backgroundColor: "#000" }} />
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
 export function Viewer({ photos, start, onClose }: { photos: AnimalPhoto[]; start: number; onClose: () => void }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
@@ -150,7 +220,7 @@ export function Viewer({ photos, start, onClose }: { photos: AnimalPhoto[]; star
   const p = photos[index];
   return (
     <Modal visible transparent={false} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={s.viewer}>
+      <GestureHandlerRootView style={s.viewer}>
         <FlatList
           data={photos}
           horizontal
@@ -160,7 +230,7 @@ export function Viewer({ photos, start, onClose }: { photos: AnimalPhoto[]; star
           keyExtractor={(x, i) => `${x.url}-${i}`}
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
-          renderItem={({ item }) => <Pic photo={item} style={{ width, height: height * 0.72, backgroundColor: "#000" }} />}
+          renderItem={({ item }) => <ZoomPic photo={item} width={width} height={height * 0.72} />}
         />
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={s.close}>
           <MaterialCommunityIcons name="close" size={26} color="#fff" />
@@ -176,7 +246,7 @@ export function Viewer({ photos, start, onClose }: { photos: AnimalPhoto[]; star
             {p.ref_doctype !== "Animal" ? <Text style={s.infoRef}>{p.ref_name}</Text> : null}
           </View>
         ) : null}
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

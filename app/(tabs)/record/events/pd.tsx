@@ -20,6 +20,7 @@ import { useOperator } from "@/src/hooks/useOperator";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { extractFrappeError } from "@/src/services/api";
 import type { Animal } from "@/types";
+import { useRecordDraft } from "@/src/hooks/useRecordDraft";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
 
@@ -51,6 +52,19 @@ export default function PD() {
     () => new Set(eligibility?.diagnosable ?? []),
     [eligibility],
   );
+
+  // Left by a tab switch with input in it: kept for "Continue recording".
+  useRecordDraft({
+    title: "Pregnancy diagnosis",
+    state: { selected, result, remarks, vet },
+    filled: selected.some((a) => a.id !== preset?.id) || result !== "Confirmed" || !!remarks.trim(),
+    restore: (d) => {
+      setSelected(d.selected);
+      setResult(d.result);
+      setRemarks(d.remarks);
+      setVet(d.vet);
+    },
+  });
 
   const handleSubmit = async () => {
     setError(null);

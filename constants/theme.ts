@@ -25,6 +25,10 @@ export const LIGHT = {
   // Legacy keys mapped to monochrome equivalents so existing components
   // keep compiling without further edits. Do not introduce new tinted keys.
   brand: "#000000",
+  // The chosen animal in a picker: the one orange the farm asked for, so the
+  // pick stands out from the monochrome list. Border + a soft tint behind.
+  selected: "#EA580C",
+  selectedBg: "rgba(234, 88, 12, 0.10)",
 } as const;
 
 export type Palette = { [K in keyof typeof LIGHT]: string };
@@ -46,6 +50,8 @@ export const DARK: Palette = {
   warning: "#9CA3AF",
   danger: "#E5484D",
   brand: "#FFFFFF",
+  selected: "#FB923C",
+  selectedBg: "rgba(251, 146, 60, 0.16)",
 };
 
 // Backwards-compatible static export. Screens not yet migrated to useColors()
@@ -108,7 +114,7 @@ export const FONT = {
 export const APP = {
   /** Last-resort fallback for the version caption when neither the Expo config
    *  nor the native build number can be read. Everything else that used to live
-   *  here — farm, operator name, milk price, "today" — was demo data standing in
+   *  here — farm, operator name, "today" — was demo data standing in
    *  for the backend. It now comes from the session or from Livestock Settings,
    *  where it can actually be correct. */
   version: "1.0.0",
