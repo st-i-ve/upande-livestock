@@ -21,6 +21,8 @@ export type QualityTest = {
   milk_recording: string | null;
   quantity_l: number | null;
   butterfat_percent: number | null;
+  bulk_scc?: number | null;
+  scc_over_ceiling?: boolean;
   protein_percent: number | null;
   snf_percent: number | null;
   ph: number | null;
@@ -35,6 +37,7 @@ export type QualityTestOptions = {
   sample_types: string[];
   shifts: string[];
   limits: QualityLimits;
+  scc_ceiling?: number;
   recordings: { name: string; herd: string; milking_time: string; net_yield_kg: number }[];
   can_write: boolean;
 };
@@ -62,7 +65,7 @@ export const getQualityTests = async (
 
 export type RecordQualityInput = {
   /** Server fields, built by `payloadFrom`. */
-  fields: Record<string, string | number>;
+  fields: Record<string, string | number | string[]>;
   /** Stable per recording; the queue's own id, so a retry cannot duplicate. */
   clientRef: string;
   /** A photo of the lab slip, held on the phone until the sheet is sent. */

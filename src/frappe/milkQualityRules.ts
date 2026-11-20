@@ -42,6 +42,7 @@ export type QualityForm = {
   specific_gravity: string;
   protein_percent: string;
   butterfat_percent: string;
+  bulk_scc: string;
   resazurin_score: string;
   resazurin_result: string;
   antibiotics: string;
@@ -56,14 +57,14 @@ export type QualityForm = {
 export const emptyForm = (date: string, buyer = ""): QualityForm => ({
   sample_date: date, shift: "", sample_type: "Bottle sample", buyer, milk_recording: "",
   quantity_l: "", receiving_temp_c: "", ph: "", tta: "", snf_percent: "", freezing_point: "",
-  specific_gravity: "", protein_percent: "", butterfat_percent: "", resazurin_score: "",
+  specific_gravity: "", protein_percent: "", butterfat_percent: "", bulk_scc: "", resazurin_score: "",
   resazurin_result: "", antibiotics: "", hydrogen_peroxide: "", frothing: "", aflatoxin_ppt: "",
   sensory_score: "", sensory_note: "", remarks: "",
 });
 
 export const NUMBER_FIELDS = [
   "quantity_l", "receiving_temp_c", "ph", "tta", "snf_percent", "freezing_point",
-  "specific_gravity", "protein_percent", "butterfat_percent", "aflatoxin_ppt",
+  "specific_gravity", "protein_percent", "butterfat_percent", "bulk_scc", "aflatoxin_ppt",
 ] as const;
 
 const OUTCOME_FIELDS = [
@@ -112,6 +113,13 @@ export const previewChecks = (form: QualityForm, lim: QualityLimits): Record<Che
     frothing: !form.frothing ? null : form.frothing === "Pass" ? "pass" : "fail",
     aflatoxin: afla > 0 && lim.aflatoxin_limit_ppt > 0 ? (afla > lim.aflatoxin_limit_ppt ? "fail" : "pass") : null,
   };
+};
+
+/** A typed bulk SCC (cells/ml × 1000) above the farm's ceiling; 0 means no ceiling. */
+export const sccOver = (text: string, ceiling: number): boolean => {
+  if (!text.trim() || !ceiling) return false;
+  const n = toNumber(text);
+  return Number.isFinite(n) && n > ceiling;
 };
 
 export type Overall = "Pass" | "Fail" | "Not assessed";

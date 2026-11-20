@@ -10,7 +10,6 @@ import { RecordQualityInput } from "@/src/frappe/milkQualityTest";
 import type { FileAsset } from "@/src/frappe/files";
 import type { PhotoContext } from "@/src/frappe/animalPhotos";
 import type { ManualFeedInput } from "@/src/frappe/manualFeed";
-import type { QualityEntry } from "@/src/frappe/quality";
 import type { WeightOutcome, WeightSession } from "@/src/frappe/weights";
 import { invalidateStock } from "@/src/hooks/useServerLists";
 import { queuedTitle, type FeedChoice } from "@/src/feed/feedSessions";
@@ -148,17 +147,11 @@ export const useRecordQualityTest = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quality-tests"] });
+      // The result is also written back onto the batch's milk recordings.
+      qc.invalidateQueries({ queryKey: ["milk-batches"] });
+      qc.invalidateQueries({ queryKey: ["quality-options"] });
+      qc.invalidateQueries({ queryKey: ["milk"] });
     },
-  });
-};
-
-/** The older Quality screen: lab figures against a recorded milking. */
-export const useRecordMilkQuality = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (entry: QualityEntry): Promise<OfflineMutationResult> =>
-      save("MilkQuality", entry, `Milk quality · ${entry.recording}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["milk"] }),
   });
 };
 

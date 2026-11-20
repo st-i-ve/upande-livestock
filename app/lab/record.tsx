@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import React, { useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Banner } from "@/components/Banner";
 import { Button } from "@/components/Button";
+import { ResultChip } from "@/components/ResultChip";
 import { Chip, Chips } from "@/components/Chips";
 import { DateField } from "@/components/DateTimeField";
 import { Field, FieldRow, Input, Textarea } from "@/components/Field";
@@ -16,7 +18,7 @@ import { useAuthStore } from "@/src/auth/authStore";
 import { canSeeQuality } from "@/src/auth/roles";
 import { pickCalfPhoto } from "@/src/frappe/calfPhoto";
 import type { FileAsset } from "@/src/frappe/files";
-import { batchLabel } from "@/src/frappe/milkBatchLabel";
+import { batchFields, batchLabel, pendingFirst } from "@/src/frappe/milkBatchLabel";
 import { getMilkBatches } from "@/src/frappe/milkBatches";
 import { getQualityTestOptions, getQualityTests } from "@/src/frappe/milkQualityTest";
 import {
@@ -27,10 +29,10 @@ import {
   payloadFrom,
   previewChecks,
   previewOverall,
+  sccOver,
   toggleSensorySign,
   toggleSign,
   type CheckKey,
-  type Chip as ChipValue,
   type QualityForm,
 } from "@/src/frappe/milkQualityRules";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
@@ -42,21 +44,6 @@ import { extractFrappeError, todayISO } from "@/src/services/api";
 const SAMPLE_TYPES = ["Bottle sample", "Tanker", "Can"];
 const SHIFTS = ["Morning", "Afternoon", "Evening"];
 const CHECKS = Object.keys(CHECK_LABELS) as CheckKey[];
-
-/** Pass / Fail as a word and a mark, never colour alone. */
-function ResultChip({ label, chip }: { label: string; chip: ChipValue }) {
-  const c = useColors();
-  const s = useMemo(() => makeStyles(c), [c]);
-  if (!chip) return <Text style={s.chipOff}>{label} —</Text>;
-  const bad = chip === "fail";
-  return (
-    <View style={[s.chip, bad && { borderColor: c.danger }]}>
-      <Text style={[s.chipText, bad && { color: c.danger, ...font("700") }]}>
-        {bad ? "✕" : chip === "warn" ? "!" : "✓"} {label}
-      </Text>
-    </View>
-  );
-}
 
 /**
  * Milk quality: the buyer's result sheet for a batch, recorded on the phone.
@@ -78,16 +65,27 @@ export default function MilkQuality() {
   const limits = options.data?.limits ?? DEFAULT_LIMITS;
   // The batches milked lately: a result is recorded against one of them.
   const batchesQ = useQuery({ queryKey: ["milk-batches"], queryFn: () => getMilkBatches(), enabled: !offline, staleTime: 60_000 });
-  const batches = batchesQ.data ?? [];
+  // Batches awaiting a result first (the server orders them so; sorted again for old servers).
+  const batches = useMemo(() => pendingFirst(batchesQ.data ?? []), [batchesQ.data]);
+  const { batch: wantedBatch } = useLocalSearchParams<{ batch?: string }>();
   const batchOf = (rec: string) => batches.find((b) => b.milk_recording === rec);
+  const ceiling = options.data?.scc_ceiling ?? 0;
 
   const [form, setForm] = useState<QualityForm>(() => emptyForm(todayISO()));
   const [photo, setPhoto] = useState<FileAsset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  // Arriving from the Quality list with a batch tapped: pick it.
+  useEffect(() => {
+    const b = wantedBatch ? batches.find((x) => x.key === wantedBatch) : undefined;
+    if (b) setForm((f) => (f.milk_recording === b.milk_recording ? f : { ...f, milk_recording: b.milk_recording, sample_date: b.date, shift: b.shift }));
+  }, [wantedBatch, batches]);
+
   const buyer = form.buyer || options.data?.default_buyer || "";
   const set = (k: keyof QualityForm) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const pickedBatch = form.milk_recording ? batchOf(form.milk_recording) : undefined;
+  const sccHigh = sccOver(form.bulk_scc, ceiling);
   const checks = useMemo(() => previewChecks(form, limits), [form, limits]);
   const overall = previewOverall(checks);
 
@@ -126,7 +124,8 @@ export default function MilkQuality() {
     if (batches.length && !form.milk_recording) return setError("Choose the milked batch this sample came from.");
     try {
       await mutation.mutateAsync({
-        fields: payloadFrom({ ...form, buyer }),
+        // Every recording of the batch, so the server writes SCC, fat and protein onto each.
+        fields: { ...payloadFrom({ ...form, buyer }), ...(pickedBatch ? { recordings: batchFields(pickedBatch).recordings } : {}) },
         slipPhoto: photo,
       });
       setDone("Saved on this phone. It is sent when there is signal.");
@@ -258,6 +257,14 @@ export default function MilkQuality() {
       </FieldRow>
       <FieldRow>
         {num("Butter fat %", "butterfat_percent")}
+        {num("Bulk SCC (cells/ml × 1000)", "bulk_scc", { help: ceiling ? `Ceiling ${ceiling}` : undefined })}
+      </FieldRow>
+      {sccHigh ? (
+        <Banner tone="danger">
+          {form.bulk_scc} is above the farm&apos;s ceiling of {ceiling}. It will still be recorded and flagged.
+        </Banner>
+      ) : null}
+      <FieldRow>
         {num("Aflatoxin M1 (ppt)", "aflatoxin_ppt", { help: `Fails above ${limits.aflatoxin_limit_ppt || "—"}` })}
       </FieldRow>
 
@@ -323,7 +330,7 @@ export default function MilkQuality() {
                 {t.sample_date} · {t.sample_type}
               </Text>
               <Text style={s.meta}>
-                {t.buyer || "—"} · Fat {t.butterfat_percent ?? "—"} · Protein {t.protein_percent ?? "—"} · SNF {t.snf_percent ?? "—"}
+                {t.buyer || "—"} · SCC {t.bulk_scc ?? "—"}{t.scc_over_ceiling ? " (over ceiling)" : ""} · Fat {t.butterfat_percent ?? "—"} · Protein {t.protein_percent ?? "—"} · SNF {t.snf_percent ?? "—"}
               </Text>
               <View style={[s.chips, { marginTop: 4 }]}>
                 {CHECKS.map((k) => (
@@ -352,12 +359,6 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
       borderWidth: StyleSheet.hairlineWidth, borderColor: c.borderSubtle, gap: 8,
     },
     chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-    chip: {
-      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth, borderColor: c.borderSubtle,
-    },
-    chipText: { fontSize: 11, color: c.text },
-    chipOff: { fontSize: 11, color: c.textSubtle, paddingVertical: 3 },
     overall: { fontSize: 16, color: c.text, ...font("600") },
     overallSmall: { fontSize: 13, color: c.text, ...font("600") },
     empty: { paddingVertical: 16, textAlign: "center", color: c.textSubtle, fontSize: 12 },

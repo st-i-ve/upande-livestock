@@ -81,3 +81,15 @@ test("the sign buttons flip a figure and a sensory score", () => {
   assert.equal(toggleSensorySign("1"), "-1");
   assert.equal(toggleSensorySign(""), "-");
 });
+
+test("bulk SCC is a number the form sends, counts as a result by itself, and is judged against the ceiling", async () => {
+  const { sccOver } = await import("../milkQualityRules.ts");
+  const f = { ...emptyForm("2026-11-19"), bulk_scc: "250,5" };
+  assert.equal(formProblem(f), null);
+  assert.equal(payloadFrom(f).bulk_scc, 250.5);
+  assert.equal(sccOver("250", 200), true);
+  assert.equal(sccOver("150", 200), false);
+  assert.equal(sccOver("250", 0), false, "no ceiling set, no alert");
+  assert.equal(sccOver("", 200), false);
+  assert.equal(formProblem({ ...f, bulk_scc: "abc" }), "bulk scc must be a number.");
+});
