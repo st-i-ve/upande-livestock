@@ -6,9 +6,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PillButton } from "@/components/PillButton";
 import { PillSegmented } from "@/components/PillSegmented";
+import { TextSizeSlider } from "@/components/TextSizeSlider";
 import { RADIUS, font } from "@/constants/theme";
 import { useColors } from "@/src/hooks/useColors";
-import { TEXT_STEPS, TOTAL_SCALE_CAP, effectiveScale, textStepOf, type ThemePref } from "@/src/theme/textScale";
+import { DEFAULT_TEXT_SCALE, TOTAL_SCALE_CAP, effectiveScale, textScalePercent, type ThemePref } from "@/src/theme/textScale";
 import { useTextScale, useThemePref, useThemeStore } from "@/src/theme/themeStore";
 
 const THEMES: { id: ThemePref; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
@@ -17,13 +18,10 @@ const THEMES: { id: ThemePref; label: string; icon: keyof typeof MaterialCommuni
   { id: "dark", label: "Dark", icon: "moon-waning-crescent" },
 ];
 
-/** The "A" on each size step, drawn at a fixed size so the control never grows. */
-const STEP_GLYPH = [14, 16, 20, 26];
-
 /**
  * Profile > Accessibility > Text size & theme. A modal over the profile: the
- * theme (System, Light, Dark) and the text size step, both applied the moment
- * they are tapped — the whole app behind, and the preview here, change at once —
+ * theme (System, Light, Dark) and the text size slider, both applied the moment
+ * they change — the whole app behind, and the preview here, change at once —
  * and both remembered on the phone.
  */
 export default function Accessibility() {
@@ -34,7 +32,6 @@ export default function Accessibility() {
   const setThemePref = useThemeStore((st) => st.setThemePref);
   const setTextScale = useThemeStore((st) => st.setTextScale);
   const osScale = useWindowDimensions().fontScale;
-  const step = textStepOf(scale);
   const total = effectiveScale(scale, osScale);
 
   return (
@@ -73,22 +70,24 @@ export default function Accessibility() {
           {pref === "system" ? "Follows the phone's light or dark setting." : `Always ${pref}, whatever the phone is set to.`}
         </Text>
 
-        <Text style={[s.section, { marginTop: 28 }]}>Text size · {step.label}</Text>
-        <PillSegmented
-          value={step.id}
-          onChange={(id) => setTextScale(TEXT_STEPS.find((t) => t.id === id)!.scale)}
-          minHeight={56}
-          testID="text-size-segmented"
-          options={TEXT_STEPS.map((t, i) => ({
-            id: t.id,
-            label: `${t.label} text`,
-            render: (on: boolean) => (
-              <Text allowFontScaling={false} style={[s.glyph, { fontSize: STEP_GLYPH[i], lineHeight: STEP_GLYPH[i] + 8 }, on && s.segLabelOn]}>
-                A
-              </Text>
-            ),
-          }))}
-        />
+        <View style={s.sizeHead}>
+          <Text style={[s.section, { marginBottom: 0 }]}>Text size · {textScalePercent(scale)}</Text>
+          <Pressable
+            onPress={() => setTextScale(DEFAULT_TEXT_SCALE)}
+            disabled={scale === DEFAULT_TEXT_SCALE}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Reset text size to default"
+            testID="text-size-reset"
+          >
+            <Text style={[s.reset, scale === DEFAULT_TEXT_SCALE && { opacity: 0.4 }]}>Reset to default</Text>
+          </Pressable>
+        </View>
+        <View style={s.sliderRow}>
+          <Text allowFontScaling={false} style={[s.glyph, { fontSize: 14 }]}>A</Text>
+          <TextSizeSlider value={scale} onChange={setTextScale} testID="text-size-slider" />
+          <Text allowFontScaling={false} style={[s.glyph, { fontSize: 28 }]}>A</Text>
+        </View>
 
         <Text style={[s.section, { marginTop: 28 }]}>Preview</Text>
         <View style={s.preview}>
@@ -139,6 +138,9 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     section: { fontSize: 13, ...font("600"), color: c.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.4 },
     segLabel: { fontSize: 14, ...font("500"), color: c.text, flexShrink: 1 },
     segLabelOn: { color: c.bg, ...font("600") },
+    sizeHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 28, marginBottom: 6 },
+    reset: { fontSize: 14, ...font("600"), color: c.text, textDecorationLine: "underline" },
+    sliderRow: { flexDirection: "row", alignItems: "center", gap: 12 },
     glyph: { ...font("600"), color: c.text },
     hint: { fontSize: 13, color: c.textMuted, marginTop: 10 },
     preview: {

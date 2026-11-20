@@ -14,27 +14,39 @@ export const parseThemePref = (v: string | null | undefined): ThemePref =>
 
 export type TextStep = { id: string; label: string; scale: number };
 
-export const TEXT_STEPS: readonly TextStep[] = [
-  { id: "small", label: "Small", scale: 0.9 },
-  { id: "default", label: "Default", scale: 1 },
-  { id: "large", label: "Large", scale: 1.15 },
-  { id: "xl", label: "Extra large", scale: 1.3 },
-];
-
+export const MIN_TEXT_SCALE = 0.85;
+export const MAX_TEXT_SCALE = 1.4;
+export const TEXT_SCALE_STEP = 0.05;
 export const DEFAULT_TEXT_SCALE = 1;
 
 /** The app's scale times the phone's never goes past this. */
 export const TOTAL_SCALE_CAP = 1.6;
 
-/** A stored scale, read back as one of the steps (anything else is Default). */
-export function parseTextScale(v: string | null | undefined): number {
-  const n = v == null ? NaN : Number(v);
-  const step = TEXT_STEPS.find((s) => Math.abs(s.scale - n) < 1e-6);
-  return step ? step.scale : DEFAULT_TEXT_SCALE;
+/** Any number clamped to the slider's range and snapped to its 0.05 steps. */
+export function snapTextScale(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_TEXT_SCALE;
+  const c = Math.min(MAX_TEXT_SCALE, Math.max(MIN_TEXT_SCALE, n));
+  return Math.round(Math.round(c / TEXT_SCALE_STEP) * TEXT_SCALE_STEP * 100) / 100;
 }
 
-export const textStepOf = (scale: number): TextStep =>
-  TEXT_STEPS.find((s) => Math.abs(s.scale - scale) < 1e-6) ?? TEXT_STEPS[1];
+/**
+ * A stored scale read back: a number (the old levels 0.9, 1, 1.15, 1.3 are
+ * numbers too, and load as they were), clamped and snapped; junk is Default.
+ */
+export function parseTextScale(v: string | null | undefined): number {
+  if (v == null || v.trim() === "") return DEFAULT_TEXT_SCALE;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? snapTextScale(n) : DEFAULT_TEXT_SCALE;
+}
+
+/** "115%" for a scale. */
+export const textScalePercent = (scale: number): string => `${Math.round(scale * 100)}%`;
+
+export const textStepOf = (scale: number): TextStep => ({
+  id: String(scale),
+  label: textScalePercent(scale),
+  scale,
+});
 
 /** A font size (or line height) at the app's scale, to the half point. */
 export function scaleSize(size: number, scale: number): number {

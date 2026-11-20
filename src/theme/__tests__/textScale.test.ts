@@ -1,6 +1,6 @@
 import { describe, expect, it } from "../../__tests__/jestLike.ts";
 import {
-  DEFAULT_TEXT_SCALE, TEXT_STEPS, TOTAL_SCALE_CAP, effectiveScale, maxOsMultiplier,
+  DEFAULT_TEXT_SCALE, MAX_TEXT_SCALE, MIN_TEXT_SCALE, snapTextScale, textScalePercent, TOTAL_SCALE_CAP, effectiveScale, maxOsMultiplier,
   parseTextScale, parseThemePref, scaleSize, textStepOf,
 } from "../textScale.ts";
 
@@ -13,20 +13,24 @@ describe("reading the stored preferences back", () => {
     expect(parseThemePref("Dark")).toBe("system");
   });
 
-  it("text scale: only a known step, else Default", () => {
+  it("text scale: old levels load as they were, others clamp and snap", () => {
     expect(parseTextScale("1.15")).toBe(1.15);
     expect(parseTextScale("0.9")).toBe(0.9);
     expect(parseTextScale("1.3")).toBe(1.3);
+    expect(parseTextScale("1.12")).toBe(1.1);
+    expect(parseTextScale("2")).toBe(MAX_TEXT_SCALE);
+    expect(parseTextScale("0.5")).toBe(MIN_TEXT_SCALE);
     expect(parseTextScale(null)).toBe(DEFAULT_TEXT_SCALE);
     expect(parseTextScale("")).toBe(DEFAULT_TEXT_SCALE);
-    expect(parseTextScale("2")).toBe(DEFAULT_TEXT_SCALE);
     expect(parseTextScale("big")).toBe(DEFAULT_TEXT_SCALE);
+    expect(parseTextScale("-1")).toBe(DEFAULT_TEXT_SCALE);
   });
 
-  it("names the step for a scale", () => {
-    expect(TEXT_STEPS.map((s) => s.scale)).toEqual([0.9, 1, 1.15, 1.3]);
-    expect(textStepOf(1.3).label).toBe("Extra large");
-    expect(textStepOf(7).label).toBe("Default");
+  it("snaps to 0.05 within the range and labels as a percent", () => {
+    expect(snapTextScale(1.07)).toBe(1.05);
+    expect(snapTextScale(NaN)).toBe(1);
+    expect(textScalePercent(1.15)).toBe("115%");
+    expect(textStepOf(1.3).label).toBe("130%");
   });
 });
 
@@ -39,7 +43,8 @@ describe("scale maths", () => {
   });
 
   it("the phone's font scale on top never takes the total past the cap", () => {
-    for (const { scale } of TEXT_STEPS) {
+    for (let i = 0; i <= 11; i++) {
+      const scale = snapTextScale(MIN_TEXT_SCALE + i * 0.05);
       for (const os of [0.85, 1, 1.3, 1.5, 2, 3]) {
         expect(effectiveScale(scale, os)).toBeLessThanOrEqual(TOTAL_SCALE_CAP + 0.01);
       }
