@@ -62,7 +62,10 @@ type EventSpecificInput =
       serviceType?: "A.I." | "Natural";
       semenItem?: string;
       semenWarehouse?: string;
+      /** Typed bull: the fallback when the Livestock Sire list is empty. */
       sire?: string;
+      /** A Livestock Sire record (its name): the picker's answer. */
+      sireLink?: string;
     }
   | {
       eventType: "Pregnancy Diagnosis";
@@ -297,6 +300,7 @@ export const createAnimalEvent = async (
         service_type: input.serviceType,
         service_date: common.event_date,
         sire: input.sire,
+        sire_link: input.sireLink || undefined,
         // What the straw used is a stock line, sent only when the screen showed
         // one (the Service event type posts stock). The server issues it as the
         // named Stock Entry "Livestock Service", one per event, from this store

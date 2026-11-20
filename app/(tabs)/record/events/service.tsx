@@ -14,6 +14,7 @@ import { Picker } from "@/components/Picker";
 import { Screen } from "@/components/Screen";
 import { AvailableStockButton } from "@/components/AvailableStockButton";
 import { StockItemFields } from "@/components/StockItemFields";
+import { SirePickerButton } from "@/components/SirePickerButton";
 import { VetPicker } from "@/components/VetPicker";
 import { outOfStock, savedTitle, stockOutcomeText } from "@/src/frappe/eventItems";
 import { useEventItems } from "@/src/hooks/useEventItems";
@@ -22,6 +23,7 @@ import { useBackdate } from "@/src/hooks/useBackdate";
 import { useBackdatingWindow } from "@/src/hooks/useBackdatingWindow";
 import { useOperator } from "@/src/hooks/useOperator";
 import { usePullToRefresh, useRefreshOnFocus } from "@/src/hooks/useServerLists";
+import { sireFields } from "@/src/frappe/sireList";
 import { useVetChoice } from "@/src/hooks/useVets";
 import { titleFor, useFinishRecording, usePresetAnimal, useSeedAnimal } from "@/src/hooks/useRecordContext";
 import { extractFrappeError } from "@/src/services/api";
@@ -41,6 +43,8 @@ export default function Service() {
   const [straw, setStraw] = useState<string>("");
   const [strawUom, setStrawUom] = useState<string>("");
   const [semenWarehouse, setSemenWarehouse] = useState<string>("");
+  // The picked Livestock Sire, and the typed fallback for "Sire not listed".
+  const [sireLink, setSireLink] = useState("");
   const [sire, setSire] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,18 +60,19 @@ export default function Service() {
   // Left by a tab switch with input in it: kept for "Continue recording".
   useRecordDraft({
     title: "Service",
-    state: { selected, type, straw, strawUom, semenWarehouse, sire, remarks, vet, day: isBackdating ? backdateDate : "" },
+    state: { selected, type, straw, strawUom, semenWarehouse, sireLink, sire, remarks, vet, day: isBackdating ? backdateDate : "" },
     filled:
       selected.some((a) => a.id !== preset?.id) ||
       type !== "A.I." ||
-      !!(straw || sire.trim() || remarks.trim()),
+      !!(straw || sireLink || sire.trim() || remarks.trim()),
     restore: (d) => {
       setSelected(d.selected);
       setType(d.type);
       setStraw(d.straw);
       setStrawUom(d.strawUom);
       setSemenWarehouse(d.semenWarehouse);
-      setSire(d.sire);
+      setSireLink(d.sireLink ?? "");
+      setSire(d.sire ?? "");
       setRemarks(d.remarks);
       setVet(d.vet);
       if (isBackdating && d.day) setBackdateDate(d.day);
@@ -100,7 +105,7 @@ export default function Service() {
           eventDate: isBackdating ? backdateDate : serverToday,
           serviceType: type,
           vet: vet || undefined,
-          sire: sire.trim() || undefined,
+          ...sireFields(sireLink, sire),
           semenItem: willIssueSemen ? straw : undefined,
           semenWarehouse: willIssueSemen && semenWarehouse ? semenWarehouse : undefined,
           remarks: remarks || undefined,
@@ -182,8 +187,22 @@ export default function Service() {
           />
         </>
       ) : null}
-      <Field label="Bull / sire" help={type === "A.I." && consumes ? "Optional. With a straw picked, the server takes the sire from the straw." : "Optional."}>
-        <Input value={sire} onChangeText={setSire} placeholder="Bull name or number" />
+      <Field label="Bull / sire" help={type === "A.I." && consumes ? "Optional. A semen sire fills his straw; with a straw picked, the server takes the sire from the straw." : "Optional."}>
+        <SirePickerButton
+          linked={sireLink}
+          typed={sire}
+          onType={setSire}
+          onPick={(b) => {
+            setSireLink(b?.name ?? "");
+            // A semen sire brings his straw when the form has one to fill.
+            const ch = b?.semenItem ? semenChoices?.find((x) => x.value === b.semenItem) : undefined;
+            if (ch && consumes && type === "A.I.") {
+              setStraw(ch.value);
+              setStrawUom(ch.uom ?? "");
+              setSemenWarehouse(ch.warehouse ?? "");
+            }
+          }}
+        />
       </Field>
       <VetPicker vets={vets} value={vet} onChange={setVet} label="Vet / AI technician" />
       <Field label="Remarks">
