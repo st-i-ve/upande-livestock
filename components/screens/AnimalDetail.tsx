@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { font } from "@/constants/theme";
 import { Banner } from "@/components/Banner";
@@ -12,33 +13,48 @@ import { Screen } from "@/components/Screen";
 import { SectionTitle } from "@/components/SectionTitle";
 import { StandingSection } from "@/components/StandingSection";
 import { Timeline } from "@/components/Timeline";
+import { FamilyTree, SireRecord } from "@/components/FamilyTree";
+import { sectionsFor } from "@/src/family";
 import { AnimalImage } from "@/components/AnimalImage";
 import { AnimalPhotos, Viewer } from "@/components/AnimalPhotos";
 import { STAGE_LABELS, ageFrom } from "@/services/utils";
 import { kindOf } from "@/src/animalKind";
+import { heroInfo } from "@/src/heroInfo";
 import { extractFrappeError } from "@/src/services/api";
-import { useAnimal, useAnimalProfile } from "@/src/hooks/useAnimal";
+import type { AnimalProfile } from "@/src/frappe/animal";
+import { useAnimal, useAnimalFamily, useAnimalProfile } from "@/src/hooks/useAnimal";
 import { useLocalAnimal } from "@/src/hooks/useLocalAnimal";
 import { useAnimalGallery } from "@/src/hooks/useAnimalGallery";
 import { useCanRecord } from "@/src/hooks/useCanRecord";
 import { useColors } from "@/src/hooks/useColors";
 import { useAnimalEvents } from "@/src/hooks/useAnimalEvents";
+import { useDisabledEvents } from "@/src/hooks/useDisabledEvents";
+import { visibleActions } from "@/src/events/disabled";
 import type { TimelineEvent } from "@/components/Timeline";
 
 export function AnimalDetail({ id }: { id: string }) {
   const { canRecord } = useCanRecord();
+  // Quick actions for events the farm switched off are not offered.
+  const disabledEvents = useDisabledEvents();
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   // The local copy answers first (and offline); the server adds what only it
-  // knows: her stage, days in milk and any treatment.
+  // knows: the stage, the breeding note and any treatment.
   const local = useLocalAnimal(id);
   const online = useAnimal(id);
   const profileQ = useAnimalProfile(id);
   const profile = profileQ.data ?? null;
+  const familyQ = useAnimalFamily(id);
+  const family = familyQ.data ?? null;
   const gallery = useAnimalGallery(id).data?.photos ?? [];
   const [viewing, setViewing] = useState<number | null>(null);
   const a = local.data
-    ? { ...local.data, inTreatment: online.data?.inTreatment ?? 0, milkSafe: online.data?.milkSafe ?? null }
+    ? {
+        ...local.data,
+        inTreatment: online.data?.inTreatment ?? 0,
+        milkSafe: online.data?.milkSafe ?? null,
+        stream: online.data?.stream ?? local.data.stream ?? null,
+      }
     : (online.data ?? null);
   // The stored stage answers offline; the live profile, when there is one, wins.
   const stage = profile?.stage ?? local.data?.stage ?? null;
@@ -48,6 +64,7 @@ export function AnimalDetail({ id }: { id: string }) {
   const refetch = () => {
     online.refetch();
     profileQ.refetch();
+    familyQ.refetch();
   };
   const {
     data: events,
@@ -103,11 +120,21 @@ export function AnimalDetail({ id }: { id: string }) {
   }
 
   const kind = kindOf({ ...a, stage });
+  const male = a.sex === "M";
+  // By sex: a male never shows her figures; a breeding male shows his record as a sire.
+  const sections = sectionsFor({
+    sex: a.sex,
+    stage,
+    stream: a.stream ?? null,
+    breedingBull: family?.breedingBull ?? null,
+  });
+  const heroLabel = stage ? (STAGE_LABELS[stage] ?? stage) : "";
+  const info = heroInfo({ sex: a.sex, breed: a.breed || profile?.breed, stream: a.stream });
   const isFemaleAdult = kind === "cow" || kind === "heifer";
   // In calf and milking: she has calved (so she is a cow, not an in-calf heifer).
   const lactating = (a.parity ?? 0) > 0 || profile?.cycle.daysInMilk != null;
   type Action = { label: string; route: string; icon: keyof typeof MaterialCommunityIcons.glyphMap };
-  const actions: Action[] = [
+  const actions: Action[] = visibleActions<Action>([
     { label: "Check up", route: "diagnosis", icon: "magnify" },
     ...(isFemaleAdult ? [{ label: "Service", route: "service", icon: "heart" } as Action] : []),
     { label: "Treat", route: "treatment", icon: "medical-bag" },
@@ -119,7 +146,7 @@ export function AnimalDetail({ id }: { id: string }) {
     { label: "Deworm", route: "deworming", icon: "bug-outline" },
     { label: "Weigh", route: "weight", icon: "scale" },
     { label: "Move", route: "movement", icon: "arrow-left-right" },
-  ];
+  ], disabledEvents);
 
   return (
     <Screen
@@ -147,13 +174,47 @@ export function AnimalDetail({ id }: { id: string }) {
         style={s.hero}
       >
         <AnimalImage image={a.image ?? profile?.photo} animal={{ ...a, stage }} style={s.heroPhoto} />
+        {/* Soft dark scrims top and bottom, so white labels read on any photo
+            and on the silhouette card in either theme. */}
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <Defs>
+            <LinearGradient id="heroTop" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#000" stopOpacity={0.5} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0} />
+            </LinearGradient>
+            <LinearGradient id="heroBottom" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#000" stopOpacity={0} />
+              <Stop offset="0.45" stopColor="#000" stopOpacity={0.35} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0.72} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100" height="26" fill="url(#heroTop)" />
+          <Rect x="0" y="48" width="100" height="52" fill="url(#heroBottom)" />
+        </Svg>
+        <View style={s.heroTop} pointerEvents="none" testID="hero-labels">
+          {info.sex ? (
+            <View style={s.heroChip} testID="hero-sex">
+              <MaterialCommunityIcons name={info.sex.icon} size={14} color="#fff" />
+              <Text style={s.heroChipText}>{info.sex.label}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          <View style={s.heroChips}>
+            {info.chips.map((chip) => (
+              <View key={chip.key} style={s.heroChip} testID={`hero-${chip.key}`}>
+                <Text style={s.heroChipText} numberOfLines={1}>{chip.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
         <View style={s.heroShade}>
           <Text style={s.heroName} numberOfLines={1}>{a.name}</Text>
           <Text style={s.heroId} numberOfLines={1}>{a.id}</Text>
           <View style={s.heroRow}>
             {stage ? (
               <View style={s.heroBadge}>
-                <Text style={s.heroBadgeText}>{STAGE_LABELS[stage] ?? stage}</Text>
+                <Text style={s.heroBadgeText}>{heroLabel}</Text>
               </View>
             ) : null}
             <Text style={s.heroMeta} numberOfLines={1}>
@@ -166,12 +227,14 @@ export function AnimalDetail({ id }: { id: string }) {
         <Viewer photos={gallery} start={viewing} onClose={() => setViewing(null)} />
       ) : null}
 
+      {sections.bull && family?.bred ? <SireRecord bred={family.bred} offspring={family.offspring.length} /> : null}
+
       <View style={s.facts}>
         <Fact label="Sex" value={a.sex === "M" ? "Male" : "Female"} />
         <Fact label="Breed" value={a.breed || profile?.breed || "—"} />
         <Fact label="Dam" value={a.dam || "—"} />
         <Fact label="Sire" value={a.sire || "—"} />
-        <Fact label="Parity" value={String(a.parity ?? 0)} />
+        {sections.female ? <Fact label="Parity" value={String(a.parity ?? 0)} /> : null}
         <Fact label="Weight" value={a.lastWt ? `${a.lastWt} kg` : "—"} />
         {profile?.cycle.daysInMilk != null ? (
           <Fact label="Days in milk" value={`${profile.cycle.daysInMilk}`} />
@@ -199,7 +262,13 @@ export function AnimalDetail({ id }: { id: string }) {
 
       <AnimalPhotos id={id} isCalf={kind === "calf"} hasCalved={isFemaleAdult && (a.parity ?? 0) > 0} />
 
-      <StandingSection id={id} />
+      <FamilyTree
+        family={family}
+        loading={familyQ.isLoading}
+        me={{ id: a.id, name: a.name, sex: a.sex, dob: a.dob, stage, image: a.image ?? profile?.photo, thumb: a.thumb ?? profile?.thumb }}
+      />
+
+      <StandingSection id={id} male={male} />
 
       <SectionTitle>History</SectionTitle>
       {eventsLoading ? (
@@ -238,8 +307,18 @@ const makeStyles = (c: ReturnType<typeof useColors>) =>
     heroPhoto: { width: "100%", height: "100%" },
     heroShade: {
       position: "absolute", left: 0, right: 0, bottom: 0, padding: 14, paddingTop: 36,
-      backgroundColor: "rgba(0,0,0,0.45)",
     },
+    heroTop: {
+      position: "absolute", left: 0, right: 0, top: 0, padding: 12,
+      flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8,
+    },
+    heroChips: { flexShrink: 1, flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 6 },
+    heroChip: {
+      flexDirection: "row", alignItems: "center", gap: 4, maxWidth: 180,
+      paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999,
+      backgroundColor: "rgba(0,0,0,0.42)", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(255,255,255,0.35)",
+    },
+    heroChipText: { fontSize: 12, ...font("600"), color: "#fff" },
     heroName: { fontSize: 24, ...font("700"), color: "#fff" },
     heroId: { fontSize: 12, color: "rgba(255,255,255,0.8)", ...font("400") },
     heroRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },

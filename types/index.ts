@@ -9,6 +9,8 @@ export type Animal = {
   parity: number;
   lastWt: number;
   milkSafe: string | null;
+  /** ISO date of the latest weighing, when the local store knows it. */
+  lastWtDate?: string | null;
   inTreatment: 0 | 1;
   pregnant: 0 | 1;
   /** Set when the animal comes from the local store (animals_since). */
@@ -21,6 +23,8 @@ export type Animal = {
   dam?: string | null;
   sire?: string | null;
   status?: string | null;
+  /** Males: "Feedlot" or "Breeding" (Animal.stream), from the local store. */
+  stream?: string | null;
   /** The animal's stage from the local store; see STAGE_LABELS. */
   stage?: string | null;
 };

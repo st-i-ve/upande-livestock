@@ -47,6 +47,9 @@ export const STAGE_LABELS: Record<string, string> = {
   served: "Served",
   confirmed: "In calf",
   dry: "Dry",
+  calf: "Calf",
+  bull: "Breeding bull",
+  unknown: "Unknown",
   retired: "Left the herd",
 };
 

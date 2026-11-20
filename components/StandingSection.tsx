@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { font } from "@/constants/theme";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -8,6 +8,10 @@ import { SectionTitle } from "@/components/SectionTitle";
 import type { Peers, StandingMetric } from "@/src/frappe/standing";
 import { useAnimalStanding } from "@/src/hooks/useAnimal";
 import { useColors } from "@/src/hooks/useColors";
+import { measuresFor } from "@/src/family";
+import { StandingRadar, StandingViewToggle } from "@/components/StandingRadar";
+import { viewFor } from "@/src/standingRadar";
+import { useStandingView } from "@/src/stores/standingView";
 
 const fmt = (n: number | null, unit: string) =>
   n == null ? "—" : `${Number.isInteger(n) ? n : n.toFixed(1)}${unit ? ` ${unit}` : ""}`;
@@ -30,15 +34,28 @@ const verdict = (m: StandingMetric, p: Peers) =>
  * a better end, full is the good end), the tick is the middle. Online; the last
  * answer is kept and shown with its date when there is no signal.
  */
-export function StandingSection({ id }: { id: string }) {
+/** A male gets only the measures that mean something for him (no parity, no calving figures). */
+export function StandingSection({ id, male = false }: { id: string; male?: boolean }) {
   const c = useColors();
   const s = useMemo(() => makeStyles(c), [c]);
   const q = useAnimalStanding(id);
   const d = q.data;
+  const chosen = useStandingView((v) => v.chosen);
+  const choose = useStandingView((v) => v.set);
+  const hydrate = useStandingView((v) => v.hydrate);
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+  const metrics = useMemo(() => (d ? measuresFor(d.metrics, male) : []), [d, male]);
+  // Radar by default with three or more measures, bars with fewer; the user's choice wins.
+  const view = viewFor(metrics, chosen);
 
   return (
     <>
-      <SectionTitle>Performance vs other animals</SectionTitle>
+      <View style={s.head}>
+        <SectionTitle style={s.headTitle}>Performance vs other animals</SectionTitle>
+        {metrics.length ? <StandingViewToggle value={view} onChange={choose} /> : null}
+      </View>
       {q.isLoading ? (
         <Loader />
       ) : !d ? (
@@ -55,10 +72,12 @@ export function StandingSection({ id }: { id: string }) {
           <Text style={s.scope}>
             vs {d.herd.name} ({d.herd.n}) and {d.group.label} ({d.group.n})
           </Text>
-          {d.metrics.map((m) => (
-            <MetricBar key={m.key} m={m} />
-          ))}
-          {!d.per_animal_milk ? (
+          {view === "chart" ? (
+            <StandingRadar metrics={metrics} groupLabel={d.group.n > 1 ? d.group.label : d.herd.name} />
+          ) : (
+            metrics.map((m) => <MetricBar key={m.key} m={m} />)
+          )}
+          {!d.per_animal_milk && !male ? (
             <Text style={s.note}>Milk per animal is not recorded, so yield is not compared.</Text>
           ) : null}
         </View>
@@ -100,6 +119,8 @@ function MetricBar({ m }: { m: StandingMetric }) {
 
 const makeStyles = (c: ReturnType<typeof useColors>) =>
   StyleSheet.create({
+    head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14, marginBottom: 8 },
+    headTitle: { marginTop: 0, marginBottom: 0, flexShrink: 1 },
     card: { borderWidth: 1, borderColor: c.borderSubtle, borderRadius: 12, padding: 12, gap: 12 },
     scope: { fontSize: 12, color: c.textMuted },
     item: { gap: 4 },
